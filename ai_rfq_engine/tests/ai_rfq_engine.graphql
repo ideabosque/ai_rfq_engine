@@ -1,0 +1,283 @@
+fragment RequestInfo on RequestType {
+    userId
+    requestId
+    title
+    description
+    items
+    services
+    status
+    expiredAt
+    updatedBy
+    createdAt
+    updatedAt
+}
+
+fragment RequestListInfo on RequestListType {
+    requestList{
+        ...RequestInfo
+    }
+    pageSize
+    pageNumber
+    total
+}
+
+fragment QuoteInfo on QuoteType {
+    requestId
+    quoteId
+    providerId
+    customerId
+    installments
+    billingAddress
+    shippingAddress
+    shippingMethod
+    shippingAmount
+    totalAmount
+    status
+    updatedBy
+    createdAt
+    updatedAt
+}
+
+fragment QuoteListInfo on QuoteListType {
+    quoteList{
+        ...QuoteInfo
+    }
+    pageSize
+    pageNumber
+    total
+}
+
+fragment QuoteServiceInfo on QuoteServiceType {
+    quoteId
+    serviceId
+    serviceType
+    serviceName
+    requestData
+    data
+    uom
+    pricePerUom
+    qty
+    subtotal
+    updatedBy
+    createdAt
+    updatedAt
+}
+
+fragment QuoteServiceListInfo on QuoteServiceListType {
+    quoteServiceList{
+        ...QuoteServiceInfo
+    }
+    pageSize
+    pageNumber
+    total
+}
+
+query ping {
+    ping
+}
+
+query getRequest(
+    $userId: String!,
+    $requestId: String!
+) {
+    request(
+        userId: $userId,
+        requestId: $requestId
+    ) {
+        ...RequestInfo
+    }
+}
+
+query getRequestList(
+    $pageNumber: Int, 
+    $limit: Int,
+    $userId: String
+) {
+    requestList(
+        pageNumber: $pageNumber,
+        limit: $limit,
+        userId: $userId
+    ) {
+        ...RequestListInfo
+    }
+}
+
+mutation insertUpdateRequest(
+    $userId: String!,
+    $requestId: String,
+    $title: String,
+    $description: String,
+    $items: [JSON],
+    $services: [JSON],
+    $status: String,
+    $daysUntilExpiration: Int,
+    $updatedBy: String!
+) {
+    insertUpdateRequest(
+        userId: $userId,
+        requestId: $requestId,
+        title: $title,
+        description: $description,
+        items: $items,
+        services: $services,
+        status: $status,
+        daysUntilExpiration: $daysUntilExpiration,
+        updatedBy: $updatedBy
+    ) {
+        request{
+            ...RequestInfo
+        }
+    }
+}
+
+mutation deleteRequest(
+    $userId: String!,
+    $requestId: String!
+) {
+    deleteRequest(
+        userId: $userId,
+        requestId: $requestId
+    ) {
+        ok
+    }
+}
+
+query getQuote(
+    $requestId: String!,
+    $quoteId: String!
+) {
+    quote(
+        requestId: $requestId,
+        quoteId: $quoteId
+    ) {
+        ...QuoteInfo
+    }
+}
+
+query getQuoteList(
+    $pageNumber: Int, 
+    $limit: Int,
+    $requestId: String
+) {
+    quoteList(
+        pageNumber: $pageNumber,
+        limit: $limit,
+        requestId: $requestId
+    ) {
+        ...QuoteListInfo
+    }
+}
+
+mutation insertUpdateQuote(
+    $requestId: String!,
+    $quoteId: String,
+    $providerId: String,
+    $customerId: String,
+    $installments: [JSON],
+    $billingAddress: JSON,
+    $shippingAddress: JSON,
+    $shippingMethod: String,
+    $shippingAmount: Float,
+    $totalAmount: Float,
+    $status: String,
+    $updatedBy: String!
+) {
+    insertUpdateQuote(
+        requestId: $requestId,
+        quoteId: $quoteId,
+        providerId: $providerId,
+        customerId: $customerId,
+        installments: $installments,
+        billingAddress: $billingAddress,
+        shippingAddress: $shippingAddress,
+        shippingMethod: $shippingMethod,
+        shippingAmount: $shippingAmount,
+        totalAmount: $totalAmount,
+        status: $status,
+        updatedBy: $updatedBy
+    ) {
+        quote{
+            ...QuoteInfo
+        }
+    }
+}
+
+mutation deleteQuote(
+    $requestId: String!,
+    $quoteId: String!
+) {
+    deleteQuote(
+        requestId: $requestId,
+        quoteId: $quoteId
+    ) {
+        ok
+    }
+}
+
+query getQuoteService(
+    $quoteId: String!,
+    $serviceId: String!
+) {
+    quoteService(
+        quoteId: $quoteId,
+        serviceId: $serviceId
+    ) {
+        ...QuoteServiceInfo
+    }
+}
+
+query getQuoteServiceList(
+    $pageNumber: Int, 
+    $limit: Int,
+    $quoteId: String
+) {
+    quoteServiceList(
+        pageNumber: $pageNumber,
+        limit: $limit,
+        quoteId: $quoteId
+    ) {
+        ...QuoteServiceListInfo
+    }
+}
+
+mutation insertUpdateQuoteService(
+    $quoteId: String!,
+    $serviceId: String!,
+    $serviceType: String!,
+    $serviceName: String!,
+    $requestData: JSON,
+    $data: JSON,
+    $uom: String!,
+    $pricePerUom: Float!,
+    $qty: Float!,
+    $updatedBy: String!
+) {
+    insertUpdateQuoteService(
+        quoteId: $quoteId,
+        serviceId: $serviceId,
+        serviceType: $serviceType,
+        serviceName: $serviceName,
+        requestData: $requestData,
+        data: $data,
+        uom: $uom,
+        pricePerUom: $pricePerUom,
+        qty: $qty,
+        updatedBy: $updatedBy
+    ) {
+        quoteService{
+            ...QuoteServiceInfo
+        }
+    }
+}
+
+mutation deleteQuoteService(
+    $quoteId: String!,
+    $serviceId: String!
+) {
+    deleteQuoteService(
+        quoteId: $quoteId,
+        serviceId: $serviceId
+    ) {
+        ok
+    }
+}
