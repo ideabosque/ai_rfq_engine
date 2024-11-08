@@ -1,3 +1,41 @@
+fragment ServiceInfo on ServiceType {
+    serviceType
+    serviceId
+    serviceName
+    serviceDescription
+    updatedBy
+    createdAt
+    updatedAt
+}
+
+fragment ServiceListInfo on ServiceListType {
+    serviceList{
+        ...ServiceInfo
+    }
+    pageSize
+    pageNumber
+    total
+}
+
+fragment ServiceProviderInfo on ServiceProviderType {
+    serviceId
+    providerId
+    serviceType
+    serviceSpec
+    updatedBy
+    createdAt
+    updatedAt
+}
+
+fragment ServiceProviderListInfo on ServiceProviderListType {
+    serviceProviderList{
+        ...ServiceProviderInfo
+    }
+    pageSize
+    pageNumber
+    total
+}
+
 fragment RequestInfo on RequestType {
     userId
     requestId
@@ -74,6 +112,128 @@ fragment QuoteServiceListInfo on QuoteServiceListType {
 
 query ping {
     ping
+}
+
+query getService(
+    $serviceType: String!,
+    $serviceId: String!
+) {
+    service(
+        serviceType: $serviceType,
+        serviceId: $serviceId
+    ) {
+        ...ServiceInfo
+    }
+}
+
+query getServiceList(
+    $pageNumber: Int, 
+    $limit: Int,
+    $serviceType: String,
+    $serviceName: String,
+    $serviceDescription: String
+) {
+    serviceList(
+        pageNumber: $pageNumber,
+        limit: $limit,
+        serviceType: $serviceType,
+        serviceName: $serviceName,
+        serviceDescription: $serviceDescription
+    ) {
+        ...ServiceListInfo
+    }
+}
+
+mutation insertUpdateService(
+    $serviceType: String!
+    $serviceId: String,
+    $serviceName: String,
+    $serviceDescription: String,
+    $updatedBy: String!
+) {
+    insertUpdateService(
+        serviceType: $serviceType,
+        serviceId: $serviceId,
+        serviceName: $serviceName,
+        serviceDescription: $serviceDescription,
+        updatedBy: $updatedBy
+    ) {
+        service{
+            ...ServiceInfo
+        }
+    }
+}
+
+mutation deleteService(
+    $serviceType: String!,
+    $serviceId: String!
+) {
+    deleteService(
+        serviceType: $serviceType,
+        serviceId: $serviceId
+    ) {
+        ok
+    }
+}
+
+query getServiceProvider(
+    $serviceId: String!,
+    $providerId: String!
+) {
+    serviceProvider(
+        serviceId: $serviceId,
+        providerId: $providerId
+    ) {
+        ...ServiceProviderInfo
+    }
+}
+
+query getServiceProviderList(
+    $pageNumber: Int, 
+    $limit: Int,
+    $serviceId: String,
+    $serviceTypes: [String]
+) {
+    serviceProviderList(
+        pageNumber: $pageNumber,
+        limit: $limit,
+        serviceId: $serviceId,
+        serviceTypes: $serviceTypes
+    ) {
+        ...ServiceProviderListInfo
+    }
+}
+
+mutation insertUpdateServiceProvider(
+    $serviceId: String!,
+    $providerId: String!,
+    $serviceType: String,
+    $serviceSpec: JSON,
+    $updatedBy: String!
+) {
+    insertUpdateServiceProvider(
+        serviceId: $serviceId,
+        providerId: $providerId,
+        serviceType: $serviceType,
+        serviceSpec: $serviceSpec,
+        updatedBy: $updatedBy
+    ) {
+        serviceProvider{
+            ...ServiceProviderInfo
+        }
+    }
+}
+
+mutation deleteServiceProvider(
+    $serviceId: String!,
+    $providerId: String!
+) {
+    deleteServiceProvider(
+        serviceId: $serviceId,
+        providerId: $providerId
+    ) {
+        ok
+    }
 }
 
 query getRequest(

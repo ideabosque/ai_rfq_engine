@@ -56,7 +56,132 @@ class AIRFQEngineTest(unittest.TestCase):
             "variables": {},
             "operation_name": "ping",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_insert_update_service(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "serviceType": "XXXXXXXXXXXXXXXXXXXX",
+                # "serviceId": "592901047928754671",
+                "serviceName": "XXXXXXXXXXXXXXXXXXXX",
+                "serviceDescription": "XXXXXXXXXXXXXXXXXXXX",
+                "updatedBy": "XYZ",
+            },
+            "operation_name": "insertUpdateService",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_delete_service(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "serviceType": "XXXXXXXXXXXXXXXXXXXX",
+                "serviceId": "13662447239293833711",
+            },
+            "operation_name": "deleteService",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_service(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "serviceType": "XXXXXXXXXXXXXXXXXXXX",
+                "serviceId": "592901047928754671",
+            },
+            "operation_name": "getService",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_service_list(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "serviceType": "XXXXXXXXXXXXXXXXXXXX",
+                "pageNumber": 1,
+                "limit": 10,
+            },
+            "operation_name": "getServiceList",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_delete_service(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "serviceType": "XXXXXXXXXXXXXXXXXXXX",
+                "serviceId": "XXXXXXXXXXXXXXXXXX",
+            },
+            "operation_name": "deleteService",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_insert_update_service_provider(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "serviceId": "592901047928754671",
+                "providerId": "XXXXXXXXXXXXXXXXXXXX",
+                "serviceType": "XXXXXXXXXXXXXXXXXXXX",
+                "serviceSpec": {},
+                "updatedBy": "XYZ",
+            },
+            "operation_name": "insertUpdateServiceProvider",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_delete_service_provider(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "serviceId": "592901047928754671",
+                "providerId": "XXXXXXXXXXXXXXXXXXXX",
+            },
+            "operation_name": "deleteServiceProvider",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_service_provider(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "serviceId": "592901047928754671",
+                "providerId": "XXXXXXXXXXXXXXXXXXXX",
+            },
+            "operation_name": "getServiceProvider",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    # @unittest.skip("demonstrating skipping")
+    def test_graphql_service_provider_list(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "serviceId": "592901047928754671",
+                "pageNumber": 1,
+                "limit": 10,
+            },
+            "operation_name": "getServiceProviderList",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -73,7 +198,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "insertUpdateUser",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -86,7 +211,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "deleteUser",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -99,7 +224,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "getUser",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -113,7 +238,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "getUserList",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -133,7 +258,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "insertUpdateRequest",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -146,7 +271,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "deleteRequest",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -159,7 +284,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "getRequest",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -173,7 +298,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "getRequestList",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -196,7 +321,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "insertUpdateQuote",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -209,7 +334,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "deleteQuote",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -222,7 +347,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "getQuote",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -236,7 +361,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "getQuoteList",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -257,7 +382,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "insertUpdateQuoteService",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -270,7 +395,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "deleteQuoteService",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
     @unittest.skip("demonstrating skipping")
@@ -283,10 +408,10 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "getQuoteService",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    # @unittest.skip("demonstrating skipping")
+    @unittest.skip("demonstrating skipping")
     def test_graphql_quote_service_list(self):
         payload = {
             "query": document,
@@ -297,7 +422,7 @@ class AIRFQEngineTest(unittest.TestCase):
             },
             "operation_name": "getQuoteServiceList",
         }
-        response = self.ai_rfq_engine.rfq_graphql(**payload)
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
 

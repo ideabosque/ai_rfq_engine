@@ -26,6 +26,8 @@ from .mutations import (
     DeleteQuoteItemProduct,
     DeleteQuoteService,
     DeleteRequest,
+    DeleteService,
+    DeleteServiceProvider,
     InsertUpdateComment,
     InsertUpdateFile,
     InsertUpdateInstallment,
@@ -33,6 +35,8 @@ from .mutations import (
     InsertUpdateQuoteItemProduct,
     InsertUpdateQuoteService,
     InsertUpdateRequest,
+    InsertUpdateService,
+    InsertUpdateServiceProvider,
 )
 from .queries import (
     resolve_comment,
@@ -49,6 +53,10 @@ from .queries import (
     resolve_quote_service_list,
     resolve_request,
     resolve_request_list,
+    resolve_service,
+    resolve_service_list,
+    resolve_service_provider,
+    resolve_service_provider_list,
 )
 from .types import (
     CommentListType,
@@ -65,6 +73,10 @@ from .types import (
     QuoteType,
     RequestListType,
     RequestType,
+    ServiceListType,
+    ServiceProviderListType,
+    ServiceProviderType,
+    ServiceType,
 )
 
 
@@ -84,11 +96,44 @@ def type_class():
         QuoteType,
         RequestListType,
         RequestType,
+        ServiceListType,
+        ServiceProviderListType,
+        ServiceProviderType,
+        ServiceType,
     ]
 
 
 class Query(ObjectType):
     ping = String()
+
+    service = Field(
+        ServiceType,
+        service_type=String(required=True),
+        service_id=String(required=True),
+    )
+
+    service_list = Field(
+        ServiceListType,
+        page_number=Int(),
+        limit=Int(),
+        service_type=String(),
+        service_name=String(),
+        service_description=String(),
+    )
+
+    service_provider = Field(
+        ServiceProviderType,
+        service_id=String(required=True),
+        provider_id=String(required=True),
+    )
+
+    service_provider_list = Field(
+        ServiceProviderListType,
+        page_number=Int(),
+        limit=Int(),
+        service_id=String(),
+        service_types=List(String),
+    )
 
     request = Field(
         RequestType,
@@ -215,6 +260,26 @@ class Query(ObjectType):
     def resolve_ping(self, info: ResolveInfo) -> str:
         return f"Hello at {time.strftime('%X')}!!"
 
+    def resolve_service(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ServiceType:
+        return resolve_service(info, **kwargs)
+
+    def resolve_service_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ServiceListType:
+        return resolve_service_list(info, **kwargs)
+
+    def resolve_service_provider(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ServiceProviderType:
+        return resolve_service_provider(info, **kwargs)
+
+    def resolve_service_provider_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ServiceProviderListType:
+        return resolve_service_provider_list(info, **kwargs)
+
     def resolve_request(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
     ) -> RequestType:
@@ -283,6 +348,10 @@ class Query(ObjectType):
 
 
 class Mutations(ObjectType):
+    insert_update_service = InsertUpdateService.Field()
+    delete_service = DeleteService.Field()
+    insert_update_service_provider = InsertUpdateServiceProvider.Field()
+    delete_service_provider = DeleteServiceProvider.Field()
     insert_update_request = InsertUpdateRequest.Field()
     delete_request = DeleteRequest.Field()
     insert_update_quote = InsertUpdateQuote.Field()

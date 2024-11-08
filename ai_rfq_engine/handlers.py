@@ -28,6 +28,8 @@ from .models import (
     QuoteModel,
     QuoteServiceModel,
     RequestModel,
+    ServiceModel,
+    ServiceProviderModel,
 )
 from .types import (
     CommentListType,
@@ -136,6 +138,246 @@ def execute_graphql_query(
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
+def get_service(service_type: str, service_id: str) -> ServiceModel:
+    return ServiceModel.get(service_type, service_id)
+
+
+def _get_service(service_type: str, service_id: str) -> Dict[str, Any]:
+    service = get_service(service_type, service_id)
+    return {
+        "service_type": service.service_type,
+        "service_id": service.service_id,
+        "service_name": service.service_name,
+        "service_description": service.service_description,
+    }
+
+
+def get_service_count(service_type: str, service_id: str) -> int:
+    return ServiceModel.count(service_type, ServiceModel.service_id == service_id)
+
+
+def get_service_type(info: ResolveInfo, service: ServiceModel) -> ServiceType:
+    service = service.__dict__["attribute_values"]
+    return ServiceType(**Utility.json_loads(Utility.json_dumps(service)))
+
+
+def resolve_service_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ServiceType:
+    return get_service_type(
+        info,
+        get_service(kwargs.get("service_type"), kwargs.get("service_id")),
+    )
+
+
+@monitor_decorator
+@resolve_list_decorator(
+    attributes_to_get=["service_type", "service_id"],
+    list_type_class=ServiceListType,
+    type_funct=get_service_type,
+)
+def resolve_service_list_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
+    service_type = kwargs.get("service_type")
+    service_name = kwargs.get("service_name")
+    service_description = kwargs.get("service_description")
+
+    args = []
+    inquiry_funct = ServiceModel.scan
+    count_funct = ServiceModel.count
+    if service_type:
+        args = [service_type, None]
+        inquiry_funct = ServiceModel.query
+
+    the_filters = None  # We can add filters for the query.
+    if service_name:
+        the_filters &= ServiceModel.service_name.contains(service_name)
+    if service_description:
+        the_filters &= ServiceModel.service_description.contains(service_description)
+    if the_filters is not None:
+        args.append(the_filters)
+
+    return inquiry_funct, count_funct, args
+
+
+@insert_update_decorator(
+    keys={
+        "hash_key": "service_type",
+        "range_key": "service_id",
+    },
+    model_funct=get_service,
+    count_funct=get_service_count,
+    type_funct=get_service_type,
+    # data_attributes_except_for_data_diff=data_attributes_except_for_data_diff,
+    # activity_history_funct=None,
+)
+def insert_update_service_handler(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> ServiceType:
+    service_type = kwargs.get("service_type")
+    service_id = kwargs.get("service_id")
+    if kwargs.get("entity") is None:
+        ServiceModel(
+            service_type,
+            service_id,
+            **{
+                "service_name": kwargs["service_name"],
+                "service_description": kwargs["service_description"],
+                "updated_by": kwargs["updated_by"],
+                "created_at": pendulum.now("UTC"),
+                "updated_at": pendulum.now("UTC"),
+            },
+        ).save()
+        return
+
+    service = kwargs.get("entity")
+    actions = [
+        RequestModel.updated_by.set(kwargs.get("updated_by")),
+        RequestModel.updated_at.set(pendulum.now("UTC")),
+    ]
+    if kwargs.get("service_name"):
+        actions.append(ServiceModel.service_name.set(kwargs.get("service_name")))
+    if kwargs.get("service_description"):
+        actions.append(
+            ServiceModel.service_description.set(kwargs.get("service_description"))
+        )
+
+    service.update(actions=actions)
+    return
+
+
+@delete_decorator(
+    keys={
+        "hash_key": "service_type",
+        "range_key": "service_id",
+    },
+    model_funct=get_service,
+)
+def delete_service_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    kwargs.get("entity").delete()
+    return True
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def get_service_provider(service_id: str, provider_id: str) -> ServiceProviderModel:
+    return ServiceProviderModel.get(service_id, provider_id)
+
+
+def get_service_provider_count(service_id: str, provider_id: str) -> int:
+    return ServiceProviderModel.count(
+        service_id, ServiceProviderModel.provider_id == provider_id
+    )
+
+
+def get_service_provider_type(
+    info: ResolveInfo, service_provider: ServiceProviderModel
+) -> ServiceProviderType:
+    service_provider = service_provider.__dict__["attribute_values"]
+    return ServiceProviderType(
+        **Utility.json_loads(Utility.json_dumps(service_provider))
+    )
+
+
+def resolve_service_provider_handler(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> ServiceProviderType:
+    return get_service_provider_type(
+        info,
+        get_service_provider(kwargs.get("service_id"), kwargs.get("provider_id")),
+    )
+
+
+@monitor_decorator
+@resolve_list_decorator(
+    attributes_to_get=["service_id", "provider_id"],
+    list_type_class=ServiceProviderListType,
+    type_funct=get_service_provider_type,
+)
+def resolve_service_provider_list_handler(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> Any:
+    service_id = kwargs.get("service_id")
+    service_types = kwargs.get("service_types")
+
+    args = []
+    inquiry_funct = ServiceProviderModel.scan
+    count_funct = ServiceProviderModel.count
+    if service_id:
+        args = [service_id, None]
+        inquiry_funct = ServiceProviderModel.query
+
+    the_filters = None  # We can add filters for the query.
+    if service_types:
+        the_filters &= ServiceProviderModel.service_type.is_in(service_types)
+    if the_filters is not None:
+        args.append(the_filters)
+
+    return inquiry_funct, count_funct, args
+
+
+@insert_update_decorator(
+    keys={
+        "hash_key": "service_id",
+        "range_key": "provider_id",
+    },
+    range_key_required=True,
+    model_funct=get_service_provider,
+    count_funct=get_service_provider_count,
+    type_funct=get_service_provider_type,
+)
+def insert_update_service_provider_handler(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> ServiceProviderType:
+    service_id = kwargs.get("service_id")
+    provider_id = kwargs.get("provider_id")
+    if kwargs.get("entity") is None:
+        ServiceProviderModel(
+            service_id,
+            provider_id,
+            **{
+                "service_type": kwargs["service_type"],
+                "service_spec": kwargs["service_spec"],
+                "updated_by": kwargs["updated_by"],
+                "created_at": pendulum.now("UTC"),
+                "updated_at": pendulum.now("UTC"),
+            },
+        ).save()
+        return
+
+    service_provider = kwargs.get("entity")
+    actions = [
+        ServiceProviderModel.updated_by.set(kwargs.get("updated_by")),
+        ServiceProviderModel.updated_at.set(pendulum.now("UTC")),
+    ]
+    if kwargs.get("service_type"):
+        actions.append(ServiceProviderModel.service_type.set(kwargs["service_types"]))
+    if kwargs.get("service_spec"):
+        actions.append(ServiceProviderModel.service_spec.set(kwargs["service_spec"]))
+
+    service_provider.update(actions=actions)
+    return
+
+
+@delete_decorator(
+    keys={
+        "hash_key": "service_id",
+        "range_key": "provider_id",
+    },
+    model_funct=get_service_provider,
+)
+def delete_service_provider_handler(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> bool:
+    kwargs.get("entity").delete()
+    return True
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
 def get_request(user_id: str, request_id: str) -> RequestModel:
     return RequestModel.get(user_id, request_id)
 
@@ -151,9 +393,6 @@ def _get_request(user_id: str, request_id: str) -> Dict[str, Any]:
         "services": request.services,
         "status": request.status,
         "expired_at": request.expired_at,
-        "updated_by": request.updated_by,
-        "created_at": request.created_at,
-        "updated_at": request.updated_at,
     }
 
 
