@@ -23,6 +23,10 @@ from .handlers import (
     resolve_quote_service_list_handler,
     resolve_request_handler,
     resolve_request_list_handler,
+    resolve_service_handler,
+    resolve_service_list_handler,
+    resolve_service_provider_handler,
+    resolve_service_provider_list_handler,
 )
 from .types import (
     CommentListType,
@@ -39,7 +43,33 @@ from .types import (
     QuoteType,
     RequestListType,
     RequestType,
+    ServiceListType,
+    ServiceProviderListType,
+    ServiceProviderType,
+    ServiceType,
 )
+
+
+def resolve_service(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ServiceType:
+    return resolve_service_handler(info, **kwargs)
+
+
+def resolve_service_list(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> ServiceListType:
+    return resolve_service_list_handler(info, **kwargs)
+
+
+def resolve_service_provider(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> ServiceProviderType:
+    return resolve_service_provider_handler(info, **kwargs)
+
+
+def resolve_service_provider_list(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> ServiceProviderListType:
+    return resolve_service_provider_list_handler(info, **kwargs)
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:

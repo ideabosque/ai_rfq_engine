@@ -8,6 +8,7 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, DateTime, Field, Float, Int, List, Mutation, String
+
 from silvaengine_utility import JSON
 
 from .handlers import (
@@ -18,6 +19,8 @@ from .handlers import (
     delete_quote_item_product_handler,
     delete_quote_service_handler,
     delete_request_handler,
+    delete_service_handler,
+    delete_service_provider_handler,
     insert_update_comment_handler,
     insert_update_file_handler,
     insert_update_installment_handler,
@@ -25,6 +28,8 @@ from .handlers import (
     insert_update_quote_item_product_handler,
     insert_update_quote_service_handler,
     insert_update_request_handler,
+    insert_update_service_handler,
+    insert_update_service_provider_handler,
 )
 from .types import (
     CommentType,
@@ -34,7 +39,95 @@ from .types import (
     QuoteServiceType,
     QuoteType,
     RequestType,
+    ServiceProviderType,
+    ServiceType,
 )
+
+
+class InsertUpdateService(Mutation):
+    service = Field(ServiceType)
+
+    class Arguments:
+        service_type = String(required=True)
+        service_id = String(required=False)
+        service_name = String(required=False)
+        service_description = String(required=False)
+        updated_by = String(required=True)
+
+    @staticmethod
+    def mutate(root: Any, info: Any, **kwargs: Dict[str, Any]) -> "InsertUpdateService":
+        try:
+            service = insert_update_service_handler(info, **kwargs)
+        except Exception as e:
+            log = traceback.format_exc()
+            info.context.get("logger").error(log)
+            raise e
+
+        return InsertUpdateService(service=service)
+
+
+class DeleteService(Mutation):
+    ok = Boolean()
+
+    class Arguments:
+        service_type = String(required=True)
+        service_id = String(required=True)
+
+    @staticmethod
+    def mutate(root: Any, info: Any, **kwargs: Dict[str, Any]) -> "DeleteService":
+        try:
+            ok = delete_service_handler(info, **kwargs)
+        except Exception as e:
+            log = traceback.format_exc()
+            info.context.get("logger").error(log)
+            raise e
+
+        return DeleteService(ok=ok)
+
+
+class InsertUpdateServiceProvider(Mutation):
+    service_provider = Field(ServiceProviderType)
+
+    class Arguments:
+        service_id = String(required=True)
+        provider_id = String(required=True)
+        service_type = String(required=False)
+        service_spec = JSON(required=False)
+        updated_by = String(required=True)
+
+    @staticmethod
+    def mutate(
+        root: Any, info: Any, **kwargs: Dict[str, Any]
+    ) -> "InsertUpdateServiceProvider":
+        try:
+            service_provider = insert_update_service_provider_handler(info, **kwargs)
+        except Exception as e:
+            log = traceback.format_exc()
+            info.context.get("logger").error(log)
+            raise e
+
+        return InsertUpdateServiceProvider(service_provider=service_provider)
+
+
+class DeleteServiceProvider(Mutation):
+    ok = Boolean()
+
+    class Arguments:
+        service_id = String(required=True)
+        provider_id = String(required=True)
+
+    @staticmethod
+    def mutate(
+        root: Any, info: Any, **kwargs: Dict[str, Any]
+    ) -> "DeleteServiceProvider":
+        try:
+            ok = delete_service_provider_handler(info, **kwargs)
+        except Exception as e:
+            log = traceback.format_exc()
+            info.context.get("logger").error(log)
+            raise e
+
+        return DeleteServiceProvider(ok=ok)
 
 
 class InsertUpdateRequest(Mutation):

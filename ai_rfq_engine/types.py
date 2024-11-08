@@ -20,20 +20,20 @@ from silvaengine_utility import JSON
 
 
 class ServiceType(ObjectType):
-    provider_id = String()
-    service_id = String()
     service_type = String()
-    service_spec = JSON()
+    service_id = String()
+    service_name = String()
+    service_description = String()
     updated_by = String()
     created_at = DateTime()
     updated_at = DateTime()
 
 
 class ServiceProviderType(ObjectType):
-    provider_id = String()
     service_id = String()
-    provider_type = String()
-    provider_spec = JSON()
+    provider_id = String()
+    service_type = String()
+    service_spec = JSON()
     updated_by = String()
     created_at = DateTime()
     updated_at = DateTime()
