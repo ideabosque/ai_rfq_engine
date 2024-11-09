@@ -11,6 +11,8 @@ from typing import Any, Dict
 import boto3
 import pendulum
 from graphene import ResolveInfo
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     delete_decorator,
     insert_update_decorator,
@@ -18,12 +20,12 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .models import (
     CommentModel,
     FileModel,
     InstallmentModel,
+    ItemModel,
     QuoteItemProductModel,
     QuoteModel,
     QuoteServiceModel,
@@ -38,6 +40,8 @@ from .types import (
     FileType,
     InstallmentListType,
     InstallmentType,
+    ItemListType,
+    ItemType,
     QuoteItemProductListType,
     QuoteItemProductType,
     QuoteListType,
@@ -273,7 +277,18 @@ def get_service_provider_count(service_id: str, provider_id: str) -> int:
 def get_service_provider_type(
     info: ResolveInfo, service_provider: ServiceProviderModel
 ) -> ServiceProviderType:
+    try:
+        service = _get_service(
+            service_provider.service_type, service_provider.service_id
+        )
+    except Exception as e:
+        log = traceback.format_exc()
+        info.context.get("logger").exception(log)
+        raise e
     service_provider = service_provider.__dict__["attribute_values"]
+    service_provider["service"] = service
+    service_provider.pop("service_type")
+    service_provider.pop("service_id")
     return ServiceProviderType(
         **Utility.json_loads(Utility.json_dumps(service_provider))
     )
@@ -369,6 +384,116 @@ def insert_update_service_provider_handler(
 def delete_service_provider_handler(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> bool:
+    kwargs.get("entity").delete()
+    return True
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def get_item(item_type: str, item_id: str) -> ItemModel:
+    return ItemModel.get(item_type, item_id)
+
+
+def get_item_count(item_type: str, item_id: str) -> int:
+    return ItemModel.count(item_type, ItemModel.item_id == item_id)
+
+
+def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
+    item = item.__dict__["attribute_values"]
+    return ItemType(**Utility.json_loads(Utility.json_dumps(item)))
+
+
+def resolve_item_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
+    return get_item_type(
+        info,
+        get_item(kwargs.get("item_type"), kwargs.get("item_id")),
+    )
+
+
+@monitor_decorator
+@resolve_list_decorator(
+    attributes_to_get=["item_type", "item_id"],
+    list_type_class=ItemListType,
+    type_funct=get_item_type,
+)
+def resolve_item_list_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
+    item_type = kwargs.get("item_type")
+    item_name = kwargs.get("item_name")
+    item_description = kwargs.get("item_description")
+
+    args = []
+    inquiry_funct = ItemModel.scan
+
+    count_funct = ItemModel.count
+    if item_type:
+        args = [item_type, None]
+        inquiry_funct = ItemModel.query
+
+    the_filters = None  # We can add filters for the query.
+    if item_name:
+        the_filters &= ItemModel.item_name.contains(item_name)
+    if item_description:
+        the_filters &= ItemModel.item_description.contains(item_description)
+    if the_filters is not None:
+        args.append(the_filters)
+
+    return inquiry_funct, count_funct, args
+
+
+@insert_update_decorator(
+    keys={
+        "hash_key": "item_type",
+        "range_key": "item_id",
+    },
+    range_key_required=True,
+    model_funct=get_item,
+    count_funct=get_item_count,
+    type_funct=get_item_type,
+    # data_attributes_except_for_data_diff=data_attributes_except_for_data_diff,
+    # activity_history_funct=None,
+)
+def insert_update_item_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
+    item_type = kwargs.get("item_type")
+    item_id = kwargs.get("item_id")
+    if kwargs.get("entity") is None:
+        ItemModel(
+            item_type,
+            item_id,
+            **{
+                "item_name": kwargs["item_name"],
+                "item_description": kwargs["item_description"],
+                "updated_by": kwargs["updated_by"],
+                "created_at": pendulum.now("UTC"),
+                "updated_at": pendulum.now("UTC"),
+            },
+        ).save()
+        return
+
+    item = kwargs.get("entity")
+    actions = [
+        ItemModel.updated_by.set(kwargs.get("updated_by")),
+        ItemModel.updated_at.set(pendulum.now("UTC")),
+    ]
+    if kwargs.get("item_name") is not None:
+        actions.append(ItemModel.item_name.set(kwargs["item_name"]))
+    if kwargs.get("item_description") is not None:
+        actions.append(ItemModel.item_description.set(kwargs["item_description"]))
+
+    item.update(actions=actions)
+    return
+
+
+@delete_decorator(
+    keys={
+        "hash_key": "item_type",
+        "range_key": "item_id",
+    },
+    model_funct=get_item,
+)
+def delete_item_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
 

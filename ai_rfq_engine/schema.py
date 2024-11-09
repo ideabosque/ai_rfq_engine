@@ -22,6 +22,7 @@ from .mutations import (
     DeleteComment,
     DeleteFile,
     DeleteInstallment,
+    DeleteItem,
     DeleteQuote,
     DeleteQuoteItemProduct,
     DeleteQuoteService,
@@ -31,6 +32,7 @@ from .mutations import (
     InsertUpdateComment,
     InsertUpdateFile,
     InsertUpdateInstallment,
+    InsertUpdateItem,
     InsertUpdateQuote,
     InsertUpdateQuoteItemProduct,
     InsertUpdateQuoteService,
@@ -45,6 +47,8 @@ from .queries import (
     resolve_file_list,
     resolve_installment,
     resolve_installment_list,
+    resolve_item,
+    resolve_item_list,
     resolve_quote,
     resolve_quote_item_product,
     resolve_quote_item_product_list,
@@ -65,6 +69,8 @@ from .types import (
     FileType,
     InstallmentListType,
     InstallmentType,
+    ItemListType,
+    ItemType,
     QuoteItemProductListType,
     QuoteItemProductType,
     QuoteListType,
@@ -133,6 +139,21 @@ class Query(ObjectType):
         limit=Int(),
         service_id=String(),
         service_types=List(String),
+    )
+
+    item = Field(
+        ItemType,
+        item_type=String(required=True),
+        item_id=String(required=True),
+    )
+
+    item_list = Field(
+        ItemListType,
+        page_number=Int(),
+        limit=Int(),
+        item_type=String(),
+        item_name=String(),
+        item_description=String(),
     )
 
     request = Field(
@@ -280,6 +301,14 @@ class Query(ObjectType):
     ) -> ServiceProviderListType:
         return resolve_service_provider_list(info, **kwargs)
 
+    def resolve_item(self, info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
+        return resolve_item(info, **kwargs)
+
+    def resolve_item_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ItemListType:
+        return resolve_item_list(info, **kwargs)
+
     def resolve_request(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
     ) -> RequestType:
@@ -352,6 +381,8 @@ class Mutations(ObjectType):
     delete_service = DeleteService.Field()
     insert_update_service_provider = InsertUpdateServiceProvider.Field()
     delete_service_provider = DeleteServiceProvider.Field()
+    insert_update_item = InsertUpdateItem.Field()
+    delete_item = DeleteItem.Field()
     insert_update_request = InsertUpdateRequest.Field()
     delete_request = DeleteRequest.Field()
     insert_update_quote = InsertUpdateQuote.Field()

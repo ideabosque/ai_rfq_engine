@@ -30,9 +30,8 @@ class ServiceType(ObjectType):
 
 
 class ServiceProviderType(ObjectType):
-    service_id = String()
+    service = JSON()
     provider_id = String()
-    service_type = String()
     service_spec = JSON()
     updated_by = String()
     created_at = DateTime()
@@ -81,6 +80,16 @@ class QuoteServiceType(ObjectType):
     price_per_uom = Float()
     qty = Float()
     subtotal = Float()
+    updated_by = String()
+    created_at = DateTime()
+    updated_at = DateTime()
+
+
+class ItemType(ObjectType):
+    item_type = String()
+    item_id = String()
+    item_name = String()
+    item_description = String()
     updated_by = String()
     created_at = DateTime()
     updated_at = DateTime()
@@ -156,6 +165,10 @@ class QuoteListType(ListObjectType):
 
 class QuoteServiceListType(ListObjectType):
     quote_service_list = List(QuoteServiceType)
+
+
+class ItemListType(ListObjectType):
+    item_list = List(ItemType)
 
 
 class QuoteItemProductListType(ListObjectType):

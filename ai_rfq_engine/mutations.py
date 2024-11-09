@@ -15,6 +15,7 @@ from .handlers import (
     delete_comment_handler,
     delete_file_handler,
     delete_installment_handler,
+    delete_item_handler,
     delete_quote_handler,
     delete_quote_item_product_handler,
     delete_quote_service_handler,
@@ -24,6 +25,7 @@ from .handlers import (
     insert_update_comment_handler,
     insert_update_file_handler,
     insert_update_installment_handler,
+    insert_update_item_handler,
     insert_update_quote_handler,
     insert_update_quote_item_product_handler,
     insert_update_quote_service_handler,
@@ -35,6 +37,7 @@ from .types import (
     CommentType,
     FileType,
     InstallmentType,
+    ItemType,
     QuoteItemProductType,
     QuoteServiceType,
     QuoteType,
@@ -128,6 +131,47 @@ class DeleteServiceProvider(Mutation):
             raise e
 
         return DeleteServiceProvider(ok=ok)
+
+
+class InsertUpdateItem(Mutation):
+    item = Field(ItemType)
+
+    class Arguments:
+        item_type = String(required=True)
+        item_id = String(required=False)
+        item_name = String(required=False)
+        item_description = String(required=False)
+        updated_by = String(required=True)
+
+    @staticmethod
+    def mutate(root: Any, info: Any, **kwargs: Dict[str, Any]) -> "InsertUpdateItem":
+        try:
+            item = insert_update_item_handler(info, **kwargs)
+        except Exception as e:
+            log = traceback.format_exc()
+            info.context.get("logger").error(log)
+            raise e
+
+        return InsertUpdateItem(item=item)
+
+
+class DeleteItem(Mutation):
+    ok = Boolean()
+
+    class Arguments:
+        item_type = String(required=True)
+        item_id = String(required=True)
+
+    @staticmethod
+    def mutate(root: Any, info: Any, **kwargs: Dict[str, Any]) -> "DeleteItem":
+        try:
+            ok = delete_item_handler(info, **kwargs)
+        except Exception as e:
+            log = traceback.format_exc()
+            info.context.get("logger").error(log)
+            raise e
+
+        return DeleteItem(ok=ok)
 
 
 class InsertUpdateRequest(Mutation):
