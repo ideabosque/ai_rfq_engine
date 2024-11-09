@@ -18,9 +18,8 @@ fragment ServiceListInfo on ServiceListType {
 }
 
 fragment ServiceProviderInfo on ServiceProviderType {
-    serviceId
+    service
     providerId
-    serviceType
     serviceSpec
     updatedBy
     createdAt
@@ -30,6 +29,25 @@ fragment ServiceProviderInfo on ServiceProviderType {
 fragment ServiceProviderListInfo on ServiceProviderListType {
     serviceProviderList{
         ...ServiceProviderInfo
+    }
+    pageSize
+    pageNumber
+    total
+}
+
+fragment ItemInfo on ItemType {
+    itemType
+    itemId
+    itemName
+    itemDescription
+    updatedBy
+    createdAt
+    updatedAt
+}
+
+fragment ItemListInfo on ItemListType {
+    itemList{
+        ...ItemInfo
     }
     pageSize
     pageNumber
@@ -231,6 +249,68 @@ mutation deleteServiceProvider(
     deleteServiceProvider(
         serviceId: $serviceId,
         providerId: $providerId
+    ) {
+        ok
+    }
+}
+
+query getItem(
+    $itemType: String!,
+    $itemId: String!
+) {
+    item(
+        itemType: $itemType,
+        itemId: $itemId
+    ) {
+        ...ItemInfo
+    }
+}
+
+query getItemList(
+    $pageNumber: Int, 
+    $limit: Int,
+    $itemType: String,
+    $itemName: String,
+    $itemDescription: String
+) {
+    itemList(
+        pageNumber: $pageNumber,
+        limit: $limit,
+        itemType: $itemType,
+        itemName: $itemName,
+        itemDescription: $itemDescription
+    ) {
+        ...ItemListInfo
+    }
+}
+
+mutation insertUpdateItem(
+    $itemType: String!,
+    $itemId: String,
+    $itemName: String,
+    $itemDescription: String,
+    $updatedBy: String!
+) {
+    insertUpdateItem(
+        itemType: $itemType,
+        itemId: $itemId,
+        itemName: $itemName,
+        itemDescription: $itemDescription,
+        updatedBy: $updatedBy
+    ) {
+        item{
+            ...ItemInfo
+        }
+    }
+}
+
+mutation deleteItem(
+    $itemType: String!,
+    $itemId: String!
+) {
+    deleteItem(
+        itemType: $itemType,
+        itemId: $itemId
     ) {
         ok
     }

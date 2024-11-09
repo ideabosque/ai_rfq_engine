@@ -170,7 +170,63 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_insert_update_item(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "itemType": "XXXXXXXXXXXXXXXXXXXX",
+                "itemId": "1688715816992117231",
+                "itemName": "XXXXXXXXXXXXXXXXXXXX",
+                "itemDescription": "XXXXXXXXXXXXXXXXXXXX",
+                "updatedBy": "XYZ",
+            },
+            "operation_name": "insertUpdateItem",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_delete_item(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "itemType": "XXXXXXXXXXXXXXXXXXXX",
+                "itemId": "XXXXXXXXXXXXXXXXXXXX",
+            },
+            "operation_name": "deleteItem",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_item(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "itemType": "XXXXXXXXXXXXXXXXXXXX",
+                "itemId": "1688715816992117231",
+            },
+            "operation_name": "getItem",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
     # @unittest.skip("demonstrating skipping")
+    def test_graphql_item_list(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "itemType": "XXXXXXXXXXXXXXXXXXXX",
+                "pageNumber": 1,
+                "limit": 10,
+            },
+            "operation_name": "getItemList",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
     def test_graphql_service_provider_list(self):
         payload = {
             "query": document,

@@ -44,6 +44,19 @@ class ServiceProviderModel(BaseModel):
     updated_at = UTCDateTimeAttribute()
 
 
+class ItemModel(BaseModel):
+    class Meta(BaseModel.Meta):
+        table_name = "are-items"
+
+    item_type = UnicodeAttribute(hash_key=True)
+    item_id = UnicodeAttribute(range_key=True)
+    item_name = UnicodeAttribute()
+    item_description = UnicodeAttribute()
+    updated_by = UnicodeAttribute()
+    created_at = UTCDateTimeAttribute()
+    updated_at = UTCDateTimeAttribute()
+
+
 class RequestModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-requests"

@@ -15,6 +15,8 @@ from .handlers import (
     resolve_file_list_handler,
     resolve_installment_handler,
     resolve_installment_list_handler,
+    resolve_item_handler,
+    resolve_item_list_handler,
     resolve_quote_handler,
     resolve_quote_item_product_handler,
     resolve_quote_item_product_list_handler,
@@ -35,6 +37,8 @@ from .types import (
     FileType,
     InstallmentListType,
     InstallmentType,
+    ItemListType,
+    ItemType,
     QuoteItemProductListType,
     QuoteItemProductType,
     QuoteListType,
@@ -70,6 +74,14 @@ def resolve_service_provider_list(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> ServiceProviderListType:
     return resolve_service_provider_list_handler(info, **kwargs)
+
+
+def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
+    return resolve_item_handler(info, **kwargs)
+
+
+def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemListType:
+    return resolve_item_list_handler(info, **kwargs)
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:
