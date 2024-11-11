@@ -165,7 +165,6 @@ class QuoteServiceModel(BaseModel):
     service_id = UnicodeAttribute(range_key=True)
     provider_id = UnicodeAttribute()
     request_data = MapAttribute(default={})
-    data = MapAttribute(default={})
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()
     subtotal = NumberAttribute()

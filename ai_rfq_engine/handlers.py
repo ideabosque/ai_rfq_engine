@@ -1086,8 +1086,6 @@ def insert_update_quote_service_handler(
         }
         if kwargs.get("request_data") is not None:
             cols["request_data"] = kwargs["request_data"]
-        if kwargs.get("data") is not None:
-            cols["data"] = kwargs["data"]
 
         QuoteServiceModel(
             quote_id,
@@ -1103,8 +1101,6 @@ def insert_update_quote_service_handler(
     ]
     if kwargs.get("request_data") is not None:
         actions.append(QuoteServiceModel.request_data.set(kwargs.get("request_data")))
-    if kwargs.get("data") is not None:
-        actions.append(QuoteServiceModel.data.set(kwargs.get("data")))
     if kwargs.get("price_per_uom") is not None:
         actions.append(QuoteServiceModel.price_per_uom.set(kwargs.get("price_per_uom")))
     if kwargs.get("qty") is not None:
@@ -1237,7 +1233,7 @@ def insert_update_quote_item_product_handler(info: ResolveInfo, **kwargs: Any) -
                 "provider_id": kwargs["provider_id"],
                 "price_per_uom": kwargs["price_per_uom"],
                 "qty": kwargs["qty"],
-                "subtotal": kwargs["subtotal"],
+                "subtotal": kwargs["price_per_uom"] * kwargs["qty"],
                 "updated_by": kwargs["updated_by"],
                 "created_at": pendulum.now("UTC"),
                 "updated_at": pendulum.now("UTC"),
@@ -1260,8 +1256,9 @@ def insert_update_quote_item_product_handler(info: ResolveInfo, **kwargs: Any) -
         )
     if kwargs.get("qty") is not None:
         actions.append(QuoteItemProductModel.qty.set(kwargs.get("qty")))
-    if kwargs.get("subtotal") is not None:
-        actions.append(QuoteItemProductModel.subtotal.set(kwargs.get("subtotal")))
+    if kwargs.get("price_per_uom") is not None and kwargs.get("qty") is not None:
+        subtotal = kwargs["price_per_uom"] * kwargs["qty"]
+        actions.append(QuoteItemProductModel.subtotal.set(subtotal))
 
     quote_item_product.update(actions=actions)
     return
