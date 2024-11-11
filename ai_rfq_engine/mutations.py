@@ -8,7 +8,6 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, DateTime, Field, Float, Int, List, Mutation, String
-
 from silvaengine_utility import JSON
 
 from .handlers import (
@@ -99,6 +98,8 @@ class InsertUpdateServiceProvider(Mutation):
         provider_id = String(required=True)
         service_type = String(required=False)
         service_spec = JSON(required=False)
+        uom = String(required=False)
+        base_price_per_uom = Float(required=False)
         updated_by = String(required=True)
 
     @staticmethod
@@ -321,11 +322,9 @@ class InsertUpdateQuoteService(Mutation):
     class Arguments:
         quote_id = String(required=True)
         service_id = String(required=True)
-        service_type = String(required=False)
-        service_name = String(required=False)
+        provider_id = String(required=False)
         request_data = JSON(required=False)
         data = JSON(required=False)
-        uom = String(required=False)
         price_per_uom = Float(required=False)
         qty = Float(required=False)
         updated_by = String(required=True)

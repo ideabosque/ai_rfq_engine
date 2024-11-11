@@ -15,7 +15,6 @@ from graphene import (
     ObjectType,
     String,
 )
-
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
@@ -34,6 +33,8 @@ class ServiceProviderType(ObjectType):
     service = JSON()
     provider_id = String()
     service_spec = JSON()
+    uom = String()
+    base_price_per_uom = Float()
     updated_by = String()
     created_at = DateTime()
     updated_at = DateTime()
@@ -96,12 +97,9 @@ class QuoteType(ObjectType):
 
 class QuoteServiceType(ObjectType):
     quote_id = String()
-    service_id = String()
-    service_type = String()
-    service_name = String()
+    service_provider = JSON()
     request_data = JSON()
     data = JSON()
-    uom = String()
     price_per_uom = Float()
     qty = Float()
     subtotal = Float()

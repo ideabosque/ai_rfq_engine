@@ -14,7 +14,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-
 from silvaengine_dynamodb_base import BaseModel
 
 
@@ -39,6 +38,8 @@ class ServiceProviderModel(BaseModel):
     provider_id = UnicodeAttribute(range_key=True)
     service_type = UnicodeAttribute()
     service_spec = MapAttribute(default={})
+    uom = UnicodeAttribute()
+    base_price_per_uom = NumberAttribute()
     updated_by = UnicodeAttribute()
     created_at = UTCDateTimeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -162,11 +163,9 @@ class QuoteServiceModel(BaseModel):
 
     quote_id = UnicodeAttribute(hash_key=True)
     service_id = UnicodeAttribute(range_key=True)
-    service_type = UnicodeAttribute()
-    service_name = UnicodeAttribute()
+    provider_id = UnicodeAttribute()
     request_data = MapAttribute(default={})
     data = MapAttribute(default={})
-    uom = UnicodeAttribute()
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()
     subtotal = NumberAttribute()
