@@ -15,6 +15,7 @@ from graphene import (
     ObjectType,
     String,
 )
+
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
@@ -33,6 +34,30 @@ class ServiceProviderType(ObjectType):
     service = JSON()
     provider_id = String()
     service_spec = JSON()
+    updated_by = String()
+    created_at = DateTime()
+    updated_at = DateTime()
+
+
+class ItemType(ObjectType):
+    item_type = String()
+    item_id = String()
+    item_name = String()
+    item_description = String()
+    updated_by = String()
+    created_at = DateTime()
+    updated_at = DateTime()
+
+
+class ProductType(ObjectType):
+    provider_id = String()
+    product_id = String()
+    sku = String()
+    product_name = String()
+    product_description = String()
+    uom = String()
+    base_price_per_uom = Float()
+    data = JSON()
     updated_by = String()
     created_at = DateTime()
     updated_at = DateTime()
@@ -85,26 +110,11 @@ class QuoteServiceType(ObjectType):
     updated_at = DateTime()
 
 
-class ItemType(ObjectType):
-    item_type = String()
-    item_id = String()
-    item_name = String()
-    item_description = String()
-    updated_by = String()
-    created_at = DateTime()
-    updated_at = DateTime()
-
-
 class QuoteItemProductType(ObjectType):
     quote_id = String()
-    item_id = String()
-    item_group = String()
-    item_name = String()
+    item = JSON()
     request_data = JSON()
-    product_id = String()
-    product_name = String()
-    sku = String()
-    uom = String()
+    product = JSON()
     price_per_uom = Float()
     qty = Float()
     subtotal = Float()
@@ -155,6 +165,14 @@ class ServiceProviderListType(ListObjectType):
     service_provider_list = List(ServiceProviderType)
 
 
+class ItemListType(ListObjectType):
+    item_list = List(ItemType)
+
+
+class ProductListType(ListObjectType):
+    product_list = List(ProductType)
+
+
 class RequestListType(ListObjectType):
     request_list = List(RequestType)
 
@@ -165,10 +183,6 @@ class QuoteListType(ListObjectType):
 
 class QuoteServiceListType(ListObjectType):
     quote_service_list = List(QuoteServiceType)
-
-
-class ItemListType(ListObjectType):
-    item_list = List(ItemType)
 
 
 class QuoteItemProductListType(ListObjectType):

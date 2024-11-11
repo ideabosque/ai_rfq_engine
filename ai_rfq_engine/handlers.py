@@ -26,6 +26,7 @@ from .models import (
     FileModel,
     InstallmentModel,
     ItemModel,
+    ProductModel,
     QuoteItemProductModel,
     QuoteModel,
     QuoteServiceModel,
@@ -42,6 +43,8 @@ from .types import (
     InstallmentType,
     ItemListType,
     ItemType,
+    ProductListType,
+    ProductType,
     QuoteItemProductListType,
     QuoteItemProductType,
     QuoteListType,
@@ -494,6 +497,134 @@ def insert_update_item_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> N
     model_funct=get_item,
 )
 def delete_item_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    kwargs.get("entity").delete()
+    return True
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def get_product(provider_id: str, product_id: str) -> ProductModel:
+    return ProductModel.get(provider_id, product_id)
+
+
+def get_product_count(provider_id: str, product_id: str) -> int:
+    return ProductModel.count(provider_id, ProductModel.product_id == product_id)
+
+
+def get_product_type(info: ResolveInfo, product: ProductModel) -> ProductType:
+    product = product.__dict__["attribute_values"]
+    return ProductType(**Utility.json_loads(Utility.json_dumps(product)))
+
+
+def resolve_product_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ProductType:
+    return get_product_type(
+        info,
+        get_product(kwargs.get("provider_id"), kwargs.get("product_id")),
+    )
+
+
+@monitor_decorator
+@resolve_list_decorator(
+    attributes_to_get=["provider_id", "product_id"],
+    list_type_class=ProductListType,
+    type_funct=get_product_type,
+)
+def resolve_product_list_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
+    provider_id = kwargs.get("provider_id")
+    sku = kwargs.get("sku")
+    product_name = kwargs.get("product_name")
+    product_description = kwargs.get("product_description")
+
+    args = []
+    inquiry_funct = ProductModel.scan
+
+    count_funct = ProductModel.count
+    if provider_id:
+        args = [provider_id, None]
+        inquiry_funct = ProductModel.query
+
+    the_filters = None  # We can add filters for the query.
+    if sku:
+        the_filters &= ProductModel.sku.contains(sku)
+    if product_name:
+        the_filters &= ProductModel.product_name.contains(product_name)
+    if product_description:
+        the_filters &= ProductModel.product_description.contains(product_description)
+    if the_filters is not None:
+        args.append(the_filters)
+
+    return inquiry_funct, count_funct, args
+
+
+@insert_update_decorator(
+    keys={
+        "hash_key": "provider_id",
+        "range_key": "product_id",
+    },
+    model_funct=get_product,
+    count_funct=get_product_count,
+    type_funct=get_product_type,
+)
+def insert_update_product_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
+    provider_id = kwargs.get("provider_id")
+    product_id = kwargs.get("product_id")
+    if kwargs.get("entity") is None:
+        cols = {
+            "sku": kwargs["sku"],
+            "product_name": kwargs["product_name"],
+            "product_description": kwargs["product_description"],
+            "uom": kwargs["uom"],
+            "base_price_per_uom": kwargs["base_price_per_uom"],
+            "updated_by": kwargs["updated_by"],
+            "created_at": pendulum.now("UTC"),
+            "updated_at": pendulum.now("UTC"),
+        }
+        if kwargs.get("data"):
+            cols["data"] = kwargs["data"]
+        ProductModel(
+            provider_id,
+            product_id,
+            **cols,
+        ).save()
+        return
+
+    product = kwargs.get("entity")
+    actions = [
+        ProductModel.updated_by.set(kwargs.get("updated_by")),
+        ProductModel.updated_at.set(pendulum.now("UTC")),
+    ]
+    if kwargs.get("sku") is not None:
+        actions.append(ProductModel.sku.set(kwargs["sku"]))
+    if kwargs.get("product_name") is not None:
+        actions.append(ProductModel.product_name.set(kwargs["product_name"]))
+    if kwargs.get("product_description") is not None:
+        actions.append(
+            ProductModel.product_description.set(kwargs["product_description"])
+        )
+    if kwargs.get("uom") is not None:
+        actions.append(ProductModel.uom.set(kwargs["uom"]))
+    if kwargs.get("base_price_per_uom") is not None:
+        actions.append(
+            ProductModel.base_price_per_uom.set(kwargs["base_price_per_uom"])
+        )
+    if kwargs.get("data") is not None:
+        actions.append(ProductModel.data.set(kwargs["data"]))
+
+    product.update(actions=actions)
+    return
+
+
+@delete_decorator(
+    keys={
+        "hash_key": "provider_id",
+        "range_key": "product_id",
+    },
+    model_funct=get_product,
+)
+def delete_product_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
 
@@ -973,24 +1104,6 @@ def get_quote_item_product(quote_id: str, item_id: str) -> QuoteItemProductModel
     return QuoteItemProductModel.get(quote_id, item_id)
 
 
-def _get_quote_item_product(quote_id: str, item_id: str) -> Dict[str, Any]:
-    quote_item_product = get_quote_item_product(quote_id, item_id)
-    return {
-        "quote_id": quote_item_product.quote_id,
-        "item_id": quote_item_product.item_id,
-        "item_group": quote_item_product.item_group,
-        "item_name": quote_item_product.item_name,
-        "request_data": quote_item_product.request_data,
-        "product_id": quote_item_product.product_id,
-        "product_name": quote_item_product.product_name,
-        "sku": quote_item_product.sku,
-        "uom": quote_item_product.uom,
-        "price_per_uom": quote_item_product.price_per_uom,
-        "qty": quote_item_product.qty,
-        "subtotal": quote_item_product.subtotal,
-    }
-
-
 def get_quote_item_product_count(quote_id: str, item_id: str) -> int:
     return QuoteItemProductModel.count(
         quote_id, QuoteItemProductModel.item_id == item_id
@@ -1025,10 +1138,9 @@ def resolve_quote_item_product_list_handler(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> Any:
     quote_id = kwargs.get("quote_id")
-    item_groups = kwargs.get("item_groups")
-    item_name = kwargs.get("item_name")
-    product_id = kwargs.get("product_id")
-    product_name = kwargs.get("product_name")
+    item_types = kwargs.get("item_types")
+    product_ids = kwargs.get("product_ids")
+    provider_ids = kwargs.get("provider_ids")
 
     args = []
     inquiry_funct = QuoteItemProductModel.scan
@@ -1038,14 +1150,12 @@ def resolve_quote_item_product_list_handler(
         inquiry_funct = QuoteItemProductModel.query
 
     the_filters = None  # We can add filters for the query.
-    if item_groups:
-        the_filters &= QuoteItemProductModel.item_group.is_in(*item_groups)
-    if item_name:
-        the_filters &= QuoteItemProductModel.item_name.contains(item_name)
-    if product_id:
-        the_filters &= QuoteItemProductModel.product_id == product_id
-    if product_name:
-        the_filters &= QuoteItemProductModel.product_name.contains(product_name)
+    if item_types:
+        the_filters &= QuoteItemProductModel.item_type.is_in(*item_types)
+    if product_ids:
+        the_filters &= QuoteItemProductModel.product_id.is_in(*product_ids)
+    if provider_ids:
+        the_filters &= QuoteItemProductModel.provider_id.is_in(*provider_ids)
     if the_filters is not None:
         args.append(the_filters)
 
@@ -1072,13 +1182,10 @@ def insert_update_quote_item_product_handler(info: ResolveInfo, **kwargs: Any) -
             quote_id,
             item_id,
             **{
-                "item_group": kwargs["item_group"],
-                "item_name": kwargs["item_name"],
+                "item_type": kwargs["item_type"],
                 "request_data": kwargs["request_data"],
                 "product_id": kwargs["product_id"],
-                "product_name": kwargs["product_name"],
-                "sku": kwargs["sku"],
-                "uom": kwargs["uom"],
+                "provider_id": kwargs["provider_id"],
                 "price_per_uom": kwargs["price_per_uom"],
                 "qty": kwargs["qty"],
                 "subtotal": kwargs["subtotal"],

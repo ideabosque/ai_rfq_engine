@@ -16,6 +16,7 @@ from .handlers import (
     delete_file_handler,
     delete_installment_handler,
     delete_item_handler,
+    delete_product_handler,
     delete_quote_handler,
     delete_quote_item_product_handler,
     delete_quote_service_handler,
@@ -26,6 +27,7 @@ from .handlers import (
     insert_update_file_handler,
     insert_update_installment_handler,
     insert_update_item_handler,
+    insert_update_product_handler,
     insert_update_quote_handler,
     insert_update_quote_item_product_handler,
     insert_update_quote_service_handler,
@@ -38,6 +40,7 @@ from .types import (
     FileType,
     InstallmentType,
     ItemType,
+    ProductType,
     QuoteItemProductType,
     QuoteServiceType,
     QuoteType,
@@ -172,6 +175,51 @@ class DeleteItem(Mutation):
             raise e
 
         return DeleteItem(ok=ok)
+
+
+class InsertUpdateProduct(Mutation):
+    product = Field(ProductType)
+
+    class Arguments:
+        provider_id = String(required=True)
+        product_id = String(required=False)
+        sku = String(required=False)
+        product_name = String(required=False)
+        product_description = String(required=False)
+        uom = String(required=False)
+        base_price_per_uom = Float(required=False)
+        data = JSON(required=False)
+        updated_by = String(required=True)
+
+    @staticmethod
+    def mutate(root: Any, info: Any, **kwargs: Dict[str, Any]) -> "InsertUpdateProduct":
+        try:
+            product = insert_update_product_handler(info, **kwargs)
+        except Exception as e:
+            log = traceback.format_exc()
+            info.context.get("logger").error(log)
+            raise e
+
+        return InsertUpdateProduct(product=product)
+
+
+class DeleteProduct(Mutation):
+    ok = Boolean()
+
+    class Arguments:
+        provider_id = String(required=True)
+        product_id = String(required=True)
+
+    @staticmethod
+    def mutate(root: Any, info: Any, **kwargs: Dict[str, Any]) -> "DeleteProduct":
+        try:
+            ok = delete_product_handler(info, **kwargs)
+        except Exception as e:
+            log = traceback.format_exc()
+            info.context.get("logger").error(log)
+            raise e
+
+        return DeleteProduct(ok=ok)
 
 
 class InsertUpdateRequest(Mutation):
@@ -320,14 +368,11 @@ class InsertUpdateQuoteItemProduct(Mutation):
 
     class Arguments:
         quote_id = String(required=True)
-        Item_id = String(required=True)
-        Item_group = String(required=True)
-        Item_name = String(required=True)
+        item_id = String(required=True)
+        item_type = String(required=True)
         request_data = JSON(required=True)
         product_id = String(required=True)
-        product_name = String(required=True)
-        sku = String(required=True)
-        uom = String(required=True)
+        provider_id = String(required=True)
         price_per_uom = Float(required=True)
         qty = Float(required=True)
         subtotal = Float(required=True)

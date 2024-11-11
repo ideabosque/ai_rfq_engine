@@ -212,7 +212,7 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    # @unittest.skip("demonstrating skipping")
+    @unittest.skip("demonstrating skipping")
     def test_graphql_item_list(self):
         payload = {
             "query": document,
@@ -222,6 +222,66 @@ class AIRFQEngineTest(unittest.TestCase):
                 "limit": 10,
             },
             "operation_name": "getItemList",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_insert_update_product(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "providerId": "XXXXXXXXXXXXXXXXXXXX",
+                "productId": "7642515695959085551",
+                "sku": "abc",
+                "productName": "XXXXXXXXXXXXXXXXXXXX",
+                "productDescription": "XXXXXXXXXXXXXXXXXXXX",
+                "uom": "kg",
+                "basePricePerUom": 100,
+                "data": {},
+                "updatedBy": "XYZ",
+            },
+            "operation_name": "insertUpdateProduct",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_delete_product(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "providerId": "XXXXXXXXXXXXXXXXXXXX",
+                "productId": "10203797220767175151",
+            },
+            "operation_name": "deleteProduct",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    # @unittest.skip("demonstrating skipping")
+    def test_graphql_product(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "providerId": "XXXXXXXXXXXXXXXXXXXX",
+                "productId": "7642515695959085551",
+            },
+            "operation_name": "getProduct",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_product_list(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "providerId": "XXXXXXXXXXXXXXXXXXXX",
+                "pageNumber": 1,
+                "limit": 10,
+            },
+            "operation_name": "getProductList",
         }
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)

@@ -54,6 +54,29 @@ fragment ItemListInfo on ItemListType {
     total
 }
 
+fragment ProductInfo on ProductType {
+    providerId
+    productId
+    sku
+    productName
+    productDescription
+    uom
+    basePricePerUom
+    data
+    updatedBy
+    createdAt
+    updatedAt
+}
+
+fragment ProductListInfo on ProductListType {
+    productList{
+        ...ProductInfo
+    }
+    pageSize
+    pageNumber
+    total
+}
+
 fragment RequestInfo on RequestType {
     userId
     requestId
@@ -311,6 +334,78 @@ mutation deleteItem(
     deleteItem(
         itemType: $itemType,
         itemId: $itemId
+    ) {
+        ok
+    }
+}
+
+query getProduct(
+    $providerId: String!,
+    $productId: String!
+) {
+    product(
+        providerId: $providerId,
+        productId: $productId
+    ) {
+        ...ProductInfo
+    }
+}
+
+query getProductList(
+    $pageNumber: Int, 
+    $limit: Int,
+    $providerId: String,
+    $sku: String,
+    $productName: String,
+    $productDescription: String
+) {
+    productList(
+        pageNumber: $pageNumber,
+        limit: $limit,
+        providerId: $providerId,
+        sku: $sku,
+        productName: $productName,
+        productDescription: $productDescription
+    ) {
+        ...ProductListInfo
+    }
+}
+
+mutation insertUpdateProduct(
+    $providerId: String!,
+    $productId: String,
+    $sku: String,
+    $productName: String,
+    $productDescription: String,
+    $uom: String,
+    $basePricePerUom: Float,
+    $data: JSON,
+    $updatedBy: String!
+) {
+    insertUpdateProduct(
+        providerId: $providerId,
+        productId: $productId,
+        sku: $sku,
+        productName: $productName,
+        productDescription: $productDescription,
+        uom: $uom,
+        basePricePerUom: $basePricePerUom,
+        data: $data,
+        updatedBy: $updatedBy
+    ) {
+        product{
+            ...ProductInfo
+        }
+    }
+}
+
+mutation deleteProduct(
+    $providerId: String!,
+    $productId: String!
+) {
+    deleteProduct(
+        providerId: $providerId,
+        productId: $productId
     ) {
         ok
     }
