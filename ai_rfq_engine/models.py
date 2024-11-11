@@ -57,6 +57,38 @@ class ItemModel(BaseModel):
     updated_at = UTCDateTimeAttribute()
 
 
+class SkuIndex(LocalSecondaryIndex):
+    class Meta:
+        # index_name is optional, but can be provided to override the default name
+        index_name = "sku-index"
+        billing_mode = "PAY_PER_REQUEST"
+        projection = AllProjection()
+
+    # This attribute is the hash key for the index
+    # Note that this attribute must also exist
+    # in the model
+    provider_id = UnicodeAttribute(hash_key=True)
+    sku = UnicodeAttribute(range_key=True)
+
+
+class ProductModel(BaseModel):
+    class Meta(BaseModel.Meta):
+        table_name = "are-products"
+
+    provider_id = UnicodeAttribute(hash_key=True)
+    product_id = UnicodeAttribute(range_key=True)
+    sku = UnicodeAttribute()
+    product_name = UnicodeAttribute()
+    product_description = UnicodeAttribute()
+    uom = UnicodeAttribute()
+    base_price_per_uom = NumberAttribute()
+    data = MapAttribute(default={})
+    updated_by = UnicodeAttribute()
+    created_at = UTCDateTimeAttribute()
+    updated_at = UTCDateTimeAttribute()
+    sku_index = SkuIndex()
+
+
 class RequestModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-requests"
@@ -149,13 +181,10 @@ class QuoteItemProductModel(BaseModel):
 
     quote_id = UnicodeAttribute(hash_key=True)
     item_id = UnicodeAttribute(range_key=True)
-    item_group = UnicodeAttribute()
-    item_name = UnicodeAttribute()
+    item_type = UnicodeAttribute()
     request_data = MapAttribute(default={})
     product_id = UnicodeAttribute()
-    product_name = UnicodeAttribute()
-    sku = UnicodeAttribute()
-    uom = UnicodeAttribute()
+    provider_id = UnicodeAttribute()
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()
     subtotal = NumberAttribute()

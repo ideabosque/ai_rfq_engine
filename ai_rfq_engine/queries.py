@@ -17,6 +17,8 @@ from .handlers import (
     resolve_installment_list_handler,
     resolve_item_handler,
     resolve_item_list_handler,
+    resolve_product_handler,
+    resolve_product_list_handler,
     resolve_quote_handler,
     resolve_quote_item_product_handler,
     resolve_quote_item_product_list_handler,
@@ -39,6 +41,8 @@ from .types import (
     InstallmentType,
     ItemListType,
     ItemType,
+    ProductListType,
+    ProductType,
     QuoteItemProductListType,
     QuoteItemProductType,
     QuoteListType,
@@ -82,6 +86,16 @@ def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
 
 def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemListType:
     return resolve_item_list_handler(info, **kwargs)
+
+
+def resolve_product(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ProductType:
+    return resolve_product_handler(info, **kwargs)
+
+
+def resolve_product_list(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> ProductListType:
+    return resolve_product_list_handler(info, **kwargs)
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:

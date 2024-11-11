@@ -23,6 +23,7 @@ from .mutations import (
     DeleteFile,
     DeleteInstallment,
     DeleteItem,
+    DeleteProduct,
     DeleteQuote,
     DeleteQuoteItemProduct,
     DeleteQuoteService,
@@ -33,6 +34,7 @@ from .mutations import (
     InsertUpdateFile,
     InsertUpdateInstallment,
     InsertUpdateItem,
+    InsertUpdateProduct,
     InsertUpdateQuote,
     InsertUpdateQuoteItemProduct,
     InsertUpdateQuoteService,
@@ -49,6 +51,8 @@ from .queries import (
     resolve_installment_list,
     resolve_item,
     resolve_item_list,
+    resolve_product,
+    resolve_product_list,
     resolve_quote,
     resolve_quote_item_product,
     resolve_quote_item_product_list,
@@ -71,6 +75,8 @@ from .types import (
     InstallmentType,
     ItemListType,
     ItemType,
+    ProductListType,
+    ProductType,
     QuoteItemProductListType,
     QuoteItemProductType,
     QuoteListType,
@@ -156,6 +162,22 @@ class Query(ObjectType):
         item_description=String(),
     )
 
+    product = Field(
+        ProductType,
+        provider_id=String(required=True),
+        product_id=String(required=True),
+    )
+
+    product_list = Field(
+        ProductListType,
+        page_number=Int(),
+        limit=Int(),
+        provider_id=String(),
+        sku=String(),
+        product_name=String(),
+        product_description=String(),
+    )
+
     request = Field(
         RequestType,
         required=True,
@@ -218,10 +240,9 @@ class Query(ObjectType):
         page_number=Int(),
         limit=Int(),
         quote_id=String(),
-        Item_groups=List(String),
-        Item_name=String(),
-        product_id=String(),
-        product_name=String(),
+        item_types=List(String),
+        product_ids=List(String),
+        provider_ids=List(String),
     )
 
     installment = Field(
@@ -309,6 +330,16 @@ class Query(ObjectType):
     ) -> ItemListType:
         return resolve_item_list(info, **kwargs)
 
+    def resolve_product(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ProductType:
+        return resolve_product(info, **kwargs)
+
+    def resolve_product_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ProductListType:
+        return resolve_product_list(info, **kwargs)
+
     def resolve_request(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
     ) -> RequestType:
@@ -383,6 +414,8 @@ class Mutations(ObjectType):
     delete_service_provider = DeleteServiceProvider.Field()
     insert_update_item = InsertUpdateItem.Field()
     delete_item = DeleteItem.Field()
+    insert_update_product = InsertUpdateProduct.Field()
+    delete_product = DeleteProduct.Field()
     insert_update_request = InsertUpdateRequest.Field()
     delete_request = DeleteRequest.Field()
     insert_update_quote = InsertUpdateQuote.Field()
