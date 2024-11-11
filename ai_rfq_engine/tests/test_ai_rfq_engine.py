@@ -425,7 +425,7 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    # @unittest.skip("demonstrating skipping")
+    @unittest.skip("demonstrating skipping")
     def test_graphql_insert_update_quote_service(self):
         payload = {
             "query": document,
@@ -480,6 +480,26 @@ class AIRFQEngineTest(unittest.TestCase):
                 "limit": 10,
             },
             "operation_name": "getQuoteServiceList",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    # @unittest.skip("demonstrating skipping")
+    def test_graphql_insert_update_quote_item_product(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "quoteId": "XXXXXXXXXXXXXXXXXXXX",
+                "itemId": "1688715816992117231",
+                "itemType": "XXXXXXXXXXXXXXXXXXXX",
+                "providerId": "XXXXXXXXXXXXXXXXXXXX",
+                "productId": "7642515695959085551",
+                "requestData": {},
+                "pricePerUom": 100.0,
+                "qty": 10,
+                "updatedBy": "XYZ",
+            },
+            "operation_name": "insertUpdateQuoteItemProduct",
         }
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)

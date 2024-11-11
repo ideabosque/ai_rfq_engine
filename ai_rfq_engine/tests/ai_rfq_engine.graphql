@@ -150,6 +150,28 @@ fragment QuoteServiceListInfo on QuoteServiceListType {
     total
 }
 
+fragment QuoteItemProductInfo on QuoteItemProductType {
+    quoteId
+    item
+    requestData
+    product
+    pricePerUom
+    qty
+    subtotal
+    updatedBy
+    createdAt
+    updatedAt
+}
+
+fragment QuoteItemProductListInfo on QuoteItemProductListType {
+    quoteItemProductList{
+        ...QuoteItemProductInfo
+    }
+    pageSize
+    pageNumber
+    total
+}
+
 query ping {
     ping
 }
@@ -587,7 +609,6 @@ mutation insertUpdateQuoteService(
     $serviceId: String!,
     $providerId: String!,
     $requestData: JSON,
-    $data: JSON,
     $pricePerUom: Float!,
     $qty: Float!,
     $updatedBy: String!
@@ -597,7 +618,6 @@ mutation insertUpdateQuoteService(
         serviceId: $serviceId,
         providerId: $providerId,
         requestData: $requestData,
-        data: $data,
         pricePerUom: $pricePerUom,
         qty: $qty,
         updatedBy: $updatedBy
@@ -615,6 +635,78 @@ mutation deleteQuoteService(
     deleteQuoteService(
         quoteId: $quoteId,
         serviceId: $serviceId
+    ) {
+        ok
+    }
+}
+
+query getQuoteItemProduct(
+    $quoteId: String!,
+    $itemId: String!
+) {
+    quoteItemProduct(
+        quoteId: $quoteId,
+        itemId: $itemId
+    ) {
+        ...QuoteItemProductInfo
+    }
+}
+
+query getQuoteItemProductList(
+    $pageNumber: Int, 
+    $limit: Int,
+    $quoteId: String,
+    $itemTypes: [String],
+    $productIds: [String],
+    $providerIds: [String]
+) {
+    quoteItemProductList(
+        pageNumber: $pageNumber,
+        limit: $limit,
+        quoteId: $quoteId,
+        itemTypes: $itemTypes,
+        productIds: $productIds,
+        providerIds: $providerIds
+    ) {
+        ...QuoteItemProductListInfo
+    }
+}
+
+mutation insertUpdateQuoteItemProduct(
+    $quoteId: String!,
+    $itemId: String!,
+    $itemType: String!,
+    $requestData: JSON,
+    $productId: String,
+    $providerId: String,
+    $pricePerUom: Float!,
+    $qty: Float!,
+    $updatedBy: String!
+) {
+    insertUpdateQuoteItemProduct(
+        quoteId: $quoteId,
+        itemId: $itemId,
+        itemType: $itemType,
+        requestData: $requestData,
+        productId: $productId,
+        providerId: $providerId,
+        pricePerUom: $pricePerUom,
+        qty: $qty,
+        updatedBy: $updatedBy
+    ) {
+        quoteItemProduct{
+            ...QuoteItemProductInfo
+        }
+    }
+}
+
+mutation deleteQuoteItemProduct(
+    $quoteId: String!,
+    $itemId: String!
+) {
+    deleteQuoteItemProduct(
+        quoteId: $quoteId,
+        itemId: $itemId
     ) {
         ok
     }

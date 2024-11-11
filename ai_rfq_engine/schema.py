@@ -232,7 +232,7 @@ class Query(ObjectType):
         QuoteItemProductType,
         required=True,
         quote_id=String(required=True),  # quote_id of the quote
-        Item_id=String(required=True),
+        item_id=String(required=True),
     )
 
     quote_item_product_list = Field(

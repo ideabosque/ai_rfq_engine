@@ -324,7 +324,6 @@ class InsertUpdateQuoteService(Mutation):
         service_id = String(required=True)
         provider_id = String(required=False)
         request_data = JSON(required=False)
-        data = JSON(required=False)
         price_per_uom = Float(required=False)
         qty = Float(required=False)
         updated_by = String(required=True)
@@ -368,13 +367,12 @@ class InsertUpdateQuoteItemProduct(Mutation):
     class Arguments:
         quote_id = String(required=True)
         item_id = String(required=True)
-        item_type = String(required=True)
-        request_data = JSON(required=True)
-        product_id = String(required=True)
-        provider_id = String(required=True)
-        price_per_uom = Float(required=True)
-        qty = Float(required=True)
-        subtotal = Float(required=True)
+        item_type = String(required=False)
+        request_data = JSON(required=False)
+        product_id = String(required=False)
+        provider_id = String(required=False)
+        price_per_uom = Float(required=False)
+        qty = Float(required=False)
         updated_by = String(required=True)
 
     @staticmethod
@@ -398,7 +396,7 @@ class DeleteQuoteItemProduct(Mutation):
 
     class Arguments:
         quote_id = String(required=True)
-        Item_id = String(required=True)
+        item_id = String(required=True)
 
     @staticmethod
     def mutate(
