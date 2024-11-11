@@ -137,6 +137,8 @@ class AIRFQEngineTest(unittest.TestCase):
                 "providerId": "XXXXXXXXXXXXXXXXXXXX",
                 "serviceType": "XXXXXXXXXXXXXXXXXXXX",
                 "serviceSpec": {},
+                "uom": "hr",
+                "basePricePerUom": 100,
                 "updatedBy": "XYZ",
             },
             "operation_name": "insertUpdateServiceProvider",
@@ -259,7 +261,7 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    # @unittest.skip("demonstrating skipping")
+    @unittest.skip("demonstrating skipping")
     def test_graphql_product(self):
         payload = {
             "query": document,
@@ -296,63 +298,6 @@ class AIRFQEngineTest(unittest.TestCase):
                 "limit": 10,
             },
             "operation_name": "getServiceProviderList",
-        }
-        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
-        logger.info(response)
-
-    @unittest.skip("demonstrating skipping")
-    def test_graphql_insert_update_user(self):
-        payload = {
-            "query": document,
-            "variables": {
-                "companyId": "XXXXXXXX",
-                "userId": "9949609751659483631",
-                "email": "XXXXXXXXXXXXX",
-                "fullName": "XYZ",
-                "data": {},
-                "updatedBy": "XYZ",
-            },
-            "operation_name": "insertUpdateUser",
-        }
-        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
-        logger.info(response)
-
-    @unittest.skip("demonstrating skipping")
-    def test_graphql_delete_user(self):
-        payload = {
-            "query": document,
-            "variables": {
-                "companyId": "XXXXXXXX",
-                "userId": "8814524378649399791",
-            },
-            "operation_name": "deleteUser",
-        }
-        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
-        logger.info(response)
-
-    @unittest.skip("demonstrating skipping")
-    def test_graphql_user(self):
-        payload = {
-            "query": document,
-            "variables": {
-                "companyId": "XXXXXXXX",
-                "userId": "9949609751659483631",
-            },
-            "operation_name": "getUser",
-        }
-        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
-        logger.info(response)
-
-    @unittest.skip("demonstrating skipping")
-    def test_graphql_user_list(self):
-        payload = {
-            "query": document,
-            "variables": {
-                "companyId": "XXXXXXXX",
-                "pageNumber": 1,
-                "limit": 10,
-            },
-            "operation_name": "getUserList",
         }
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
@@ -480,18 +425,16 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    @unittest.skip("demonstrating skipping")
+    # @unittest.skip("demonstrating skipping")
     def test_graphql_insert_update_quote_service(self):
         payload = {
             "query": document,
             "variables": {
                 "quoteId": "10132984814893470191",
-                "serviceId": "XXXXXXXXXXXXXXXXXXXX",
-                "serviceType": "XXXXXXXXXXXXXXXXXXXX",
-                "serviceName": "XXXXXXXXXXXXXXXXXXXX",
+                "serviceId": "592901047928754671",
+                "providerId": "XXXXXXXXXXXXXXXXXXXX",
                 # "requestData": {},
                 # "data": {},
-                "uom": "hr",
                 "pricePerUom": 100.0,
                 "qty": 10,
                 "updatedBy": "XYZ",

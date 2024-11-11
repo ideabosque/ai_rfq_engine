@@ -224,8 +224,8 @@ class Query(ObjectType):
         page_number=Int(),
         limit=Int(),
         quote_id=String(),
+        service_ids=List(String),
         service_types=List(String),
-        service_name=String(),
     )
 
     quote_item_product = Field(

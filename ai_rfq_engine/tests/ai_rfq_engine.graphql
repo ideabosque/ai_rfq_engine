@@ -21,6 +21,8 @@ fragment ServiceProviderInfo on ServiceProviderType {
     service
     providerId
     serviceSpec
+    uom
+    basePricePerUom
     updatedBy
     createdAt
     updatedAt
@@ -128,12 +130,9 @@ fragment QuoteListInfo on QuoteListType {
 
 fragment QuoteServiceInfo on QuoteServiceType {
     quoteId
-    serviceId
-    serviceType
-    serviceName
+    serviceProvider
     requestData
     data
-    uom
     pricePerUom
     qty
     subtotal
@@ -250,6 +249,8 @@ mutation insertUpdateServiceProvider(
     $providerId: String!,
     $serviceType: String,
     $serviceSpec: JSON,
+    $uom: String,
+    $basePricePerUom: Float,
     $updatedBy: String!
 ) {
     insertUpdateServiceProvider(
@@ -257,6 +258,8 @@ mutation insertUpdateServiceProvider(
         providerId: $providerId,
         serviceType: $serviceType,
         serviceSpec: $serviceSpec,
+        uom: $uom,
+        basePricePerUom: $basePricePerUom,
         updatedBy: $updatedBy
     ) {
         serviceProvider{
@@ -564,12 +567,16 @@ query getQuoteService(
 query getQuoteServiceList(
     $pageNumber: Int, 
     $limit: Int,
-    $quoteId: String
+    $quoteId: String,
+    $serviceIds: [String],
+    $serviceTypes: [String]
 ) {
     quoteServiceList(
         pageNumber: $pageNumber,
         limit: $limit,
-        quoteId: $quoteId
+        quoteId: $quoteId,
+        serviceIds: $serviceIds,
+        serviceTypes: $serviceTypes
     ) {
         ...QuoteServiceListInfo
     }
@@ -578,11 +585,9 @@ query getQuoteServiceList(
 mutation insertUpdateQuoteService(
     $quoteId: String!,
     $serviceId: String!,
-    $serviceType: String!,
-    $serviceName: String!,
+    $providerId: String!,
     $requestData: JSON,
     $data: JSON,
-    $uom: String!,
     $pricePerUom: Float!,
     $qty: Float!,
     $updatedBy: String!
@@ -590,11 +595,9 @@ mutation insertUpdateQuoteService(
     insertUpdateQuoteService(
         quoteId: $quoteId,
         serviceId: $serviceId,
-        serviceType: $serviceType,
-        serviceName: $serviceName,
+        providerId: $providerId,
         requestData: $requestData,
         data: $data,
-        uom: $uom,
         pricePerUom: $pricePerUom,
         qty: $qty,
         updatedBy: $updatedBy

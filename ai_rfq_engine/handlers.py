@@ -11,8 +11,6 @@ from typing import Any, Dict
 import boto3
 import pendulum
 from graphene import ResolveInfo
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     delete_decorator,
     insert_update_decorator,
@@ -20,6 +18,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .models import (
     CommentModel,
@@ -271,6 +270,17 @@ def get_service_provider(service_id: str, provider_id: str) -> ServiceProviderMo
     return ServiceProviderModel.get(service_id, provider_id)
 
 
+def _get_service_provider(service_id: str, provider_id: str) -> Dict[str, Any]:
+    service_provider = get_service_provider(service_id, provider_id)
+    return {
+        "service": _get_service(
+            service_provider.service_type, service_provider.service_id
+        ),
+        "provider_id": service_provider.provider_id,
+        "service_spec": service_provider.service_spec,
+    }
+
+
 def get_service_provider_count(service_id: str, provider_id: str) -> int:
     return ServiceProviderModel.count(
         service_id, ServiceProviderModel.provider_id == provider_id
@@ -356,6 +366,8 @@ def insert_update_service_provider_handler(
             **{
                 "service_type": kwargs["service_type"],
                 "service_spec": kwargs["service_spec"],
+                "uom": kwargs["uom"],
+                "base_price_per_uom": kwargs["base_price_per_uom"],
                 "updated_by": kwargs["updated_by"],
                 "created_at": pendulum.now("UTC"),
                 "updated_at": pendulum.now("UTC"),
@@ -369,9 +381,15 @@ def insert_update_service_provider_handler(
         ServiceProviderModel.updated_at.set(pendulum.now("UTC")),
     ]
     if kwargs.get("service_type"):
-        actions.append(ServiceProviderModel.service_type.set(kwargs["service_types"]))
+        actions.append(ServiceProviderModel.service_type.set(kwargs["service_type"]))
     if kwargs.get("service_spec"):
         actions.append(ServiceProviderModel.service_spec.set(kwargs["service_spec"]))
+    if kwargs.get("uom"):
+        actions.append(ServiceProviderModel.uom.set(kwargs["uom"]))
+    if kwargs.get("base_price_per_uom"):
+        actions.append(
+            ServiceProviderModel.base_price_per_uom.set(kwargs["base_price_per_uom"])
+        )
 
     service_provider.update(actions=actions)
     return
@@ -398,6 +416,16 @@ def delete_service_provider_handler(
 )
 def get_item(item_type: str, item_id: str) -> ItemModel:
     return ItemModel.get(item_type, item_id)
+
+
+def _get_item(item_type: str, item_id: str) -> Dict[str, Any]:
+    item = get_item(item_type, item_id)
+    return {
+        "item_type": item.item_type,
+        "item_id": item.item_id,
+        "item_name": item.item_name,
+        "item_description": item.item_description,
+    }
 
 
 def get_item_count(item_type: str, item_id: str) -> int:
@@ -508,6 +536,20 @@ def delete_item_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 )
 def get_product(provider_id: str, product_id: str) -> ProductModel:
     return ProductModel.get(provider_id, product_id)
+
+
+def _get_product(provider_id: str, product_id: str) -> Dict[str, Any]:
+    product = get_product(provider_id, product_id)
+    return {
+        "provider_id": product.provider_id,
+        "product_id": product.product_id,
+        "sku": product.sku,
+        "product_name": product.product_name,
+        "product_description": product.product_description,
+        "uom": product.uom,
+        "base_price_per_uom": product.base_price_per_uom,
+        "data": product.data,
+    }
 
 
 def get_product_count(provider_id: str, product_id: str) -> int:
@@ -951,22 +993,6 @@ def get_quote_service(quote_id: str, service_id: str) -> QuoteServiceModel:
     return QuoteServiceModel.get(quote_id, service_id)
 
 
-def _get_quote_service(quote_id: str, service_id: str) -> Dict[str, Any]:
-    quote_service = get_quote_service(quote_id, service_id)
-    return {
-        "quote_id": quote_service.quote_id,
-        "service_id": quote_service.service_id,
-        "service_type": quote_service.service_type,
-        "service_name": quote_service.service_name,
-        "request_data": quote_service.request_data,
-        "data": quote_service.data,
-        "uom": quote_service.uom,
-        "price_per_uom": quote_service.price_per_uom,
-        "qty": quote_service.qty,
-        "subtotal": quote_service.subtotal,
-    }
-
-
 def get_quote_service_count(quote_id: str, service_id: str) -> int:
     return QuoteServiceModel.count(quote_id, QuoteServiceModel.service_id == service_id)
 
@@ -974,7 +1000,19 @@ def get_quote_service_count(quote_id: str, service_id: str) -> int:
 def get_quote_service_type(
     info: ResolveInfo, quote_service: QuoteServiceModel
 ) -> QuoteServiceType:
+
+    try:
+        service_provider = _get_service_provider(
+            quote_service.service_id, quote_service.provider_id
+        )
+    except Exception as e:
+        log = traceback.format_exc()
+        info.context.get("logger").exception(log)
+        raise e
     quote_service = quote_service.__dict__["attribute_values"]
+    quote_service["service_provider"] = service_provider
+    quote_service.pop("service_id")
+    quote_service.pop("provider_id")
     return QuoteServiceType(**Utility.json_loads(Utility.json_dumps(quote_service)))
 
 
@@ -997,8 +1035,8 @@ def resolve_quote_service_list_handler(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> Any:
     quote_id = kwargs.get("quote_id")
-    service_types = kwargs.get("service_types")
-    service_name = kwargs.get("service_name")
+    service_ids = kwargs.get("service_ids")
+    provider_ids = kwargs.get("provider_ids")
 
     args = []
     inquiry_funct = QuoteServiceModel.scan
@@ -1009,10 +1047,10 @@ def resolve_quote_service_list_handler(
         inquiry_funct = QuoteServiceModel.query
 
     the_filters = None  # We can add filters for the query.
-    if service_types:
-        the_filters &= QuoteServiceModel.service_type.is_in(*service_types)
-    if service_name:
-        the_filters &= QuoteServiceModel.service_name.contains(service_name)
+    if service_ids:
+        the_filters &= QuoteServiceModel.service_id.is_in(*service_ids)
+    if provider_ids:
+        the_filters &= QuoteServiceModel.provider_id.is_in(*provider_ids)
     if the_filters is not None:
         args.append(the_filters)
 
@@ -1038,9 +1076,7 @@ def insert_update_quote_service_handler(
     service_id = kwargs.get("service_id")
     if kwargs.get("entity") is None:
         cols = {
-            "service_type": kwargs["service_type"],
-            "service_name": kwargs["service_name"],
-            "uom": kwargs["uom"],
+            "provider_id": kwargs["provider_id"],
             "price_per_uom": kwargs["price_per_uom"],
             "qty": kwargs["qty"],
             "subtotal": kwargs["price_per_uom"] * kwargs["qty"],
@@ -1069,8 +1105,6 @@ def insert_update_quote_service_handler(
         actions.append(QuoteServiceModel.request_data.set(kwargs.get("request_data")))
     if kwargs.get("data") is not None:
         actions.append(QuoteServiceModel.data.set(kwargs.get("data")))
-    if kwargs.get("uom") is not None:
-        actions.append(QuoteServiceModel.uom.set(kwargs.get("uom")))
     if kwargs.get("price_per_uom") is not None:
         actions.append(QuoteServiceModel.price_per_uom.set(kwargs.get("price_per_uom")))
     if kwargs.get("qty") is not None:
@@ -1113,7 +1147,22 @@ def get_quote_item_product_count(quote_id: str, item_id: str) -> int:
 def get_quote_item_product_type(
     info: ResolveInfo, quote_item_product: QuoteItemProductModel
 ) -> QuoteItemProductType:
+    try:
+        item = _get_item(quote_item_product.item_type, quote_item_product.item_id)
+        product = _get_product(
+            quote_item_product.provider_id, quote_item_product.product_id
+        )
+    except Exception as e:
+        log = traceback.format_exc()
+        info.context.get("logger").exception(log)
+        raise e
     quote_item_product = quote_item_product.__dict__["attribute_values"]
+    quote_item_product["item"] = item
+    quote_item_product["product"] = product
+    quote_item_product.pop("item_type")
+    quote_item_product.pop("item_id")
+    quote_item_product.pop("provider_id")
+    quote_item_product.pop("product_id")
     return QuoteItemProductType(
         **Utility.json_loads(Utility.json_dumps(quote_item_product))
     )
