@@ -21,7 +21,6 @@ from silvaengine_utility import Utility
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .models import (
-    CommentModel,
     FileModel,
     InstallmentModel,
     ItemModel,
@@ -34,8 +33,6 @@ from .models import (
     ServiceProviderModel,
 )
 from .types import (
-    CommentListType,
-    CommentType,
     FileListType,
     FileType,
     InstallmentListType,
@@ -1462,127 +1459,6 @@ def insert_update_installment_handler(
     model_funct=get_installment,
 )
 def delete_installment_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
-    kwargs.get("entity").delete()
-    return True
-
-
-@retry(
-    reraise=True,
-    wait=wait_exponential(multiplier=1, max=60),
-    stop=stop_after_attempt(5),
-)
-def get_comment(request_id: str, timestamp: str) -> CommentModel:
-    return CommentModel.get(request_id, timestamp)
-
-
-def _get_comment(request_id: str, timestamp: str) -> Dict[str, Any]:
-    comment = get_comment(request_id, timestamp)
-    return {
-        "request_id": comment.request_id,
-        "timestamp": comment.timestamp,
-        "user_id": comment.user_id,
-        "user_type": comment.user_type,
-        "comment": comment.comment,
-        "updated_at": comment.updated_at,
-    }
-
-
-def get_comment_count(request_id: str, timestamp: str) -> int:
-    return CommentModel.count(request_id, CommentModel.timestamp == timestamp)
-
-
-def get_comment_type(info: ResolveInfo, comment: CommentModel) -> CommentType:
-    comment = comment.__dict__["attribute_values"]
-    return CommentType(**Utility.json_loads(Utility.json_dumps(comment)))
-
-
-def resolve_comment_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> CommentType:
-    return get_comment_type(
-        info,
-        get_comment(kwargs.get("request_id"), kwargs.get("timestamp")),
-    )
-
-
-@monitor_decorator
-@resolve_list_decorator(
-    attributes_to_get=["request_id", "timestamp"],
-    list_type_class=CommentListType,
-    type_funct=get_comment_type,
-)
-def resolve_comment_list_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
-    request_id = kwargs.get("request_id")
-    user_id = kwargs.get("user_id")
-    user_types = kwargs.get("user_types")
-    comment = kwargs.get("comment")
-
-    args = []
-    inquiry_funct = CommentModel.scan
-    count_funct = CommentModel.count
-    if request_id:
-        args = [request_id, None]
-        inquiry_funct = CommentModel.query
-        if user_id:
-            args.append(CommentModel.user_id == user_id)
-            inquiry_funct = CommentModel.user_id_index.query
-            count_funct = CommentModel.user_id_index.count
-
-    the_filters = None  # We can add filters for the query.
-    if user_types:
-        the_filters &= CommentModel.user_type.is_in(*user_types)
-    if comment:
-        the_filters &= CommentModel.comment.contains(comment)
-    if the_filters is not None:
-        args.append(the_filters)
-
-    return inquiry_funct, count_funct, args
-
-
-@insert_update_decorator(
-    keys={
-        "hash_key": "request_id",
-        "range_key": "timestamp",
-    },
-    model_funct=get_comment,
-    count_funct=get_comment_count,
-    type_funct=get_comment_type,
-    # data_attributes_except_for_data_diff=data_attributes_except_for_data_diff,
-    # activity_history_funct=None,
-)
-def insert_update_comment_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    request_id = kwargs.get("request_id")
-    timestamp = kwargs.get("timestamp")
-    if kwargs.get("entity") is None:
-        CommentModel(
-            request_id,
-            timestamp,
-            **{
-                "user_id": kwargs["user_id"],
-                "user_type": kwargs["user_type"],
-                "comment": kwargs["comment"],
-                "updated_at": pendulum.now("UTC"),
-            },
-        ).save()
-        return
-
-    comment = kwargs.get("entity")
-    actions = [
-        CommentModel.updated_at.set(pendulum.now("UTC")),
-    ]
-    if kwargs.get("comment"):
-        actions.append(CommentModel.comment.set(kwargs.get("comment")))
-
-    comment.update(actions=actions)
-    return
-
-
-@delete_decorator(
-    keys={
-        "hash_key": "request_id",
-        "range_key": "timestamp",
-    },
-    model_funct=get_comment,
-)
-def delete_comment_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
 

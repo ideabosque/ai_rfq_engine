@@ -133,15 +133,6 @@ class InstallmentType(ObjectType):
     updated_at = DateTime()
 
 
-class CommentType(ObjectType):
-    request_id = String()
-    timestamp = String()
-    user_id = String()
-    user_type = String()
-    comment = String()
-    updated_at = DateTime()
-
-
 class FileType(ObjectType):
     request_id = String()
     name = String()
@@ -186,10 +177,6 @@ class QuoteItemProductListType(ListObjectType):
 
 class InstallmentListType(ListObjectType):
     installment_list = List(InstallmentType)
-
-
-class CommentListType(ListObjectType):
-    comment_list = List(CommentType)
 
 
 class FileListType(ListObjectType):
