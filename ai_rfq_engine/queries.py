@@ -9,8 +9,6 @@ from typing import Any, Dict
 from graphene import ResolveInfo
 
 from .handlers import (
-    resolve_comment_handler,
-    resolve_comment_list_handler,
     resolve_file_handler,
     resolve_file_list_handler,
     resolve_installment_handler,
@@ -33,8 +31,6 @@ from .handlers import (
     resolve_service_provider_list_handler,
 )
 from .types import (
-    CommentListType,
-    CommentType,
     FileListType,
     FileType,
     InstallmentListType,
@@ -148,16 +144,6 @@ def resolve_installment_list(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> InstallmentListType:
     return resolve_installment_list_handler(info, **kwargs)
-
-
-def resolve_comment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> CommentType:
-    return resolve_comment_handler(info, **kwargs)
-
-
-def resolve_comment_list(
-    info: ResolveInfo, **kwargs: Dict[str, Any]
-) -> CommentListType:
-    return resolve_comment_list_handler(info, **kwargs)
 
 
 def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType:

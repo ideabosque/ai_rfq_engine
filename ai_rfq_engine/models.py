@@ -211,33 +211,6 @@ class InstallmentModel(BaseModel):
     updated_at = UTCDateTimeAttribute()
 
 
-class CommentUserIdIndex(LocalSecondaryIndex):
-    class Meta:
-        # index_name is optional, but can be provided to override the default name
-        index_name = "user_id-index"
-        billing_mode = "PAY_PER_REQUEST"
-        projection = AllProjection()
-
-    # This attribute is the hash key for the index
-    # Note that this attribute must also exist
-    # in the model
-    request_id = UnicodeAttribute(hash_key=True)
-    user_id = UnicodeAttribute(range_key=True)
-
-
-class CommentModel(BaseModel):
-    class Meta(BaseModel.Meta):
-        table_name = "are-comments"
-
-    request_id = UnicodeAttribute(hash_key=True)
-    timestamp = UnicodeAttribute(range_key=True)
-    user_id = UnicodeAttribute()
-    user_type = UnicodeAttribute()
-    comment = UnicodeAttribute()
-    updated_at = UTCDateTimeAttribute()
-    user_id_index = CommentUserIdIndex()
-
-
 class FileUserIdIndex(LocalSecondaryIndex):
     class Meta:
         # index_name is optional, but can be provided to override the default name

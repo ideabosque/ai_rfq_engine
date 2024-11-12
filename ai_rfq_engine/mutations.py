@@ -11,7 +11,6 @@ from graphene import Boolean, DateTime, Field, Float, Int, List, Mutation, Strin
 from silvaengine_utility import JSON
 
 from .handlers import (
-    delete_comment_handler,
     delete_file_handler,
     delete_installment_handler,
     delete_item_handler,
@@ -22,7 +21,6 @@ from .handlers import (
     delete_request_handler,
     delete_service_handler,
     delete_service_provider_handler,
-    insert_update_comment_handler,
     insert_update_file_handler,
     insert_update_installment_handler,
     insert_update_item_handler,
@@ -35,7 +33,6 @@ from .handlers import (
     insert_update_service_provider_handler,
 )
 from .types import (
-    CommentType,
     FileType,
     InstallmentType,
     ItemType,
@@ -460,46 +457,6 @@ class DeleteInstallment(Mutation):
             raise e
 
         return DeleteInstallment(ok=ok)
-
-
-class InsertUpdateComment(Mutation):
-    comment = Field(CommentType)
-
-    class Arguments:
-        request_id = String(required=True)
-        timestamp = String()
-        user_id = String(required=True)
-        user_type = String(required=True)
-
-    @staticmethod
-    def mutate(root: Any, info: Any, **kwargs: Dict[str, Any]) -> "InsertUpdateComment":
-        try:
-            comment = insert_update_comment_handler(info, **kwargs)
-        except Exception as e:
-            log = traceback.format_exc()
-            info.context.get("logger").error(log)
-            raise e
-
-        return InsertUpdateComment(comment=comment)
-
-
-class DeleteComment(Mutation):
-    ok = Boolean()
-
-    class Arguments:
-        request_id = String(required=True)
-        timestamp = String(required=True)
-
-    @staticmethod
-    def mutate(root: Any, info: Any, **kwargs: Dict[str, Any]) -> "DeleteComment":
-        try:
-            ok = delete_comment_handler(info, **kwargs)
-        except Exception as e:
-            log = traceback.format_exc()
-            info.context.get("logger").error(log)
-            raise e
-
-        return DeleteComment(ok=ok)
 
 
 class InsertUpdateFile(Mutation):

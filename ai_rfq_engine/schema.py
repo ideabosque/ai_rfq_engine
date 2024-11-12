@@ -19,7 +19,6 @@ from graphene import (
 )
 
 from .mutations import (
-    DeleteComment,
     DeleteFile,
     DeleteInstallment,
     DeleteItem,
@@ -30,7 +29,6 @@ from .mutations import (
     DeleteRequest,
     DeleteService,
     DeleteServiceProvider,
-    InsertUpdateComment,
     InsertUpdateFile,
     InsertUpdateInstallment,
     InsertUpdateItem,
@@ -43,8 +41,6 @@ from .mutations import (
     InsertUpdateServiceProvider,
 )
 from .queries import (
-    resolve_comment,
-    resolve_comment_list,
     resolve_file,
     resolve_file_list,
     resolve_installment,
@@ -67,8 +63,6 @@ from .queries import (
     resolve_service_provider_list,
 )
 from .types import (
-    CommentListType,
-    CommentType,
     FileListType,
     FileType,
     InstallmentListType,
@@ -94,8 +88,6 @@ from .types import (
 
 def type_class():
     return [
-        CommentListType,
-        CommentType,
         FileListType,
         FileType,
         InstallmentListType,
@@ -265,23 +257,6 @@ class Query(ObjectType):
         statuses=List(String),
     )
 
-    comment = Field(
-        CommentType,
-        required=True,
-        request_id=String(required=True),
-        timestamp=String(required=True),
-    )
-
-    comment_list = Field(
-        CommentListType,
-        page_number=Int(),
-        limit=Int(),
-        request_id=String(),
-        user_id=String(),
-        user_types=List(String),
-        comment=String(),
-    )
-
     file = Field(
         FileType,
         required=True,
@@ -388,16 +363,6 @@ class Query(ObjectType):
     ) -> InstallmentListType:
         return resolve_installment_list(info, **kwargs)
 
-    def resolve_comment(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> CommentType:
-        return resolve_comment(info, **kwargs)
-
-    def resolve_comment_list(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> CommentListType:
-        return resolve_comment_list(info, **kwargs)
-
     def resolve_file(self, info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType:
         return resolve_file(info, **kwargs)
 
@@ -426,7 +391,5 @@ class Mutations(ObjectType):
     delete_quote_item_product = DeleteQuoteItemProduct.Field()
     insert_update_installment = InsertUpdateInstallment.Field()
     delete_installment = DeleteInstallment.Field()
-    insert_update_comment = InsertUpdateComment.Field()
-    delete_comment = DeleteComment.Field()
     insert_update_file = InsertUpdateFile.Field()
     delete_file = DeleteFile.Field()
