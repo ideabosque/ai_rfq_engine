@@ -120,9 +120,8 @@ class QuoteItemProductType(ObjectType):
 
 
 class InstallmentType(ObjectType):
-    quote_id = String()
+    quote = JSON()
     installment_id = String()
-    request_id = String()
     priority = String()
     salesorder_no = String()
     scheduled_date = DateTime()

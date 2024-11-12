@@ -202,7 +202,7 @@ class InstallmentModel(BaseModel):
     scheduled_date = UTCDateTimeAttribute()
     installment_ratio = NumberAttribute()
     installment_amount = NumberAttribute()
-    status = UnicodeAttribute()
+    status = UnicodeAttribute(default="initial")
     updated_by = UnicodeAttribute()
     created_at = UTCDateTimeAttribute()
     updated_at = UTCDateTimeAttribute()

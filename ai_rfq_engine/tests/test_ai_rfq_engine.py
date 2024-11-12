@@ -362,7 +362,7 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    # @unittest.skip("demonstrating skipping")
+    @unittest.skip("demonstrating skipping")
     def test_graphql_insert_update_quote(self):
         payload = {
             "query": document,
@@ -539,6 +539,27 @@ class AIRFQEngineTest(unittest.TestCase):
                 "limit": 10,
             },
             "operation_name": "getQuoteItemProductList",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    # @unittest.skip("demonstrating skipping")
+    def test_graphql_insert_update_installment(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "quoteId": "536273424614691311",
+                # "installmentId": "XXXXXXXXXXXXXXXXXXXX",
+                "requestId": "15407800632809230831",
+                "priority": "XXXXXXXXXXXXXXXXXXXX",
+                "salesorderNo": "XXXXXXXXXXXXXXXXXXXX",
+                "scheduledDate": "2024-11-11T07:20:34.206809+0000",
+                "installmentRatio": 100.0,
+                "installmentAmount": 100.0,
+                # "status": "",
+                "updatedBy": "XYZ",
+            },
+            "operation_name": "insertUpdateInstallment",
         }
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)

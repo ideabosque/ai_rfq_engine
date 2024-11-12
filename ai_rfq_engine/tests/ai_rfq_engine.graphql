@@ -170,6 +170,29 @@ fragment QuoteItemProductListInfo on QuoteItemProductListType {
     total
 }
 
+fragment InstallmentInfo on InstallmentType {
+    quote
+    installmentId
+    priority
+    salesorderNo
+    scheduledDate
+    installmentRatio
+    installmentAmount
+    status
+    updatedBy
+    createdAt
+    updatedAt
+}
+
+fragment InstallmentListInfo on InstallmentListType {
+    installmentList{
+        ...InstallmentInfo
+    }
+    pageSize
+    pageNumber
+    total
+}
+
 query ping {
     ping
 }
@@ -703,6 +726,86 @@ mutation deleteQuoteItemProduct(
     deleteQuoteItemProduct(
         quoteId: $quoteId,
         itemId: $itemId
+    ) {
+        ok
+    }
+}
+
+query getInstallment(
+    $quoteId: String!,
+    $installmentId: String!
+) {
+    installment(
+        quoteId: $quoteId,
+        installmentId: $installmentId
+    ) {
+        ...InstallmentInfo
+    }
+}
+
+query getInstallmentList(
+    $pageNumber: Int, 
+    $limit: Int,
+    $quoteId: String,
+    $requestId: String,
+    $priorities: [String],
+    $salesorderNos: [String],
+    $scheduledDateFrom: DateTime,
+    $scheduledDateTo: DateTime,
+    $statuses: [String]
+) {
+    installmentList(
+        pageNumber: $pageNumber,
+        limit: $limit,
+        quoteId: $quoteId,
+        requestId: $requestId,
+        priorities: $priorities,
+        salesorderNos: $salesorderNos,
+        scheduledDateFrom: $scheduledDateFrom,
+        scheduledDateTo: $scheduledDateTo,
+        statuses: $statuses
+    ) {
+        ...InstallmentListInfo
+    }
+}
+
+mutation insertUpdateInstallment(
+    $quoteId: String!,
+    $installmentId: String,
+    $requestId: String!,
+    $priority: String,
+    $salesorderNo: String,
+    $scheduledDate: DateTime,
+    $installmentRatio: Float,
+    $installmentAmount: Float,
+    $status: String,
+    $updatedBy: String!
+) {
+    insertUpdateInstallment(
+        quoteId: $quoteId,
+        installmentId: $installmentId,
+        requestId: $requestId,
+        priority: $priority,
+        salesorderNo: $salesorderNo,
+        scheduledDate: $scheduledDate,
+        installmentRatio: $installmentRatio,
+        installmentAmount: $installmentAmount,
+        status: $status,
+        updatedBy: $updatedBy
+    ) {
+        installment{
+            ...InstallmentInfo
+        }
+    }
+}
+
+mutation deleteInstallment(
+    $quoteId: String!,
+    $installmentId: String!
+) {
+    deleteInstallment(
+        quoteId: $quoteId,
+        installmentId: $installmentId
     ) {
         ok
     }
