@@ -841,9 +841,6 @@ def _get_quote(request_id: str, quote_id: str) -> Dict[str, Any]:
         "shipping_amount": quote.shipping_amount,
         "total_amount": quote.total_amount,
         "status": quote.status,
-        "updated_by": quote.updated_by,
-        "created_at": quote.created_at,
-        "updated_at": quote.updated_at,
     }
 
 
@@ -1009,6 +1006,7 @@ def get_quote_service_type(
     info: ResolveInfo, quote_service: QuoteServiceModel
 ) -> QuoteServiceType:
     try:
+        quote = _get_quote(quote_service.request_id, quote_service.quote_id)
         service_provider = _get_service_provider(
             quote_service.service_id, quote_service.provider_id
         )
@@ -1017,7 +1015,10 @@ def get_quote_service_type(
         info.context.get("logger").exception(log)
         raise e
     quote_service = quote_service.__dict__["attribute_values"]
+    quote_service["quote"] = quote
     quote_service["service_provider"] = service_provider
+    quote_service.pop("quote_id")
+    quote_service.pop("request_id")
     quote_service.pop("service_id")
     quote_service.pop("provider_id")
     return QuoteServiceType(**Utility.json_loads(Utility.json_dumps(quote_service)))
@@ -1084,6 +1085,7 @@ def insert_update_quote_service_handler(
     if kwargs.get("entity") is None:
         cols = {
             "provider_id": kwargs["provider_id"],
+            "request_id": kwargs["request_id"],
             "price_per_uom": kwargs["price_per_uom"],
             "qty": kwargs["qty"],
             "subtotal": kwargs["price_per_uom"] * kwargs["qty"],
@@ -1106,12 +1108,14 @@ def insert_update_quote_service_handler(
         QuoteServiceModel.updated_by.set(kwargs.get("updated_by")),
         QuoteServiceModel.updated_at.set(pendulum.now("UTC")),
     ]
+    if kwargs.get("request_id") is not None:
+        actions.append(QuoteServiceModel.request_id.set(kwargs["request_id"]))
     if kwargs.get("request_data") is not None:
-        actions.append(QuoteServiceModel.request_data.set(kwargs.get("request_data")))
+        actions.append(QuoteServiceModel.request_data.set(kwargs["request_data"]))
     if kwargs.get("price_per_uom") is not None:
-        actions.append(QuoteServiceModel.price_per_uom.set(kwargs.get("price_per_uom")))
+        actions.append(QuoteServiceModel.price_per_uom.set(kwargs["price_per_uom"]))
     if kwargs.get("qty") is not None:
-        actions.append(QuoteServiceModel.qty.set(kwargs.get("qty")))
+        actions.append(QuoteServiceModel.qty.set(kwargs["qty"]))
     if kwargs.get("price_per_uom") is not None and kwargs.get("qty") is not None:
         subtotal = kwargs["price_per_uom"] * kwargs["qty"]
         actions.append(QuoteServiceModel.subtotal.set(subtotal))
@@ -1151,6 +1155,7 @@ def get_quote_item_product_type(
     info: ResolveInfo, quote_item_product: QuoteItemProductModel
 ) -> QuoteItemProductType:
     try:
+        quote = _get_quote(quote_item_product.request_id, quote_item_product.quote_id)
         item = _get_item(quote_item_product.item_type, quote_item_product.item_id)
         product = _get_product(
             quote_item_product.provider_id, quote_item_product.product_id
@@ -1160,8 +1165,11 @@ def get_quote_item_product_type(
         info.context.get("logger").exception(log)
         raise e
     quote_item_product = quote_item_product.__dict__["attribute_values"]
+    quote_item_product["quote"] = quote
     quote_item_product["item"] = item
     quote_item_product["product"] = product
+    quote_item_product.pop("quote_id")
+    quote_item_product.pop("request_id")
     quote_item_product.pop("item_type")
     quote_item_product.pop("item_id")
     quote_item_product.pop("provider_id")
@@ -1234,6 +1242,7 @@ def insert_update_quote_item_product_handler(info: ResolveInfo, **kwargs: Any) -
             quote_id,
             item_id,
             **{
+                "request_id": kwargs["request_id"],
                 "item_type": kwargs["item_type"],
                 "request_data": kwargs["request_data"],
                 "product_id": kwargs["product_id"],
@@ -1253,16 +1262,14 @@ def insert_update_quote_item_product_handler(info: ResolveInfo, **kwargs: Any) -
         QuoteItemProductModel.updated_by.set(kwargs.get("updated_by")),
         QuoteItemProductModel.updated_at.set(pendulum.now("UTC")),
     ]
+    if kwargs.get("request_id") is not None:
+        actions.append(QuoteItemProductModel.request_id.set(kwargs["request_id"]))
     if kwargs.get("request_data") is not None:
-        actions.append(
-            QuoteItemProductModel.request_data.set(kwargs.get("request_data"))
-        )
+        actions.append(QuoteItemProductModel.request_data.set(kwargs["request_data"]))
     if kwargs.get("price_per_uom") is not None:
-        actions.append(
-            QuoteItemProductModel.price_per_uom.set(kwargs.get("price_per_uom"))
-        )
+        actions.append(QuoteItemProductModel.price_per_uom.set(kwargs["price_per_uom"]))
     if kwargs.get("qty") is not None:
-        actions.append(QuoteItemProductModel.qty.set(kwargs.get("qty")))
+        actions.append(QuoteItemProductModel.qty.set(kwargs["qty"]))
     if kwargs.get("price_per_uom") is not None and kwargs.get("qty") is not None:
         subtotal = kwargs["price_per_uom"] * kwargs["qty"]
         actions.append(QuoteItemProductModel.subtotal.set(subtotal))

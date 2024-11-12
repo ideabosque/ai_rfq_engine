@@ -95,10 +95,9 @@ class QuoteType(ObjectType):
 
 
 class QuoteServiceType(ObjectType):
-    quote_id = String()
+    quote = JSON()
     service_provider = JSON()
     request_data = JSON()
-    data = JSON()
     price_per_uom = Float()
     qty = Float()
     subtotal = Float()
@@ -108,7 +107,7 @@ class QuoteServiceType(ObjectType):
 
 
 class QuoteItemProductType(ObjectType):
-    quote_id = String()
+    quote = JSON()
     item = JSON()
     request_data = JSON()
     product = JSON()

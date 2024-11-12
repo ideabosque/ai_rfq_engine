@@ -323,6 +323,7 @@ class InsertUpdateQuoteService(Mutation):
         quote_id = String(required=True)
         service_id = String(required=True)
         provider_id = String(required=False)
+        request_id = String(required=False)
         request_data = JSON(required=False)
         price_per_uom = Float(required=False)
         qty = Float(required=False)
@@ -367,6 +368,7 @@ class InsertUpdateQuoteItemProduct(Mutation):
     class Arguments:
         quote_id = String(required=True)
         item_id = String(required=True)
+        request_id = String(required=False)
         item_type = String(required=False)
         request_data = JSON(required=False)
         product_id = String(required=False)
