@@ -484,7 +484,7 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    # @unittest.skip("demonstrating skipping")
+    @unittest.skip("demonstrating skipping")
     def test_graphql_insert_update_quote_item_product(self):
         payload = {
             "query": document,
@@ -500,6 +500,46 @@ class AIRFQEngineTest(unittest.TestCase):
                 "updatedBy": "XYZ",
             },
             "operation_name": "insertUpdateQuoteItemProduct",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_delete_quote_item_product(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "quoteId": "XXXXXXXXXXXXXXXXXXXX",
+                "itemId": "1688715816992117231",
+            },
+            "operation_name": "deleteQuoteItemProduct",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_quote_item_product(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "quoteId": "XXXXXXXXXXXXXXXXXXXX",
+                "itemId": "1688715816992117231",
+            },
+            "operation_name": "getQuoteItemProduct",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    # @unittest.skip("demonstrating skipping")
+    def test_graphql_quote_item_product_list(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "quoteId": "XXXXXXXXXXXXXXXXXXXX",
+                "pageNumber": 1,
+                "limit": 10,
+            },
+            "operation_name": "getQuoteItemProductList",
         }
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
