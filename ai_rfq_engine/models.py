@@ -164,6 +164,7 @@ class QuoteServiceModel(BaseModel):
     quote_id = UnicodeAttribute(hash_key=True)
     service_id = UnicodeAttribute(range_key=True)
     provider_id = UnicodeAttribute()
+    request_id = UnicodeAttribute()
     request_data = MapAttribute(default={})
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()
@@ -179,6 +180,7 @@ class QuoteItemProductModel(BaseModel):
 
     quote_id = UnicodeAttribute(hash_key=True)
     item_id = UnicodeAttribute(range_key=True)
+    request_id = UnicodeAttribute()
     item_type = UnicodeAttribute()
     request_data = MapAttribute(default={})
     product_id = UnicodeAttribute()

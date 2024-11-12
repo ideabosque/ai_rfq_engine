@@ -128,10 +128,9 @@ fragment QuoteListInfo on QuoteListType {
 }
 
 fragment QuoteServiceInfo on QuoteServiceType {
-    quoteId
+    quote
     serviceProvider
     requestData
-    data
     pricePerUom
     qty
     subtotal
@@ -150,7 +149,7 @@ fragment QuoteServiceListInfo on QuoteServiceListType {
 }
 
 fragment QuoteItemProductInfo on QuoteItemProductType {
-    quoteId
+    quote
     item
     requestData
     product
@@ -630,6 +629,7 @@ mutation insertUpdateQuoteService(
     $quoteId: String!,
     $serviceId: String!,
     $providerId: String!,
+    $requestId: String,
     $requestData: JSON,
     $pricePerUom: Float!,
     $qty: Float!,
@@ -639,6 +639,7 @@ mutation insertUpdateQuoteService(
         quoteId: $quoteId,
         serviceId: $serviceId,
         providerId: $providerId,
+        requestId: $requestId,
         requestData: $requestData,
         pricePerUom: $pricePerUom,
         qty: $qty,
@@ -697,17 +698,19 @@ query getQuoteItemProductList(
 mutation insertUpdateQuoteItemProduct(
     $quoteId: String!,
     $itemId: String!,
-    $itemType: String!,
+    $requestId: String,
+    $itemType: String,
     $requestData: JSON,
     $productId: String,
     $providerId: String,
-    $pricePerUom: Float!,
-    $qty: Float!,
+    $pricePerUom: Float,
+    $qty: Float,
     $updatedBy: String!
 ) {
     insertUpdateQuoteItemProduct(
         quoteId: $quoteId,
         itemId: $itemId,
+        requestId: $requestId,
         itemType: $itemType,
         requestData: $requestData,
         productId: $productId,
