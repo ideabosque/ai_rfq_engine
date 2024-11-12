@@ -418,12 +418,12 @@ class InsertUpdateInstallment(Mutation):
         quote_id = String(required=True)
         installment_id = String()
         request_id = String(required=True)
-        priority = String(required=True)
-        salesorder_no = String(required=True)
-        scheduled_date = DateTime(required=True)
-        installment_ratio = Float(required=True)
-        installment_amount = Float(required=True)
-        status = String(required=True)
+        priority = String(required=False)
+        salesorder_no = String(required=False)
+        scheduled_date = DateTime(required=False)
+        installment_ratio = Float(required=False)
+        installment_amount = Float(required=False)
+        status = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod

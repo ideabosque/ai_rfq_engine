@@ -1004,7 +1004,6 @@ def get_quote_service_count(quote_id: str, service_id: str) -> int:
 def get_quote_service_type(
     info: ResolveInfo, quote_service: QuoteServiceModel
 ) -> QuoteServiceType:
-
     try:
         service_provider = _get_service_provider(
             quote_service.service_id, quote_service.provider_id
@@ -1318,7 +1317,16 @@ def get_installment_count(quote_id: str, installment_id: str) -> int:
 def get_installment_type(
     info: ResolveInfo, installment: InstallmentModel
 ) -> InstallmentType:
+    try:
+        quote = _get_quote(installment.request_id, installment.quote_id)
+    except Exception as e:
+        log = traceback.format_exc()
+        info.context.get("logger").exception(log)
+        raise e
     installment = installment.__dict__["attribute_values"]
+    installment["quote"] = quote
+    installment.pop("request_id")
+    installment.pop("quote_id")
     return InstallmentType(**Utility.json_loads(Utility.json_dumps(installment)))
 
 
@@ -1391,45 +1399,45 @@ def insert_update_installment_handler(
     quote_id = kwargs.get("quote_id")
     installment_id = kwargs.get("installment_id")
     if kwargs.get("entity") is None:
+        cols = {
+            "request_id": kwargs["request_id"],
+            "priority": kwargs["priority"],
+            "salesorder_no": kwargs["salesorder_no"],
+            "scheduled_date": kwargs["scheduled_date"],
+            "installment_ratio": kwargs["installment_ratio"],
+            "installment_amount": kwargs["installment_amount"],
+            "updated_by": kwargs["updated_by"],
+            "created_at": pendulum.now("UTC"),
+            "updated_at": pendulum.now("UTC"),
+        }
+        if kwargs.get("status"):
+            cols["status"] = kwargs["status"]
         InstallmentModel(
             quote_id,
             installment_id,
-            **{
-                "request_id": kwargs["request_id"],
-                "priority": kwargs["priority"],
-                "salesorder_no": kwargs["salesorder_no"],
-                "scheduled_date": kwargs["scheduled_date"],
-                "installment_ratio": kwargs["installment_ratio"],
-                "installment_amount": kwargs["installment_amount"],
-                "status": kwargs["status"],
-                "updated_by": kwargs["updated_by"],
-                "created_at": pendulum.now("UTC"),
-                "updated_at": pendulum.now("UTC"),
-            },
+            **cols,
         ).save()
         return
 
     installment = kwargs.get("entity")
     actions = [
-        InstallmentModel.updated_by.set(kwargs.get("updated_by")),
+        InstallmentModel.updated_by.set(kwargs["updated_by"]),
         InstallmentModel.updated_at.set(pendulum.now("UTC")),
     ]
     if kwargs.get("priority"):
-        actions.append(InstallmentModel.priority.set(kwargs.get("priority")))
+        actions.append(InstallmentModel.priority.set(kwargs["priority"]))
     if kwargs.get("scheduled_date"):
-        actions.append(
-            InstallmentModel.scheduled_date.set(kwargs.get("scheduled_date"))
-        )
+        actions.append(InstallmentModel.scheduled_date.set(kwargs["scheduled_date"]))
     if kwargs.get("installment_ratio"):
         actions.append(
-            InstallmentModel.installment_ratio.set(kwargs.get("installment_ratio"))
+            InstallmentModel.installment_ratio.set(kwargs["installment_ratio"])
         )
     if kwargs.get("installment_amount"):
         actions.append(
-            InstallmentModel.installment_amount.set(kwargs.get("installment_amount"))
+            InstallmentModel.installment_amount.set(kwargs["installment_amount"])
         )
     if kwargs.get("status"):
-        actions.append(InstallmentModel.status.set(kwargs.get("status")))
+        actions.append(InstallmentModel.status.set(kwargs["status"]))
 
     installment.update(actions=actions)
     return
