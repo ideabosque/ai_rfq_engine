@@ -181,7 +181,7 @@ class Query(ObjectType):
     request = Field(
         RequestType,
         required=True,
-        user_id=String(required=True),  # user_id of the requestor
+        customer_id=String(required=True),  # user_id of the requestor
         request_id=String(required=True),
     )
 
@@ -189,7 +189,7 @@ class Query(ObjectType):
         RequestListType,
         page_number=Int(),
         limit=Int(),
-        user_id=String(),
+        customer_id=String(),
         title=String(),
         description=String(),
     )

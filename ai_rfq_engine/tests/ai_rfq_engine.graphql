@@ -80,7 +80,7 @@ fragment ProductListInfo on ProductListType {
 }
 
 fragment RequestInfo on RequestType {
-    userId
+    customerId
     requestId
     title
     description
@@ -103,11 +103,9 @@ fragment RequestListInfo on RequestListType {
 }
 
 fragment QuoteInfo on QuoteType {
-    requestId
+    request
     quoteId
     providerId
-    customerId
-    installments
     billingAddress
     shippingAddress
     shippingMethod
@@ -437,11 +435,11 @@ mutation deleteProduct(
 }
 
 query getRequest(
-    $userId: String!,
+    $customerId: String!,
     $requestId: String!
 ) {
     request(
-        userId: $userId,
+        customerId: $customerId,
         requestId: $requestId
     ) {
         ...RequestInfo
@@ -451,19 +449,19 @@ query getRequest(
 query getRequestList(
     $pageNumber: Int, 
     $limit: Int,
-    $userId: String
+    $customerId: String
 ) {
     requestList(
         pageNumber: $pageNumber,
         limit: $limit,
-        userId: $userId
+        customerId: $customerId
     ) {
         ...RequestListInfo
     }
 }
 
 mutation insertUpdateRequest(
-    $userId: String!,
+    $customerId: String!,
     $requestId: String,
     $title: String,
     $description: String,
@@ -474,7 +472,7 @@ mutation insertUpdateRequest(
     $updatedBy: String!
 ) {
     insertUpdateRequest(
-        userId: $userId,
+        customerId: $customerId,
         requestId: $requestId,
         title: $title,
         description: $description,
@@ -491,11 +489,11 @@ mutation insertUpdateRequest(
 }
 
 mutation deleteRequest(
-    $userId: String!,
+    $customerId: String!,
     $requestId: String!
 ) {
     deleteRequest(
-        userId: $userId,
+        customerId: $customerId,
         requestId: $requestId
     ) {
         ok
@@ -533,7 +531,6 @@ mutation insertUpdateQuote(
     $quoteId: String,
     $providerId: String,
     $customerId: String,
-    $installments: [JSON],
     $billingAddress: JSON,
     $shippingAddress: JSON,
     $shippingMethod: String,
@@ -547,7 +544,6 @@ mutation insertUpdateQuote(
         quoteId: $quoteId,
         providerId: $providerId,
         customerId: $customerId,
-        installments: $installments,
         billingAddress: $billingAddress,
         shippingAddress: $shippingAddress,
         shippingMethod: $shippingMethod,

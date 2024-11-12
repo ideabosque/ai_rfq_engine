@@ -65,7 +65,7 @@ class ProductType(ObjectType):
 
 
 class RequestType(ObjectType):
-    user_id = String()
+    customer_id = String()
     request_id = String()
     title = String()
     description = String()
@@ -79,11 +79,9 @@ class RequestType(ObjectType):
 
 
 class QuoteType(ObjectType):
-    request_id = String()
+    request = JSON()
     quote_id = String()
     provider_id = String()
-    customer_id = String()
-    installments = List(JSON)
     billing_address = JSON()
     shipping_address = JSON()
     shipping_method = String()

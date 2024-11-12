@@ -307,8 +307,8 @@ class AIRFQEngineTest(unittest.TestCase):
         payload = {
             "query": document,
             "variables": {
-                "userId": "9949609751659483631",
-                "requestId": "13556221548218618351",
+                "customerId": "9949609751659483631",
+                # "requestId": "13556221548218618351",
                 "title": "XXXXXXXX",
                 "description": "XXXXXXXX",
                 "items": [],
@@ -327,7 +327,7 @@ class AIRFQEngineTest(unittest.TestCase):
         payload = {
             "query": document,
             "variables": {
-                "userId": "9949609751659483631",
+                "customerId": "9949609751659483631",
                 "requestId": "2456336509709521391",
             },
             "operation_name": "deleteRequest",
@@ -340,7 +340,7 @@ class AIRFQEngineTest(unittest.TestCase):
         payload = {
             "query": document,
             "variables": {
-                "userId": "9949609751659483631",
+                "customerId": "9949609751659483631",
                 "requestId": "13556221548218618351",
             },
             "operation_name": "getRequest",
@@ -353,7 +353,7 @@ class AIRFQEngineTest(unittest.TestCase):
         payload = {
             "query": document,
             "variables": {
-                "userId": "9949609751659483631",
+                "customerId": "9949609751659483631",
                 "pageNumber": 1,
                 "limit": 10,
             },
@@ -362,16 +362,15 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    @unittest.skip("demonstrating skipping")
+    # @unittest.skip("demonstrating skipping")
     def test_graphql_insert_update_quote(self):
         payload = {
             "query": document,
             "variables": {
-                "requestId": "13556221548218618351",
-                "quoteId": "10132984814893470191",
+                "requestId": "15407800632809230831",
+                "quoteId": "536273424614691311",
                 "providerId": "XXXXXXXXXXXXXXXXXXXX",
                 "customerId": "9949609751659483631",
-                # "installments": [],
                 # "billingAddress": {},
                 # "shippingAddress": {},
                 # "shippingMethod": "",
@@ -530,7 +529,7 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    # @unittest.skip("demonstrating skipping")
+    @unittest.skip("demonstrating skipping")
     def test_graphql_quote_item_product_list(self):
         payload = {
             "query": document,

@@ -11,8 +11,6 @@ from typing import Any, Dict
 import boto3
 import pendulum
 from graphene import ResolveInfo
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     delete_decorator,
     insert_update_decorator,
@@ -20,6 +18,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .models import (
     CommentModel,
@@ -677,14 +676,14 @@ def delete_product_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-def get_request(user_id: str, request_id: str) -> RequestModel:
-    return RequestModel.get(user_id, request_id)
+def get_request(customer_id: str, request_id: str) -> RequestModel:
+    return RequestModel.get(customer_id, request_id)
 
 
-def _get_request(user_id: str, request_id: str) -> Dict[str, Any]:
-    request = get_request(user_id, request_id)
+def _get_request(customer_id: str, request_id: str) -> Dict[str, Any]:
+    request = get_request(customer_id, request_id)
     return {
-        "user_id": request.user_id,
+        "customer_id": request.customer_id,
         "request_id": request.request_id,
         "title": request.title,
         "description": request.description,
@@ -695,8 +694,8 @@ def _get_request(user_id: str, request_id: str) -> Dict[str, Any]:
     }
 
 
-def get_request_count(user_id: str, request_id: str) -> int:
-    return RequestModel.count(user_id, RequestModel.request_id == request_id)
+def get_request_count(customer_id: str, request_id: str) -> int:
+    return RequestModel.count(customer_id, RequestModel.request_id == request_id)
 
 
 def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
@@ -707,26 +706,26 @@ def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
 def resolve_request_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:
     return get_request_type(
         info,
-        get_request(kwargs.get("user_id"), kwargs.get("request_id")),
+        get_request(kwargs.get("customer_id"), kwargs.get("request_id")),
     )
 
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["user_id", "request_id"],
+    attributes_to_get=["customer_id", "request_id"],
     list_type_class=RequestListType,
     type_funct=get_request_type,
 )
 def resolve_request_list_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
-    user_id = kwargs.get("user_id")
+    customer_id = kwargs.get("customer_id")
     title = kwargs.get("title")
     description = kwargs.get("description")
 
     args = []
     inquiry_funct = RequestModel.scan
     count_funct = RequestModel.count
-    if user_id:
-        args = [user_id, None]
+    if customer_id:
+        args = [customer_id, None]
         inquiry_funct = RequestModel.query
 
     the_filters = None  # We can add filters for the query.
@@ -742,7 +741,7 @@ def resolve_request_list_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 
 @insert_update_decorator(
     keys={
-        "hash_key": "user_id",
+        "hash_key": "customer_id",
         "range_key": "request_id",
     },
     model_funct=get_request,
@@ -752,7 +751,7 @@ def resolve_request_list_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     # activity_history_funct=None,
 )
 def insert_update_request_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    user_id = kwargs.get("user_id")
+    customer_id = kwargs.get("customer_id")
     request_id = kwargs.get("request_id")
     cols = {
         "title": kwargs["title"],
@@ -772,7 +771,7 @@ def insert_update_request_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -
         cols["status"] = kwargs["status"]
     if kwargs.get("entity") is None:
         RequestModel(
-            user_id,
+            customer_id,
             request_id,
             **cols,
         ).save()
@@ -806,7 +805,7 @@ def insert_update_request_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 
 @delete_decorator(
     keys={
-        "hash_key": "user_id",
+        "hash_key": "customer_id",
         "range_key": "request_id",
     },
     model_funct=get_request,
@@ -832,7 +831,6 @@ def _get_quote(request_id: str, quote_id: str) -> Dict[str, Any]:
         "quote_id": quote.quote_id,
         "provider_id": quote.provider_id,
         "customer_id": quote.customer_id,
-        "installments": quote.installments,
         "billing_address": quote.billing_address,
         "shipping_address": quote.shipping_address,
         "shipping_method": quote.shipping_method,
@@ -850,7 +848,16 @@ def get_quote_count(request_id: str, quote_id: str) -> int:
 
 
 def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
+    try:
+        request = _get_request(quote.customer_id, quote.request_id)
+    except Exception as e:
+        log = traceback.format_exc()
+        info.context.get("logger").exception(log)
+        raise e
     quote = quote.__dict__["attribute_values"]
+    quote["request"] = request
+    quote.pop("customer_id")
+    quote.pop("request_id")
     return QuoteType(**Utility.json_loads(Utility.json_dumps(quote)))
 
 
@@ -921,8 +928,6 @@ def insert_update_quote_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
         "created_at": pendulum.now("UTC"),
         "updated_at": pendulum.now("UTC"),
     }
-    if kwargs.get("installments") is not None:
-        cols["installments"] = kwargs["installments"]
     if kwargs.get("billing_address") is not None:
         cols["billing_address"] = kwargs["billing_address"]
     if kwargs.get("shipping_address") is not None:
@@ -948,8 +953,6 @@ def insert_update_quote_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
         QuoteModel.updated_by.set(kwargs.get("updated_by")),
         QuoteModel.updated_at.set(pendulum.now("UTC")),
     ]
-    if kwargs.get("installments") is not None:
-        actions.append(QuoteModel.installments.set(kwargs.get("installments")))
     if kwargs.get("billing_address") is not None:
         actions.append(QuoteModel.billing_address.set(kwargs.get("billing_address")))
     if kwargs.get("shipping_address") is not None:
