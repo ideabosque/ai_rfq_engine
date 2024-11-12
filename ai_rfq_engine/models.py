@@ -94,7 +94,7 @@ class RequestModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-requests"
 
-    user_id = UnicodeAttribute(hash_key=True)
+    customer_id = UnicodeAttribute(hash_key=True)
     request_id = UnicodeAttribute(range_key=True)
     title = UnicodeAttribute()
     description = UnicodeAttribute()
@@ -143,7 +143,6 @@ class QuoteModel(BaseModel):
     quote_id = UnicodeAttribute(range_key=True)
     provider_id = UnicodeAttribute()
     customer_id = UnicodeAttribute()
-    installments = ListAttribute(default=[])
     billing_address = MapAttribute(default={})
     shipping_address = MapAttribute(default={})
     shipping_method = UnicodeAttribute(null=True)

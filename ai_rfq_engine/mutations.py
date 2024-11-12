@@ -227,7 +227,7 @@ class InsertUpdateRequest(Mutation):
     request = Field(RequestType)
 
     class Arguments:
-        user_id = String(required=True)
+        customer_id = String(required=True)
         request_id = String()
         title = String(required=False)
         description = String(required=False)
@@ -253,7 +253,7 @@ class DeleteRequest(Mutation):
     ok = Boolean()
 
     class Arguments:
-        user_id = String(required=True)
+        customer_id = String(required=True)
         request_id = String(required=True)
 
     @staticmethod
@@ -276,7 +276,6 @@ class InsertUpdateQuote(Mutation):
         quote_id = String()
         provider_id = String(required=False)
         customer_id = String(required=False)
-        installments = List(JSON, required=False)
         billing_address = JSON(required=False)
         shipping_address = JSON(required=False)
         shipping_method = String(required=False)
