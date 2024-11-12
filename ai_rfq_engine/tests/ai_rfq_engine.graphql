@@ -42,6 +42,7 @@ fragment ItemInfo on ItemType {
     itemId
     itemName
     itemDescription
+    uom
     updatedBy
     createdAt
     updatedAt
@@ -358,6 +359,7 @@ mutation insertUpdateItem(
     $itemId: String,
     $itemName: String,
     $itemDescription: String,
+    $uom: String,
     $updatedBy: String!
 ) {
     insertUpdateItem(
@@ -365,6 +367,7 @@ mutation insertUpdateItem(
         itemId: $itemId,
         itemName: $itemName,
         itemDescription: $itemDescription,
+        uom: $uom,
         updatedBy: $updatedBy
     ) {
         item{

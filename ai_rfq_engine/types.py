@@ -45,6 +45,7 @@ class ItemType(ObjectType):
     item_id = String()
     item_name = String()
     item_description = String()
+    uom = String()
     updated_by = String()
     created_at = DateTime()
     updated_at = DateTime()

@@ -53,6 +53,7 @@ class ItemModel(BaseModel):
     item_id = UnicodeAttribute(range_key=True)
     item_name = UnicodeAttribute()
     item_description = UnicodeAttribute()
+    uom = UnicodeAttribute()
     updated_by = UnicodeAttribute()
     created_at = UTCDateTimeAttribute()
     updated_at = UTCDateTimeAttribute()

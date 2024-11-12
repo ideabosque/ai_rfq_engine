@@ -172,7 +172,7 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    @unittest.skip("demonstrating skipping")
+    # @unittest.skip("demonstrating skipping")
     def test_graphql_insert_update_item(self):
         payload = {
             "query": document,
@@ -181,6 +181,7 @@ class AIRFQEngineTest(unittest.TestCase):
                 "itemId": "1688715816992117231",
                 "itemName": "XXXXXXXXXXXXXXXXXXXX",
                 "itemDescription": "XXXXXXXXXXXXXXXXXXXX",
+                "uom": "kg",
                 "updatedBy": "XYZ",
             },
             "operation_name": "insertUpdateItem",
@@ -543,13 +544,13 @@ class AIRFQEngineTest(unittest.TestCase):
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
 
-    # @unittest.skip("demonstrating skipping")
+    @unittest.skip("demonstrating skipping")
     def test_graphql_insert_update_installment(self):
         payload = {
             "query": document,
             "variables": {
                 "quoteId": "536273424614691311",
-                # "installmentId": "XXXXXXXXXXXXXXXXXXXX",
+                # "installmentId": "628259538058613231",
                 "requestId": "15407800632809230831",
                 "priority": "XXXXXXXXXXXXXXXXXXXX",
                 "salesorderNo": "XXXXXXXXXXXXXXXXXXXX",
@@ -560,6 +561,46 @@ class AIRFQEngineTest(unittest.TestCase):
                 "updatedBy": "XYZ",
             },
             "operation_name": "insertUpdateInstallment",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_delete_installment(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "quoteId": "536273424614691311",
+                "installmentId": "628259538058613231",
+            },
+            "operation_name": "deleteInstallment",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_installment(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "quoteId": "536273424614691311",
+                "installmentId": "628259538058613231",
+            },
+            "operation_name": "getInstallment",
+        }
+        response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
+        logger.info(response)
+
+    @unittest.skip("demonstrating skipping")
+    def test_graphql_installment_list(self):
+        payload = {
+            "query": document,
+            "variables": {
+                "quoteId": "536273424614691311",
+                "pageNumber": 1,
+                "limit": 10,
+            },
+            "operation_name": "getInstallmentList",
         }
         response = self.ai_rfq_engine.ai_rfq_graphql(**payload)
         logger.info(response)
