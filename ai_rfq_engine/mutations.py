@@ -145,6 +145,7 @@ class InsertUpdateItem(Mutation):
         item_id = String(required=False)
         item_name = String(required=False)
         item_description = String(required=False)
+        uom = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod

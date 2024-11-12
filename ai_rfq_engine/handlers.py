@@ -425,6 +425,7 @@ def _get_item(item_type: str, item_id: str) -> Dict[str, Any]:
         "item_id": item.item_id,
         "item_name": item.item_name,
         "item_description": item.item_description,
+        "uom": item.uom,
     }
 
 
@@ -496,6 +497,7 @@ def insert_update_item_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> N
             **{
                 "item_name": kwargs["item_name"],
                 "item_description": kwargs["item_description"],
+                "uom": kwargs["uom"],
                 "updated_by": kwargs["updated_by"],
                 "created_at": pendulum.now("UTC"),
                 "updated_at": pendulum.now("UTC"),
@@ -512,6 +514,8 @@ def insert_update_item_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> N
         actions.append(ItemModel.item_name.set(kwargs["item_name"]))
     if kwargs.get("item_description") is not None:
         actions.append(ItemModel.item_description.set(kwargs["item_description"]))
+    if kwargs.get("uom") is not None:
+        actions.append(ItemModel.uom.set(kwargs["uom"]))
 
     item.update(actions=actions)
     return
