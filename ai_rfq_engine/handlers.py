@@ -11,6 +11,8 @@ from typing import Any, Dict
 import boto3
 import pendulum
 from graphene import ResolveInfo
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     delete_decorator,
     insert_update_decorator,
@@ -18,7 +20,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .models import (
     CommentModel,
