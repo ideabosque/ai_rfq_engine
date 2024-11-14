@@ -22,7 +22,7 @@ def deploy() -> List:
             "service": "AI Assistant",
             "class": "AIRFQEngine",
             "functions": {
-                "rfq_graphql": {
+                "ai_rfq_graphql": {
                     "is_static": False,
                     "label": "AI RFQ GraphQL",
                     "query": [
