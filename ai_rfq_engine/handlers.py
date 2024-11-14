@@ -754,31 +754,32 @@ def resolve_request_list_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 def insert_update_request_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     customer_id = kwargs.get("customer_id")
     request_id = kwargs.get("request_id")
-    cols = {
-        "title": kwargs["title"],
-        "description": kwargs["description"],
-        "expired_at": pendulum.now("UTC").add(
-            days=kwargs.get("days_until_expiration", 10)
-        ),
-        "updated_by": kwargs["updated_by"],
-        "created_at": pendulum.now("UTC"),
-        "updated_at": pendulum.now("UTC"),
-    }
-    if kwargs.get("items") is not None:
-        cols["items"] = kwargs["items"]
-    if kwargs.get("services") is not None:
-        cols["services"] = kwargs["services"]
-    if kwargs.get("status") is not None:
-        cols["status"] = kwargs["status"]
     if kwargs.get("entity") is None:
-        RequestModel(
-            customer_id,
-            request_id,
-            **cols,
-        ).save()
-        return
+        cols = {
+            "title": kwargs["title"],
+            "description": kwargs["description"],
+            "expired_at": pendulum.now("UTC").add(
+                days=kwargs.get("days_until_expiration", 10)
+            ),
+            "updated_by": kwargs["updated_by"],
+            "created_at": pendulum.now("UTC"),
+            "updated_at": pendulum.now("UTC"),
+        }
+        if kwargs.get("items") is not None:
+            cols["items"] = kwargs["items"]
+        if kwargs.get("services") is not None:
+            cols["services"] = kwargs["services"]
+        if kwargs.get("status") is not None:
+            cols["status"] = kwargs["status"]
+        if kwargs.get("entity") is None:
+            RequestModel(
+                customer_id,
+                request_id,
+                **cols,
+            ).save()
+            return
 
-    user = kwargs.get("entity")
+    request = kwargs.get("entity")
     actions = [
         RequestModel.updated_by.set(kwargs.get("updated_by")),
         RequestModel.updated_at.set(pendulum.now("UTC")),
@@ -800,7 +801,7 @@ def insert_update_request_handler(info: ResolveInfo, **kwargs: Dict[str, Any]) -
             )
         )
 
-    user.update(actions=actions)
+    request.update(actions=actions)
     return
 
 
