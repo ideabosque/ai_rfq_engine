@@ -27,12 +27,12 @@ def deploy() -> List:
                     "label": "AI RFQ GraphQL",
                     "query": [
                         {
-                            "action": "user",
-                            "label": "View User",
+                            "action": "product",
+                            "label": "View Product",
                         },
                         {
-                            "action": "userList",
-                            "label": "View User List",
+                            "action": "productList",
+                            "label": "View Product List",
                         },
                         {
                             "action": "request",
@@ -49,6 +49,22 @@ def deploy() -> List:
                         {
                             "action": "quoteList",
                             "label": "View Quote List",
+                        },
+                        {
+                            "action": "service",
+                            "label": "View Service",
+                        },
+                        {
+                            "action": "serviceList",
+                            "label": "View Service List",
+                        },
+                        {
+                            "action": "serviceProvider",
+                            "label": "View Service Provider",
+                        },
+                        {
+                            "action": "serviceProviderList",
+                            "label": "View Service Provider List",
                         },
                         {
                             "action": "quoteService",
@@ -75,12 +91,12 @@ def deploy() -> List:
                             "label": "View Installment List",
                         },
                         {
-                            "action": "comment",
-                            "label": "View Comment",
+                            "action": "item",
+                            "label": "View Item",
                         },
                         {
-                            "action": "commentList",
-                            "label": "View Comment List",
+                            "action": "itemList",
+                            "label": "View Item List",
                         },
                         {
                             "action": "file",
@@ -93,12 +109,12 @@ def deploy() -> List:
                     ],
                     "mutation": [
                         {
-                            "action": "insertUpdateUser",
-                            "label": "Create Update User",
+                            "action": "insertUpdateProduct",
+                            "label": "Create Update Product",
                         },
                         {
-                            "action": "deleteUser",
-                            "label": "Delete User",
+                            "action": "deleteProduct",
+                            "label": "Delete Product",
                         },
                         {
                             "action": "insertUpdateRequest",
@@ -115,6 +131,22 @@ def deploy() -> List:
                         {
                             "action": "deleteQuote",
                             "label": "Delete Quote",
+                        },
+                        {
+                            "action": "insertUpdateService",
+                            "label": "Create Update Service",
+                        },
+                        {
+                            "action": "deleteService",
+                            "label": "Delete Service",
+                        },
+                        {
+                            "action": "insertUpdateServiceProvider",
+                            "label": "Create Update Service Provider",
+                        },
+                        {
+                            "action": "deleteServiceProvider",
+                            "label": "Delete Service Provider",
                         },
                         {
                             "action": "insertUpdateQuoteService",
@@ -141,12 +173,12 @@ def deploy() -> List:
                             "label": "Delete Installment",
                         },
                         {
-                            "action": "insertUpdateComment",
-                            "label": "Create Update Comment",
+                            "action": "insertUpdateItem",
+                            "label": "Create Update Item",
                         },
                         {
-                            "action": "deleteComment",
-                            "label": "Delete Comment",
+                            "action": "deleteItem",
+                            "label": "Delete Item",
                         },
                         {
                             "action": "insertUpdateFile",
