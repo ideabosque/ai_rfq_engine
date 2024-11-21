@@ -11,6 +11,8 @@ from typing import Any, Dict
 import boto3
 import pendulum
 from graphene import ResolveInfo
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     delete_decorator,
     insert_update_decorator,
@@ -18,7 +20,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .models import (
     FileModel,
@@ -60,9 +61,15 @@ funct_on_local_config = None
 graphql_documents = None
 aws_lambda = None
 
+## Test the waters 🧪 before diving in!
+##<--Testing Data-->##
+endpoint_id = None
+test_mode = None
+##<--Testing Data-->##
+
 
 def handlers_init(logger: logging.Logger, **setting: Dict[str, Any]) -> None:
-    global functs_on_local, funct_on_local_config, graphql_documents, aws_lambda
+    global functs_on_local, funct_on_local_config, graphql_documents, aws_lambda, endpoint_id, test_mode
     try:
         functs_on_local = setting.get("functs_on_local", {})
         funct_on_local_config = setting.get("funct_on_local_config", {})
@@ -84,6 +91,13 @@ def handlers_init(logger: logging.Logger, **setting: Dict[str, Any]) -> None:
             aws_lambda = boto3.client(
                 "lambda",
             )
+
+        ## Test the waters 🧪 before diving in!
+        ##<--Testing Data-->##
+        endpoint_id = setting.get("endpoint_id")
+        test_mode = setting.get("test_mode")
+        ##<--Testing Data-->##
+
     except Exception as e:
         log = traceback.format_exc()
         logger.error(log)
@@ -91,16 +105,18 @@ def handlers_init(logger: logging.Logger, **setting: Dict[str, Any]) -> None:
 
 
 def invoke_funct_on_local(
-    logger: logging.Logger, funct: str, **params: Dict[str, Any]
+    logger: logging.Logger,
+    setting: Dict[str, Any],
+    funct: str,
+    **params: Dict[str, Any],
 ) -> Dict[str, Any]:
     try:
-        funct_on_local = functs_on_local.get(funct)
+        funct_on_local = setting["functs_on_local"].get(funct)
         assert funct_on_local is not None, f"Function ({funct}) not found."
-        assert funct_on_local_config is not None, "funct_on_local_config is not set."
 
         result = Utility.json_loads(
             Utility.invoke_funct_on_local(
-                logger, funct, funct_on_local, funct_on_local_config, **params
+                logger, funct, funct_on_local, setting, **params
             )
         )
         if result.get("errors"):
@@ -113,25 +129,52 @@ def invoke_funct_on_local(
         raise e
 
 
+def invoke_funct_on_aws_lambda(
+    logger: logging.Logger,
+    endpoint_id: str,
+    funct: str,
+    params: Dict[str, Any] = {},
+    setting: Dict[str, Any] = None,
+) -> Dict[str, Any]:
+
+    ## Test the waters 🧪 before diving in!
+    ##<--Testing Function-->##
+    if test_mode:
+        if test_mode == "local_for_all":
+            # Jump to the local function if these conditions meet.
+            return invoke_funct_on_local(logger, setting, funct, **params)
+        elif test_mode == "local_for_aws_lambda":  # Test AWS Lambda calls from local.
+            pass
+    ##<--Testing Function-->##
+
+    # If we're at the top-level, let's call the AWS Lambda directly 💻
+    return Utility.invoke_funct_on_aws_lambda(
+        logger,
+        aws_lambda,
+        **{
+            "endpoint_id": endpoint_id,
+            "funct": funct,
+            "params": params,
+        },
+    )
+
+
 def execute_graphql_query(
     logger: logging.Logger,
     endpoint_id: str,
     funct: str,
     operation_name: str,
     variables: Dict[str, Any] = {},
+    setting: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     params = {
         "query": graphql_documents[funct],
         "variables": variables,
         "operation_name": operation_name,
     }
-    if endpoint_id is None:
-        return invoke_funct_on_local(logger, funct, **params)
 
-    result = Utility.invoke_funct_on_aws_lambda(
-        logger,
-        aws_lambda,
-        **{"endpoint_id": endpoint_id, "funct": funct, "params": params},
+    result = invoke_funct_on_aws_lambda(
+        logger, endpoint_id, funct, params=params, setting=setting
     )
     return Utility.json_loads(Utility.json_loads(result))["data"]
 
