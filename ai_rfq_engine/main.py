@@ -193,7 +193,7 @@ def deploy() -> List:
                     "support_methods": ["POST"],
                     "is_auth_required": False,
                     "is_graphql": True,
-                    "settings": "ai_rfq_engine",
+                    "settings": "beta_core_openai",
                     "disabled_in_resources": True,  # Ignore adding to resource list.
                 },
             },
