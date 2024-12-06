@@ -114,11 +114,13 @@ def invoke_funct_on_local(
         funct_on_local = setting["functs_on_local"].get(funct)
         assert funct_on_local is not None, f"Function ({funct}) not found."
 
-        result = Utility.json_loads(
-            Utility.invoke_funct_on_local(
-                logger, funct, funct_on_local, setting, **params
-            )
+        result = Utility.invoke_funct_on_local(
+            logger, funct, funct_on_local, setting, **params
         )
+        if result is None:
+            return
+
+        result = Utility.json_loads(result)
         if result.get("errors"):
             raise Exception(result["errors"])
 
@@ -148,7 +150,7 @@ def invoke_funct_on_aws_lambda(
     ##<--Testing Function-->##
 
     # If we're at the top-level, let's call the AWS Lambda directly 💻
-    return Utility.invoke_funct_on_aws_lambda(
+    result = Utility.invoke_funct_on_aws_lambda(
         logger,
         aws_lambda,
         **{
@@ -157,26 +159,34 @@ def invoke_funct_on_aws_lambda(
             "params": params,
         },
     )
+    if result is None or result == "null":
+        return
+
+    result = Utility.json_loads(Utility.json_loads(result))
+    if result.get("errors"):
+        raise Exception(result["errors"])
+
+    return result["data"]
 
 
 def execute_graphql_query(
     logger: logging.Logger,
     endpoint_id: str,
     funct: str,
-    operation_name: str,
+    query: str,
     variables: Dict[str, Any] = {},
     setting: Dict[str, Any] = None,
+    connection_id: str = None,
 ) -> Dict[str, Any]:
     params = {
-        "query": graphql_documents[funct],
+        "query": query,
         "variables": variables,
-        "operation_name": operation_name,
+        "connection_id": connection_id,
     }
 
-    result = invoke_funct_on_aws_lambda(
+    return invoke_funct_on_aws_lambda(
         logger, endpoint_id, funct, params=params, setting=setting
     )
-    return Utility.json_loads(Utility.json_loads(result))["data"]
 
 
 @retry(
