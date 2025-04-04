@@ -11,7 +11,7 @@ from graphene import Schema
 
 from silvaengine_dynamodb_base import SilvaEngineDynamoDBBase
 
-from .handlers import handlers_init
+from .handlers.config import Config
 from .schema import Mutations, Query, type_class
 
 
@@ -27,12 +27,52 @@ def deploy() -> List:
                     "label": "AI RFQ GraphQL",
                     "query": [
                         {
-                            "action": "product",
-                            "label": "View Product",
+                            "action": "item",
+                            "label": "View Item",
                         },
                         {
-                            "action": "productList",
-                            "label": "View Product List",
+                            "action": "itemList",
+                            "label": "View Item List",
+                        },
+                        {
+                            "action": "segment",
+                            "label": "View Segment",
+                        },
+                        {
+                            "action": "segmentList",
+                            "label": "View Segment List",
+                        },
+                        {
+                            "action": "segmentContact",
+                            "label": "View Segment Contact",
+                        },
+                        {
+                            "action": "segmentContactList",
+                            "label": "View Segment Contact List",
+                        },
+                        {
+                            "action": "providerItem",
+                            "label": "View Provider Item",
+                        },
+                        {
+                            "action": "providerItemList",
+                            "label": "View Provider Item List",
+                        },
+                        {
+                            "action": "itemPriceTier",
+                            "label": "View Item Price Tier",
+                        },
+                        {
+                            "action": "itemPriceTieList",
+                            "label": "View Item Price Tier List",
+                        },
+                        {
+                            "action": "discountRule",
+                            "label": "View Discount Rule",
+                        },
+                        {
+                            "action": "discountRuleList",
+                            "label": "View Discount Rule List",
                         },
                         {
                             "action": "request",
@@ -51,36 +91,12 @@ def deploy() -> List:
                             "label": "View Quote List",
                         },
                         {
-                            "action": "service",
-                            "label": "View Service",
+                            "action": "quoteItem",
+                            "label": "View Quote Item",
                         },
                         {
-                            "action": "serviceList",
-                            "label": "View Service List",
-                        },
-                        {
-                            "action": "serviceProvider",
-                            "label": "View Service Provider",
-                        },
-                        {
-                            "action": "serviceProviderList",
-                            "label": "View Service Provider List",
-                        },
-                        {
-                            "action": "quoteService",
-                            "label": "View Quote Service",
-                        },
-                        {
-                            "action": "quoteServiceList",
-                            "label": "View Quote Service List",
-                        },
-                        {
-                            "action": "quoteItemProduct",
-                            "label": "View Quote Item Raw Material",
-                        },
-                        {
-                            "action": "quoteItemProductList",
-                            "label": "View Quote Item Raw Material List",
+                            "action": "quoteItemList",
+                            "label": "View Quote Item List",
                         },
                         {
                             "action": "installment",
@@ -89,14 +105,6 @@ def deploy() -> List:
                         {
                             "action": "installmentList",
                             "label": "View Installment List",
-                        },
-                        {
-                            "action": "item",
-                            "label": "View Item",
-                        },
-                        {
-                            "action": "itemList",
-                            "label": "View Item List",
                         },
                         {
                             "action": "file",
@@ -109,12 +117,52 @@ def deploy() -> List:
                     ],
                     "mutation": [
                         {
-                            "action": "insertUpdateProduct",
-                            "label": "Create Update Product",
+                            "action": "insertUpdateItem",
+                            "label": "Create Update Item",
                         },
                         {
-                            "action": "deleteProduct",
-                            "label": "Delete Product",
+                            "action": "deleteItem",
+                            "label": "Delete Item",
+                        },
+                        {
+                            "action": "insertUpdateSegment",
+                            "label": "Create Update Segment",
+                        },
+                        {
+                            "action": "deleteSegment",
+                            "label": "Delete Segment",
+                        },
+                        {
+                            "action": "insertUpdateSegmentContact",
+                            "label": "Create Update Segment Contact",
+                        },
+                        {
+                            "action": "deleteSegmentContact",
+                            "label": "Delete Segment Contact",
+                        },
+                        {
+                            "action": "insertUpdateProviderItem",
+                            "label": "Create Update Provider Item",
+                        },
+                        {
+                            "action": "deleteProviderItem",
+                            "label": "Delete Provider Item",
+                        },
+                        {
+                            "action": "insertUpdateItemPriceTier",
+                            "label": "Create Update Item Price Tier",
+                        },
+                        {
+                            "action": "deleteItemPriceTier",
+                            "label": "Delete Item Price Tier",
+                        },
+                        {
+                            "action": "insertUpdateDiscountRule",
+                            "label": "Create Update Discount Rule",
+                        },
+                        {
+                            "action": "deleteDiscountRule",
+                            "label": "Delete Discount Rule",
                         },
                         {
                             "action": "insertUpdateRequest",
@@ -133,36 +181,12 @@ def deploy() -> List:
                             "label": "Delete Quote",
                         },
                         {
-                            "action": "insertUpdateService",
-                            "label": "Create Update Service",
+                            "action": "insertUpdateQuoteItem",
+                            "label": "Create Update Quote Item",
                         },
                         {
-                            "action": "deleteService",
-                            "label": "Delete Service",
-                        },
-                        {
-                            "action": "insertUpdateServiceProvider",
-                            "label": "Create Update Service Provider",
-                        },
-                        {
-                            "action": "deleteServiceProvider",
-                            "label": "Delete Service Provider",
-                        },
-                        {
-                            "action": "insertUpdateQuoteService",
-                            "label": "Create Update Quote Service",
-                        },
-                        {
-                            "action": "deleteQuoteService",
-                            "label": "Delete Quote Service",
-                        },
-                        {
-                            "action": "insertUpdateQuoteItemProduct",
-                            "label": "Create Update Quote Item Raw Material",
-                        },
-                        {
-                            "action": "deleteQuoteItemProduct",
-                            "label": "Delete Quote Item Raw Material",
+                            "action": "deleteQuoteItem",
+                            "label": "Delete Quote Item",
                         },
                         {
                             "action": "insertUpdateInstallment",
@@ -171,14 +195,6 @@ def deploy() -> List:
                         {
                             "action": "deleteInstallment",
                             "label": "Delete Installment",
-                        },
-                        {
-                            "action": "insertUpdateItem",
-                            "label": "Create Update Item",
-                        },
-                        {
-                            "action": "deleteItem",
-                            "label": "Delete Item",
                         },
                         {
                             "action": "insertUpdateFile",
@@ -203,12 +219,13 @@ def deploy() -> List:
 
 class AIRFQEngine(SilvaEngineDynamoDBBase):
     def __init__(self, logger: logging.Logger, **setting: Dict[str, Any]) -> None:
-        handlers_init(logger, **setting)
+        SilvaEngineDynamoDBBase.__init__(self, logger, **setting)
+
+        # Initialize configuration via the Config class
+        Config.initialize(logger, **setting)
 
         self.logger = logger
         self.setting = setting
-
-        SilvaEngineDynamoDBBase.__init__(self, logger, **setting)
 
     def ai_rfq_graphql(self, **params: Dict[str, Any]) -> Any:
         schema = Schema(

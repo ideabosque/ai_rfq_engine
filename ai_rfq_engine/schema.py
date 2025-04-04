@@ -7,295 +7,289 @@ __author__ = "bibow"
 import time
 from typing import Any, Dict
 
-from graphene import (
-    Boolean,
-    DateTime,
-    Field,
-    Int,
-    List,
-    ObjectType,
-    ResolveInfo,
-    String,
-)
+from graphene import DateTime, Field, Float, Int, List, ObjectType, ResolveInfo, String
 
-from .mutations import (
-    DeleteFile,
-    DeleteInstallment,
-    DeleteItem,
-    DeleteProduct,
-    DeleteQuote,
-    DeleteQuoteItemProduct,
-    DeleteQuoteService,
-    DeleteRequest,
-    DeleteService,
-    DeleteServiceProvider,
-    InsertUpdateFile,
-    InsertUpdateInstallment,
-    InsertUpdateItem,
-    InsertUpdateProduct,
-    InsertUpdateQuote,
-    InsertUpdateQuoteItemProduct,
-    InsertUpdateQuoteService,
-    InsertUpdateRequest,
-    InsertUpdateService,
-    InsertUpdateServiceProvider,
+from .mutations.discount_rule import DeleteDiscountRule, InsertUpdateDiscountRule
+from .mutations.file import DeleteFile, InsertUpdateFile
+from .mutations.installment import DeleteInstallment, InsertUpdateInstallment
+from .mutations.item import DeleteItem, InsertUpdateItem
+from .mutations.item_price_tier import DeleteItemPriceTier, InsertUpdateItemPriceTier
+from .mutations.provider_item import DeleteProviderItem, InsertUpdateProviderItem
+from .mutations.quote import DeleteQuote, InsertUpdateQuote
+from .mutations.quote_item import DeleteQuoteItem, InsertUpdateQuoteItem
+from .mutations.request import DeleteRequest, InsertUpdateRequest
+from .mutations.segment import DeleteSegment, InsertUpdateSegment
+from .mutations.segment_contact import DeleteSegmentContact, InsertUpdateSegmentContact
+from .queries.discount_rule import resolve_discount_rule, resolve_discount_rule_list
+from .queries.file import resolve_file, resolve_file_list
+from .queries.installment import resolve_installment, resolve_installment_list
+from .queries.item import resolve_item, resolve_item_list
+from .queries.item_price_tier import (
+    resolve_item_price_tier,
+    resolve_item_price_tier_list,
 )
-from .queries import (
-    resolve_file,
-    resolve_file_list,
-    resolve_installment,
-    resolve_installment_list,
-    resolve_item,
-    resolve_item_list,
-    resolve_product,
-    resolve_product_list,
-    resolve_quote,
-    resolve_quote_item_product,
-    resolve_quote_item_product_list,
-    resolve_quote_list,
-    resolve_quote_service,
-    resolve_quote_service_list,
-    resolve_request,
-    resolve_request_list,
-    resolve_service,
-    resolve_service_list,
-    resolve_service_provider,
-    resolve_service_provider_list,
+from .queries.provider_item import resolve_provider_item, resolve_provider_item_list
+from .queries.quote import resolve_quote, resolve_quote_list
+from .queries.quote_item import resolve_quote_item, resolve_quote_item_list
+from .queries.request import resolve_request, resolve_request_list
+from .queries.segment import resolve_segment, resolve_segment_list
+from .queries.segment_contact import (
+    resolve_segment_contact,
+    resolve_segment_contact_list,
 )
-from .types import (
-    FileListType,
-    FileType,
-    InstallmentListType,
-    InstallmentType,
-    ItemListType,
-    ItemType,
-    ProductListType,
-    ProductType,
-    QuoteItemProductListType,
-    QuoteItemProductType,
-    QuoteListType,
-    QuoteServiceListType,
-    QuoteServiceType,
-    QuoteType,
-    RequestListType,
-    RequestType,
-    ServiceListType,
-    ServiceProviderListType,
-    ServiceProviderType,
-    ServiceType,
-)
+from .types.discount_rule import DiscountRuleListType, DiscountRuleType
+from .types.file import FileListType, FileType
+from .types.installment import InstallmentListType, InstallmentType
+from .types.item import ItemListType, ItemType
+from .types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
+from .types.provider_item import ProviderItemListType, ProviderItemType
+from .types.quote import QuoteListType, QuoteType
+from .types.quote_item import QuoteItemListType, QuoteItemType
+from .types.request import RequestListType, RequestType
+from .types.segment import SegmentListType, SegmentType
+from .types.segment_contact import SegmentContactListType, SegmentContactType
 
 
 def type_class():
     return [
-        FileListType,
+        DiscountRuleType,
+        DiscountRuleListType,
         FileType,
-        InstallmentListType,
+        FileListType,
         InstallmentType,
-        QuoteItemProductListType,
-        QuoteItemProductType,
-        QuoteListType,
-        QuoteServiceListType,
-        QuoteServiceType,
+        InstallmentListType,
+        ItemType,
+        ItemListType,
+        ItemPriceTierType,
+        ItemPriceTierListType,
+        ProviderItemType,
+        ProviderItemListType,
         QuoteType,
-        RequestListType,
+        QuoteListType,
+        QuoteItemType,
+        QuoteItemListType,
         RequestType,
-        ServiceListType,
-        ServiceProviderListType,
-        ServiceProviderType,
-        ServiceType,
+        RequestListType,
+        SegmentType,
+        SegmentListType,
+        SegmentContactType,
+        SegmentContactListType,
     ]
 
 
 class Query(ObjectType):
     ping = String()
 
-    service = Field(
-        ServiceType,
-        service_type=String(required=True),
-        service_id=String(required=True),
-    )
-
-    service_list = Field(
-        ServiceListType,
-        page_number=Int(),
-        limit=Int(),
-        service_type=String(),
-        service_name=String(),
-        service_description=String(),
-    )
-
-    service_provider = Field(
-        ServiceProviderType,
-        service_id=String(required=True),
-        provider_id=String(required=True),
-    )
-
-    service_provider_list = Field(
-        ServiceProviderListType,
-        page_number=Int(),
-        limit=Int(),
-        service_id=String(),
-        service_types=List(String),
-    )
-
     item = Field(
         ItemType,
-        item_type=String(required=True),
-        item_id=String(required=True),
+        item_uuid=String(required=True),
     )
 
     item_list = Field(
         ItemListType,
-        page_number=Int(),
-        limit=Int(),
-        item_type=String(),
-        item_name=String(),
-        item_description=String(),
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        item_type=String(required=False),
+        item_name=String(required=False),
+        item_description=String(required=False),
+        uoms=List(String, required=False),
     )
 
-    product = Field(
-        ProductType,
-        provider_id=String(required=True),
-        product_id=String(required=True),
+    segment = Field(
+        SegmentType,
+        segment_uuid=String(required=True),
     )
 
-    product_list = Field(
-        ProductListType,
-        page_number=Int(),
-        limit=Int(),
-        provider_id=String(),
-        sku=String(),
-        product_name=String(),
-        product_description=String(),
+    segment_list = Field(
+        SegmentListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        provider_corporation_uuid=String(required=False),
+        segment_name=String(required=False),
+        segment_description=String(required=False),
+    )
+
+    segment_contact = Field(
+        SegmentContactType,
+        segment_uuid=String(required=True),
+        contact_uuid=String(required=True),
+    )
+
+    segment_contact_list = Field(
+        SegmentContactListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        segment_uuid=String(required=False),
+        consumer_corporation_uuid=String(required=False),
+        email=String(required=False),
+    )
+
+    provider_item = Field(
+        ProviderItemType,
+        provider_item_uuid=String(required=True),
+    )
+
+    provider_item_list = Field(
+        ProviderItemListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        item_uuid=String(required=False),
+        provider_corporation_uuid=String(required=False),
+        external_id=String(required=False),
+        min_base_price_per_uom=Float(required=False),
+        max_base_price_per_uom=Float(required=False),
+    )
+
+    item_price_tier = Field(
+        ItemPriceTierType,
+        item_uuid=String(required=True),
+        item_price_tier_uuid=String(required=True),
+    )
+
+    item_price_tier_list = Field(
+        ItemPriceTierListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        item_uuid=String(required=False),
+        provider_item_uuid=String(required=False),
+        segment_uuid=String(required=False),
+        min_quantity_greater_then=Float(required=False),
+        max_quantity_greater_then=Float(required=False),
+        min_quantity_less_then=Float(required=False),
+        max_quantity_less_then=Float(required=False),
+        min_price=Float(required=False),
+        max_price=Float(required=False),
+    )
+
+    discount_rule = Field(
+        DiscountRuleType,
+        item_uuid=String(required=True),
+        discount_rule_uuid=String(required=True),
+    )
+
+    discount_rule_list = Field(
+        DiscountRuleListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        item_uuid=String(required=False),
+        provider_item_uuid=String(required=False),
+        segment_uuid=String(required=False),
+        max_subtotal_greater_than=Float(required=False),
+        min_subtotal_greater_than=Float(required=False),
+        max_subtotal_less_than=Float(required=False),
+        min_subtotal_less_than=Float(required=False),
+        max_discount_percentage=Float(required=False),
+        min_discount_percentage=Float(required=False),
     )
 
     request = Field(
         RequestType,
-        required=True,
-        customer_id=String(required=True),  # user_id of the requestor
-        request_id=String(required=True),
+        request_uuid=String(required=True),
     )
 
     request_list = Field(
         RequestListType,
-        page_number=Int(),
-        limit=Int(),
-        customer_id=String(),
-        title=String(),
-        description=String(),
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        contact_uuid=String(required=False),
+        request_title=String(required=False),
+        request_description=String(required=False),
+        statuses=List(String, required=False),
+        from_expired_at=DateTime(required=False),
+        to_expired_at=DateTime(required=False),
     )
 
     quote = Field(
         QuoteType,
-        required=True,
-        request_id=String(required=True),  # request_id of the quote
-        quote_id=String(required=True),
+        request_uuid=String(required=True),
+        quote_uuid=String(required=True),
     )
 
     quote_list = Field(
         QuoteListType,
-        page_number=Int(),
-        limit=Int(),
-        request_id=String(),
-        provider_id=String(),
-        customer_id=String(),
-        shipping_methods=List(String),
-        statuses=List(String),
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        request_uuid=String(required=False),
+        provider_corporate_uuid=String(required=False),
+        contact_uuid=String(required=False),
+        shipping_methods=List(String, required=False),
+        min_shipping_amount=Float(required=False),
+        max_shipping_amount=Float(required=False),
+        min_total_amount=Float(required=False),
+        max_total_amount=Float(required=False),
+        min_total_discount_percentage=Float(required=False),
+        max_total_discount_percentage=Float(required=False),
+        min_final_total_amount=Float(required=False),
+        max_final_total_amount=Float(required=False),
+        statuses=List(String, required=False),
     )
 
-    quote_service = Field(
-        QuoteServiceType,
-        required=True,
-        quote_id=String(required=True),  # quote_id of the quote
-        service_id=String(required=True),
+    quote_item = Field(
+        QuoteItemType,
+        quote_uuid=String(required=True),
+        quote_item_uuid=String(required=True),
     )
 
-    quote_service_list = Field(
-        QuoteServiceListType,
-        page_number=Int(),
-        limit=Int(),
-        quote_id=String(),
-        service_ids=List(String),
-        service_types=List(String),
-    )
-
-    quote_item_product = Field(
-        QuoteItemProductType,
-        required=True,
-        quote_id=String(required=True),  # quote_id of the quote
-        item_id=String(required=True),
-    )
-
-    quote_item_product_list = Field(
-        QuoteItemProductListType,
-        page_number=Int(),
-        limit=Int(),
-        quote_id=String(),
-        item_types=List(String),
-        product_ids=List(String),
-        provider_ids=List(String),
+    quote_item_list = Field(
+        QuoteItemListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        quote_uuid=String(required=False),
+        provider_item_uuid=String(required=False),
+        item_uuid=String(required=False),
+        request_uuid=String(required=False),
+        min_price_per_uom=Float(required=False),
+        max_price_per_uom=Float(required=False),
+        min_qty=Float(required=False),
+        max_qty=Float(required=False),
+        min_subtotal=Float(required=False),
+        max_subtotal=Float(required=False),
+        min_discount_percentage=Float(required=False),
+        max_discount_percentage=Float(required=False),
+        min_final_subtotal=Float(required=False),
+        max_final_subtotal=Float(required=False),
     )
 
     installment = Field(
         InstallmentType,
-        required=True,
-        quote_id=String(required=True),  # quote_id of the quote
-        installment_id=String(required=True),
+        quote_uuid=String(required=True),
+        installment_uuid=String(required=True),
     )
 
     installment_list = Field(
         InstallmentListType,
-        page_number=Int(),
-        limit=Int(),
-        quote_id=String(),
-        request_id=String(),
-        priorities=List(String),
-        salesorder_nos=List(String),
-        scheduled_date_from=DateTime(),
-        scheduled_date_to=DateTime(),
-        statuses=List(String),
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        quote_uuid=String(required=False),
+        request_uuid=String(required=False),
+        priority=Int(required=False),
+        salesorder_no=String(required=False),
+        from_scheduled_date=DateTime(required=False),
+        to_scheduled_date=DateTime(required=False),
+        quote_item_uuid=String(required=False),
+        max_installment_ratio=Float(required=False),
+        min_installment_ratio=Float(required=False),
+        max_installment_amount=Float(required=False),
+        min_installment_amount=Float(required=False),
+        statuses=List(String, required=False),
     )
 
     file = Field(
         FileType,
-        required=True,
-        request_id=String(required=True),
-        name=String(required=True),
+        request_uuid=String(required=True),
+        file_name=String(required=True),
     )
 
     file_list = Field(
         FileListType,
-        page_number=Int(),
-        limit=Int(),
-        request_id=String(),
-        user_id=String(),
-        user_types=List(String),
-        path=String(),
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        request_uuid=String(required=False),
+        contact_uuid=String(required=False),
     )
 
     def resolve_ping(self, info: ResolveInfo) -> str:
         return f"Hello at {time.strftime('%X')}!!"
-
-    def resolve_service(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ServiceType:
-        return resolve_service(info, **kwargs)
-
-    def resolve_service_list(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ServiceListType:
-        return resolve_service_list(info, **kwargs)
-
-    def resolve_service_provider(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ServiceProviderType:
-        return resolve_service_provider(info, **kwargs)
-
-    def resolve_service_provider_list(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ServiceProviderListType:
-        return resolve_service_provider_list(info, **kwargs)
 
     def resolve_item(self, info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
         return resolve_item(info, **kwargs)
@@ -305,15 +299,55 @@ class Query(ObjectType):
     ) -> ItemListType:
         return resolve_item_list(info, **kwargs)
 
-    def resolve_product(
+    def resolve_segment(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ProductType:
-        return resolve_product(info, **kwargs)
+    ) -> SegmentType:
+        return resolve_segment(info, **kwargs)
 
-    def resolve_product_list(
+    def resolve_segment_list(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ProductListType:
-        return resolve_product_list(info, **kwargs)
+    ) -> SegmentListType:
+        return resolve_segment_list(info, **kwargs)
+
+    def resolve_segment_contact(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> SegmentContactType:
+        return resolve_segment_contact(info, **kwargs)
+
+    def resolve_segment_contact_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> SegmentContactListType:
+        return resolve_segment_contact_list(info, **kwargs)
+
+    def resolve_provider_item(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ProviderItemType:
+        return resolve_provider_item(info, **kwargs)
+
+    def resolve_provider_item_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ProviderItemListType:
+        return resolve_provider_item_list(info, **kwargs)
+
+    def resolve_item_price_tier(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ItemPriceTierType:
+        return resolve_item_price_tier(info, **kwargs)
+
+    def resolve_item_price_tier_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ItemPriceTierListType:
+        return resolve_item_price_tier_list(info, **kwargs)
+
+    def resolve_discount_rule(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> DiscountRuleType:
+        return resolve_discount_rule(info, **kwargs)
+
+    def resolve_discount_rule_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> DiscountRuleListType:
+        return resolve_discount_rule_list(info, **kwargs)
 
     def resolve_request(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
@@ -333,25 +367,15 @@ class Query(ObjectType):
     ) -> QuoteListType:
         return resolve_quote_list(info, **kwargs)
 
-    def resolve_quote_service(
+    def resolve_quote_item(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> QuoteServiceType:
-        return resolve_quote_service(info, **kwargs)
+    ) -> QuoteItemType:
+        return resolve_quote_item(info, **kwargs)
 
-    def resolve_quote_service_list(
+    def resolve_quote_item_list(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> QuoteServiceListType:
-        return resolve_quote_service_list(info, **kwargs)
-
-    def resolve_quote_item_product(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> QuoteItemProductType:
-        return resolve_quote_item_product(info, **kwargs)
-
-    def resolve_quote_item_product_list(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> QuoteItemProductListType:
-        return resolve_quote_item_product_list(info, **kwargs)
+    ) -> QuoteItemListType:
+        return resolve_quote_item_list(info, **kwargs)
 
     def resolve_installment(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
@@ -373,22 +397,24 @@ class Query(ObjectType):
 
 
 class Mutations(ObjectType):
-    insert_update_service = InsertUpdateService.Field()
-    delete_service = DeleteService.Field()
-    insert_update_service_provider = InsertUpdateServiceProvider.Field()
-    delete_service_provider = DeleteServiceProvider.Field()
     insert_update_item = InsertUpdateItem.Field()
     delete_item = DeleteItem.Field()
-    insert_update_product = InsertUpdateProduct.Field()
-    delete_product = DeleteProduct.Field()
+    insert_update_segment = InsertUpdateSegment.Field()
+    delete_segment = DeleteSegment.Field()
+    insert_update_segment_contact = InsertUpdateSegmentContact.Field()
+    delete_segment_contact = DeleteSegmentContact.Field()
+    insert_update_provider_item = InsertUpdateProviderItem.Field()
+    delete_provider_item = DeleteProviderItem.Field()
+    insert_update_item_price_tier = InsertUpdateItemPriceTier.Field()
+    delete_item_price_tier = DeleteItemPriceTier.Field()
+    insert_update_discount_rule = InsertUpdateDiscountRule.Field()
+    delete_discount_rule = DeleteDiscountRule.Field()
     insert_update_request = InsertUpdateRequest.Field()
     delete_request = DeleteRequest.Field()
     insert_update_quote = InsertUpdateQuote.Field()
     delete_quote = DeleteQuote.Field()
-    insert_update_quote_service = InsertUpdateQuoteService.Field()
-    delete_quote_service = DeleteQuoteService.Field()
-    insert_update_quote_item_product = InsertUpdateQuoteItemProduct.Field()
-    delete_quote_item_product = DeleteQuoteItemProduct.Field()
+    insert_update_quote_item = InsertUpdateQuoteItem.Field()
+    delete_quote_item = DeleteQuoteItem.Field()
     insert_update_installment = InsertUpdateInstallment.Field()
     delete_installment = DeleteInstallment.Field()
     insert_update_file = InsertUpdateFile.Field()
