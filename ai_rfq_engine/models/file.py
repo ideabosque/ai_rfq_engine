@@ -42,7 +42,7 @@ class ContactUuidIndex(LocalSecondaryIndex):
 
 
 class FileModel(BaseModel):
-    class Meta:
+    class Meta(BaseModel.Meta):
         table_name = "are-files"
 
     request_uuid = UnicodeAttribute(hash_key=True)

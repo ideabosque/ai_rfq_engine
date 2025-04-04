@@ -42,7 +42,7 @@ class ConsumerCorporationUuidIndex(LocalSecondaryIndex):
 
 
 class SegmentContactModel(BaseModel):
-    class Meta:
+    class Meta(BaseModel.Meta):
         table_name = "are-segment_contacts"
 
     segment_uuid = UnicodeAttribute(hash_key=True)

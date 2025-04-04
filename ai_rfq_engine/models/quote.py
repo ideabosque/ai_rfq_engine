@@ -62,7 +62,7 @@ class ProviderCorporateUuidQuoteUuidIndex(GlobalSecondaryIndex):
 
 
 class QuoteModel(BaseModel):
-    class Meta:
+    class Meta(BaseModel.Meta):
         table_name = "are-quotes"
 
     request_uuid = UnicodeAttribute(hash_key=True)

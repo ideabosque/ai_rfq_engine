@@ -77,7 +77,7 @@ class ExternalIdIndex(LocalSecondaryIndex):
 
 
 class ProviderItemModel(BaseModel):
-    class Meta:
+    class Meta(BaseModel.Meta):
         table_name = "are-provider_items"
 
     endpoint_id = UnicodeAttribute(hash_key=True)

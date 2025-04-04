@@ -62,7 +62,7 @@ class ItemUuidIndex(LocalSecondaryIndex):
 
 
 class QuoteItemModel(BaseModel):
-    class Meta:
+    class Meta(BaseModel.Meta):
         table_name = "are-quote_items"
 
     quote_uuid = UnicodeAttribute(hash_key=True)

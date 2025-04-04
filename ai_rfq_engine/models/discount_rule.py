@@ -57,7 +57,7 @@ class SegmentUuidIndex(LocalSecondaryIndex):
 
 
 class DiscountRuleModel(BaseModel):
-    class Meta:
+    class Meta(BaseModel.Meta):
         table_name = "are-discount_rules"
 
     item_uuid = UnicodeAttribute(hash_key=True)

@@ -47,7 +47,7 @@ class ContactUuidIndex(LocalSecondaryIndex):
 
 
 class RequestModel(BaseModel):
-    class Meta:
+    class Meta(BaseModel.Meta):
         table_name = "are-requests"
 
     endpoint_id = UnicodeAttribute(hash_key=True)

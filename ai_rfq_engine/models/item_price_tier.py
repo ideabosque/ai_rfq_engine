@@ -57,7 +57,7 @@ class SegmentUuidIndex(LocalSecondaryIndex):
 
 
 class ItemPriceTierModel(BaseModel):
-    class Meta:
+    class Meta(BaseModel.Meta):
         table_name = "are-item_price_tiers"
 
     item_uuid = UnicodeAttribute(hash_key=True)
