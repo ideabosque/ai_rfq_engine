@@ -154,9 +154,7 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         inquiry_funct = QuoteModel.query
         if provider_corporate_uuid:
             inquiry_funct = QuoteModel.provider_corporate_uuid_index.query
-            args[1] = (
-                QuoteModel.provider_corporate_uuid_index == provider_corporate_uuid
-            )
+            args[1] = QuoteModel.provider_corporate_uuid == provider_corporate_uuid
             count_funct = QuoteModel.provider_corporate_uuid_index.count
     if provider_corporate_uuid and not request_uuid:
         args = [provider_corporate_uuid, None]

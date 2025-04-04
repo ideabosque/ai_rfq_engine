@@ -151,11 +151,11 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
         inquiry_funct = DiscountRuleModel.query
         if provider_item_uuid:
             count_funct = DiscountRuleModel.provider_item_uuid_index.count
-            args[1] = DiscountRuleModel.provider_item_uuid_index == provider_item_uuid
+            args[1] = DiscountRuleModel.provider_item_uuid == provider_item_uuid
             inquiry_funct = DiscountRuleModel.provider_item_uuid_index.query
         elif segment_uuid:
             count_funct = DiscountRuleModel.segment_uuid_index.count
-            args[1] = DiscountRuleModel.segment_uuid_index == segment_uuid
+            args[1] = DiscountRuleModel.segment_uuid == segment_uuid
             inquiry_funct = DiscountRuleModel.segment_uuid_index.query
 
     the_filters = None  # We can add filters for the query

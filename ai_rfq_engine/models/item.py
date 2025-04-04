@@ -92,7 +92,7 @@ def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
 def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
     return get_item_type(
         info,
-        get_item(kwargs["endpoint_id"], kwargs["item_uuid"]),
+        get_item(info.context["endpoint_id"], kwargs["item_uuid"]),
     )
 
 
@@ -117,7 +117,7 @@ def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         inquiry_funct = ItemModel.query
         if item_type:
             count_funct = ItemModel.item_type_index.count
-            args[1] = ItemModel.item_type_index == item_type
+            args[1] = ItemModel.item_type == item_type
             inquiry_funct = ItemModel.item_type_index.query
 
     the_filters = None  # We can add filters for the query

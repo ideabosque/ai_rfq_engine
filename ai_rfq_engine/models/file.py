@@ -113,7 +113,7 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         inquiry_funct = FileModel.query
         if contact_uuid:
             inquiry_funct = FileModel.contact_uuid_index.query
-            args[1] = FileModel.contact_uuid_index == contact_uuid
+            args[1] = FileModel.contact_uuid == contact_uuid
             count_funct = FileModel.contact_uuid_index.count
 
     the_filters = None

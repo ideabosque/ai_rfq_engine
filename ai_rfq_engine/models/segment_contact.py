@@ -122,7 +122,7 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
         if consumer_corporation_uuid:
             count_funct = SegmentContactModel.consumer_corporation_uuid_index.count
             args[1] = (
-                SegmentContactModel.consumer_corporation_uuid_index
+                SegmentContactModel.consumer_corporation_uuid
                 == consumer_corporation_uuid
             )
             inquiry_funct = SegmentContactModel.consumer_corporation_uuid_index.query

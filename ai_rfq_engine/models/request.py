@@ -126,7 +126,7 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         inquiry_funct = RequestModel.query
         if contact_uuid:
             count_funct = RequestModel.contact_uuid_index.count
-            args[1] = RequestModel.contact_uuid_index == contact_uuid
+            args[1] = RequestModel.contact_uuid == contact_uuid
             inquiry_funct = RequestModel.contact_uuid_index.query
 
     the_filters = None

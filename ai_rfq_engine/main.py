@@ -228,6 +228,11 @@ class AIRFQEngine(SilvaEngineDynamoDBBase):
         self.setting = setting
 
     def ai_rfq_graphql(self, **params: Dict[str, Any]) -> Any:
+        ## Test the waters 🧪 before diving in!
+        ##<--Testing Data-->##
+        if params.get("endpoint_id") is None:
+            params["endpoint_id"] = self.setting.get("endpoint_id")
+        ##<--Testing Data-->##
         schema = Schema(
             query=Query,
             mutation=Mutations,

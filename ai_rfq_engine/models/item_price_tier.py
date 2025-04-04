@@ -153,11 +153,11 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
         inquiry_funct = ItemPriceTierModel.query
         if provider_item_uuid:
             count_funct = ItemPriceTierModel.provider_item_uuid_index.count
-            args[1] = ItemPriceTierModel.provider_item_uuid_index == provider_item_uuid
+            args[1] = ItemPriceTierModel.provider_item_uuid == provider_item_uuid
             inquiry_funct = ItemPriceTierModel.provider_item_uuid_index.query
         elif segment_uuid:
             count_funct = ItemPriceTierModel.segment_uuid_index.count
-            args[1] = ItemPriceTierModel.segment_uuid_index == segment_uuid
+            args[1] = ItemPriceTierModel.segment_uuid == segment_uuid
             inquiry_funct = ItemPriceTierModel.segment_uuid_index.query
 
     the_filters = None  # We can add filters for the query

@@ -168,18 +168,17 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
         inquiry_funct = ProviderItemModel.query
         if item_uuid:
             count_funct = ProviderItemModel.item_uuid_index.count
-            args[1] = ProviderItemModel.item_uuid_index == item_uuid
+            args[1] = ProviderItemModel.item_uuid == item_uuid
             inquiry_funct = ProviderItemModel.item_uuid_index.query
         elif provider_corporation_uuid:
             count_funct = ProviderItemModel.provider_corporation_uuid_index.count
             args[1] = (
-                ProviderItemModel.provider_corporation_uuid_index
-                == provider_corporation_uuid
+                ProviderItemModel.provider_corporation_uuid == provider_corporation_uuid
             )
             inquiry_funct = ProviderItemModel.provider_corporation_uuid_index.query
         elif external_id:
             count_funct = ProviderItemModel.external_id_index.count
-            args[1] = ProviderItemModel.external_id_index == external_id
+            args[1] = ProviderItemModel.external_id == external_id
             inquiry_funct = ProviderItemModel.external_id_index.query
 
     the_filters = None  # We can add filters for the query

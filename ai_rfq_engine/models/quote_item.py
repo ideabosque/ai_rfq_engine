@@ -160,11 +160,11 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         inquiry_funct = QuoteItemModel.query
         if provider_item_uuid:
             inquiry_funct = QuoteItemModel.provider_item_uuid_index.query
-            args[1] = QuoteItemModel.provider_item_uuid_index == provider_item_uuid
+            args[1] = QuoteItemModel.provider_item_uuid == provider_item_uuid
             count_funct = QuoteItemModel.provider_item_uuid_index.count
         elif item_uuid:
             inquiry_funct = QuoteItemModel.item_uuid_index.query
-            args[1] = QuoteItemModel.item_uuid_index == item_uuid
+            args[1] = QuoteItemModel.item_uuid == item_uuid
             count_funct = QuoteItemModel.item_uuid_index.count
 
     the_filters = None

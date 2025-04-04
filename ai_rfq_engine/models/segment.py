@@ -116,8 +116,7 @@ def resolve_segment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         if provider_corporation_uuid:
             count_funct = SegmentModel.provider_corporation_uuid_index.count
             args[1] = (
-                SegmentModel.provider_corporation_uuid_index
-                == provider_corporation_uuid
+                SegmentModel.provider_corporation_uuid == provider_corporation_uuid
             )
             inquiry_funct = SegmentModel.provider_corporation_uuid_index.query
 
