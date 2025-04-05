@@ -104,7 +104,7 @@ class Query(ObjectType):
         SegmentListType,
         page_number=Int(required=False),
         limit=Int(required=False),
-        provider_corporation_uuid=String(required=False),
+        provider_corp_external_Id=String(required=False),
         segment_name=String(required=False),
         segment_description=String(required=False),
     )
@@ -112,7 +112,7 @@ class Query(ObjectType):
     segment_contact = Field(
         SegmentContactType,
         segment_uuid=String(required=True),
-        contact_uuid=String(required=True),
+        email=String(required=True),
     )
 
     segment_contact_list = Field(
@@ -120,7 +120,8 @@ class Query(ObjectType):
         page_number=Int(required=False),
         limit=Int(required=False),
         segment_uuid=String(required=False),
-        consumer_corporation_uuid=String(required=False),
+        contact_uuid=String(required=False),
+        consumer_corp_external_id=String(required=False),
         email=String(required=False),
     )
 
@@ -134,7 +135,7 @@ class Query(ObjectType):
         page_number=Int(required=False),
         limit=Int(required=False),
         item_uuid=String(required=False),
-        provider_corporation_uuid=String(required=False),
+        provider_corp_external_Id=String(required=False),
         external_id=String(required=False),
         min_base_price_per_uom=Float(required=False),
         max_base_price_per_uom=Float(required=False),
@@ -210,7 +211,7 @@ class Query(ObjectType):
         page_number=Int(required=False),
         limit=Int(required=False),
         request_uuid=String(required=False),
-        provider_corporate_uuid=String(required=False),
+        provider_corp_external_Id=String(required=False),
         contact_uuid=String(required=False),
         shipping_methods=List(String, required=False),
         min_shipping_amount=Float(required=False),

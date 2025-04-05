@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,11 +20,12 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.segment_contact import SegmentContactListType, SegmentContactType
 
 
-class ConsumerCorporationUuidIndex(LocalSecondaryIndex):
+class ConsumerCorpExternalIdIndex(LocalSecondaryIndex):
     """
     This class represents a local secondary index
     """
@@ -35,10 +34,25 @@ class ConsumerCorporationUuidIndex(LocalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "consumer_corporation_uuid-index"
+        index_name = "consumer_corp_external_id-index"
 
     segment_uuid = UnicodeAttribute(hash_key=True)
-    consumer_corporation_uuid = UnicodeAttribute(range_key=True)
+    consumer_corp_external_id = UnicodeAttribute(range_key=True)
+
+
+class ContactUuidIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "contact_uuid-index"
+
+    segment_uuid = UnicodeAttribute(hash_key=True)
+    contact_uuid = UnicodeAttribute(range_key=True)
 
 
 class SegmentContactModel(BaseModel):
@@ -46,14 +60,15 @@ class SegmentContactModel(BaseModel):
         table_name = "are-segment_contacts"
 
     segment_uuid = UnicodeAttribute(hash_key=True)
-    contact_uuid = UnicodeAttribute(range_key=True)
-    consumer_corporation_uuid = UnicodeAttribute(default="#####")
-    email = UnicodeAttribute()
+    email = UnicodeAttribute(range_key=True)
+    contact_uuid = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
+    consumer_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
     endpoint_id = UnicodeAttribute()
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
-    consumer_corporation_uuid_index = ConsumerCorporationUuidIndex()
+    contact_uuid_index = ContactUuidIndex()
+    consumer_corp_external_id_index = ConsumerCorpExternalIdIndex()
 
 
 def create_segment_contact_table(logger: logging.Logger) -> bool:
@@ -70,14 +85,12 @@ def create_segment_contact_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-def get_segment_contact(segment_uuid: str, contact_uuid: str) -> SegmentContactModel:
-    return SegmentContactModel.get(segment_uuid, contact_uuid)
+def get_segment_contact(segment_uuid: str, email: str) -> SegmentContactModel:
+    return SegmentContactModel.get(segment_uuid, email)
 
 
-def get_segment_contact_count(segment_uuid: str, contact_uuid: str) -> int:
-    return SegmentContactModel.count(
-        segment_uuid, SegmentContactModel.contact_uuid == contact_uuid
-    )
+def get_segment_contact_count(segment_uuid: str, email: str) -> int:
+    return SegmentContactModel.count(segment_uuid, SegmentContactModel.email == email)
 
 
 def get_segment_contact_type(
@@ -97,19 +110,25 @@ def resolve_segment_contact(
 ) -> SegmentContactType:
     return get_segment_contact_type(
         info,
-        get_segment_contact(kwargs["segment_uuid"], kwargs["contact_uuid"]),
+        get_segment_contact(kwargs["segment_uuid"], kwargs["email"]),
     )
 
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["segment_uuid", "contact_uuid", "consumer_corporation_uuid"],
+    attributes_to_get=[
+        "segment_uuid",
+        "email",
+        "contact_uuid",
+        "consumer_corp_external_id",
+    ],
     list_type_class=SegmentContactListType,
     type_funct=get_segment_contact_type,
 )
 def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     segment_uuid = kwargs.get("segment_uuid")
-    consumer_corporation_uuid = kwargs.get("consumer_corporation_uuid")
+    contact_uuid = kwargs.get("contact_uuid")
+    consumer_corp_external_id = kwargs.get("consumer_corp_external_id")
     email = kwargs.get("email")
     endpoint_id = info.context.get("endpoint_id")
 
@@ -119,13 +138,17 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     if segment_uuid:
         args = [segment_uuid, None]
         inquiry_funct = SegmentContactModel.query
-        if consumer_corporation_uuid:
-            count_funct = SegmentContactModel.consumer_corporation_uuid_index.count
+        if consumer_corp_external_id:
+            count_funct = SegmentContactModel.consumer_corp_external_id_index.count
             args[1] = (
-                SegmentContactModel.consumer_corporation_uuid
-                == consumer_corporation_uuid
+                SegmentContactModel.consumer_corp_external_id
+                == consumer_corp_external_id
             )
-            inquiry_funct = SegmentContactModel.consumer_corporation_uuid_index.query
+            inquiry_funct = SegmentContactModel.consumer_corp_external_id_index.query
+        elif contact_uuid:
+            count_funct = SegmentContactModel.contact_uuid_index.count
+            args[1] = SegmentContactModel.contact_uuid == contact_uuid
+            inquiry_funct = SegmentContactModel.contact_uuid_index.query
 
     the_filters = None  # We can add filters for the query
     if email:
@@ -141,7 +164,7 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 @insert_update_decorator(
     keys={
         "hash_key": "segment_uuid",
-        "range_key": "contact_uuid",
+        "range_key": "email",
     },
     range_key_required=True,
     model_funct=get_segment_contact,
@@ -150,7 +173,7 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 )
 def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     segment_uuid = kwargs.get("segment_uuid")
-    contact_uuid = kwargs.get("contact_uuid")
+    email = kwargs.get("email")
     if kwargs.get("entity") is None:
         cols = {
             "endpoint_id": info.context.get("endpoint_id"),
@@ -158,12 +181,12 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
         }
-        for key in ["consumer_corporation_uuid"]:
+        for key in ["consumer_corp_external_id", "contact_uuid"]:
             if key in kwargs:
                 cols[key] = kwargs[key]
         SegmentContactModel(
             segment_uuid,
-            contact_uuid,
+            email,
             **cols,
         ).save()
         return
@@ -176,7 +199,8 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 
     # Map of kwargs keys to SegmentContactModel attributes
     field_map = {
-        "consumer_corporation_uuid": SegmentContactModel.consumer_corporation_uuid,
+        "consumer_corp_external_id": SegmentContactModel.consumer_corp_external_id,
+        "contact_uuid": SegmentContactModel.contact_uuid,
     }
 
     # Add actions dynamically based on the presence of keys in kwargs
@@ -192,7 +216,7 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 @delete_decorator(
     keys={
         "hash_key": "segment_uuid",
-        "range_key": "contact_uuid",
+        "range_key": "email",
     },
     model_funct=get_segment_contact,
 )

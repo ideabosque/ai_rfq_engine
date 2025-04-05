@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,11 +20,12 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.segment import SegmentListType, SegmentType
 
 
-class ProviderCorporationUuidIndex(LocalSecondaryIndex):
+class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
     """
     This class represents a local secondary index
     """
@@ -35,10 +34,10 @@ class ProviderCorporationUuidIndex(LocalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "provider_corporation_uuid-index"
+        index_name = "provider_corp_external_Id-index"
 
     endpoint_id = UnicodeAttribute(hash_key=True)
-    provider_corporation_uuid = UnicodeAttribute(range_key=True)
+    provider_corp_external_Id = UnicodeAttribute(range_key=True)
 
 
 class SegmentModel(BaseModel):
@@ -47,13 +46,13 @@ class SegmentModel(BaseModel):
 
     endpoint_id = UnicodeAttribute(hash_key=True)
     segment_uuid = UnicodeAttribute(range_key=True)
-    provider_corporation_uuid = UnicodeAttribute(default="#####")
+    provider_corp_external_Id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
     segment_name = UnicodeAttribute()
     segment_description = UnicodeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
-    provider_corporation_uuid_index = ProviderCorporationUuidIndex()
+    provider_corp_external_Id_index = ProviderCorpExternalIdIndex()
 
 
 def create_segment_table(logger: logging.Logger) -> bool:
@@ -91,19 +90,23 @@ def get_segment_type(info: ResolveInfo, segment: SegmentModel) -> SegmentType:
 def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType:
     return get_segment_type(
         info,
-        get_segment(kwargs["endpoint_id"], kwargs["segment_uuid"]),
+        get_segment(info.context["endpoint_id"], kwargs["segment_uuid"]),
     )
 
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["endpoint_id", "segment_uuid", "provider_corporation_uuid"],
+    attributes_to_get=[
+        "endpoint_id",
+        "segment_uuid",
+        "provider_corp_external_Id",
+    ],
     list_type_class=SegmentListType,
     type_funct=get_segment_type,
 )
 def resolve_segment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     endpoint_id = info.context["endpoint_id"]
-    provider_corporation_uuid = kwargs.get("provider_corporation_uuid")
+    provider_corp_external_Id = kwargs.get("provider_corp_external_Id")
     segment_name = kwargs.get("segment_name")
     segment_description = kwargs.get("segment_description")
 
@@ -113,12 +116,12 @@ def resolve_segment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     if endpoint_id:
         args = [endpoint_id, None]
         inquiry_funct = SegmentModel.query
-        if provider_corporation_uuid:
-            count_funct = SegmentModel.provider_corporation_uuid_index.count
+        if provider_corp_external_Id:
+            count_funct = SegmentModel.provider_corp_external_Id_index.count
             args[1] = (
-                SegmentModel.provider_corporation_uuid == provider_corporation_uuid
+                SegmentModel.provider_corp_external_Id == provider_corp_external_Id
             )
-            inquiry_funct = SegmentModel.provider_corporation_uuid_index.query
+            inquiry_funct = SegmentModel.provider_corp_external_Id_index.query
 
     the_filters = None  # We can add filters for the query
     if segment_name:
@@ -149,7 +152,11 @@ def insert_update_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
         }
-        for key in ["provider_corporation_uuid", "segment_name", "segment_description"]:
+        for key in [
+            "provider_corp_external_Id",
+            "segment_name",
+            "segment_description",
+        ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
         SegmentModel(
@@ -167,7 +174,7 @@ def insert_update_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
 
     # Map of kwargs keys to SegmentModel attributes
     field_map = {
-        "provider_corporation_uuid": SegmentModel.provider_corporation_uuid,
+        "provider_corp_external_Id": SegmentModel.provider_corp_external_Id,
         "segment_name": SegmentModel.segment_name,
         "segment_description": SegmentModel.segment_description,
     }

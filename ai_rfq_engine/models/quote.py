@@ -17,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,11 +25,12 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote import QuoteListType, QuoteType
 
 
-class ProviderCorporateUuidIndex(LocalSecondaryIndex):
+class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
     """
     This class represents a local secondary index
     """
@@ -40,13 +39,13 @@ class ProviderCorporateUuidIndex(LocalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "provider_corporate_uuid-index"
+        index_name = "provider_corp_external_Id-index"
 
     request_uuid = UnicodeAttribute(hash_key=True)
-    provider_corporate_uuid = UnicodeAttribute(range_key=True)
+    provider_corp_external_Id = UnicodeAttribute(range_key=True)
 
 
-class ProviderCorporateUuidQuoteUuidIndex(GlobalSecondaryIndex):
+class ProviderCorpExternalIdQuoteUuidIndex(GlobalSecondaryIndex):
     """
     This class represents a local secondary index
     """
@@ -55,9 +54,9 @@ class ProviderCorporateUuidQuoteUuidIndex(GlobalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "provider_corporate_uuid-quote_uuid-index"
+        index_name = "provider_corp_external_Id-quote_uuid-index"
 
-    provider_corporate_uuid = UnicodeAttribute(hash_key=True)
+    provider_corp_external_Id = UnicodeAttribute(hash_key=True)
     quote_uuid = UnicodeAttribute(range_key=True)
 
 
@@ -67,7 +66,7 @@ class QuoteModel(BaseModel):
 
     request_uuid = UnicodeAttribute(hash_key=True)
     quote_uuid = UnicodeAttribute(range_key=True)
-    provider_corporate_uuid = UnicodeAttribute(default="#####")
+    provider_corp_external_Id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
     contact_uuid = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     billing_address = MapAttribute(null=True)
@@ -82,8 +81,8 @@ class QuoteModel(BaseModel):
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
-    provider_corporate_uuid_index = ProviderCorporateUuidIndex()
-    provider_corporate_uuid_quote_uuid_index = ProviderCorporateUuidQuoteUuidIndex()
+    provider_corp_external_Id_index = ProviderCorpExternalIdIndex()
+    provider_corp_external_Id_quote_uuid_index = ProviderCorpExternalIdQuoteUuidIndex()
 
 
 def create_quote_table(logger: logging.Logger) -> bool:
@@ -127,13 +126,17 @@ def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["request_uuid", "quote_uuid", "provider_corporate_uuid"],
+    attributes_to_get=[
+        "request_uuid",
+        "quote_uuid",
+        "provider_corp_external_Id",
+    ],
     list_type_class=QuoteListType,
     type_funct=get_quote_type,
 )
 def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     request_uuid = kwargs.get("request_uuid")
-    provider_corporate_uuid = kwargs.get("provider_corporate_uuid")
+    provider_corp_external_Id = kwargs.get("provider_corp_external_Id")
     contact_uuid = kwargs.get("contact_uuid")
     shipping_methods = kwargs.get("shipping_methods")
     max_shipping_amount = kwargs.get("max_shipping_amount")
@@ -152,14 +155,14 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     if request_uuid:
         args = [request_uuid, None]
         inquiry_funct = QuoteModel.query
-        if provider_corporate_uuid:
-            inquiry_funct = QuoteModel.provider_corporate_uuid_index.query
-            args[1] = QuoteModel.provider_corporate_uuid == provider_corporate_uuid
-            count_funct = QuoteModel.provider_corporate_uuid_index.count
-    if provider_corporate_uuid and not request_uuid:
-        args = [provider_corporate_uuid, None]
-        inquiry_funct = QuoteModel.provider_corporate_uuid_quote_uuid_index.query
-        count_funct = QuoteModel.provider_corporate_uuid_quote_uuid_index.count
+        if provider_corp_external_Id:
+            inquiry_funct = QuoteModel.provider_corp_external_Id_index.query
+            args[1] = QuoteModel.provider_corp_external_Id == provider_corp_external_Id
+            count_funct = QuoteModel.provider_corp_external_Id_index.count
+    if provider_corp_external_Id and not request_uuid:
+        args = [provider_corp_external_Id, None]
+        inquiry_funct = QuoteModel.provider_corp_external_Id_quote_uuid_index.query
+        count_funct = QuoteModel.provider_corp_external_Id_quote_uuid_index.count
 
     the_filters = None
     if contact_uuid:
@@ -215,7 +218,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "updated_at": pendulum.now("UTC"),
         }
         for key in [
-            "provider_corporate_uuid",
+            "provider_corp_external_Id",
             "contact_uuid",
             "billing_address",
             "shipping_address",
@@ -244,7 +247,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
 
     # Map of kwargs keys to QuoteModel attributes
     field_map = {
-        "provider_corporate_uuid": QuoteModel.provider_corporate_uuid,
+        "provider_corp_external_Id": QuoteModel.provider_corp_external_Id,
         "contact_uuid": QuoteModel.contact_uuid,
         "billing_address": QuoteModel.billing_address,
         "shipping_address": QuoteModel.shipping_address,

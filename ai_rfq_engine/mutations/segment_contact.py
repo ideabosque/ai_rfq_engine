@@ -20,9 +20,9 @@ class InsertUpdateSegmentContact(Mutation):
 
     class Arguments:
         segment_uuid = String(required=True)
-        contact_uuid = String(required=True)
-        consumer_corporation_uuid = String(required=False)
-        email = String(required=False)
+        email = String(required=True)
+        contact_uuid = String(required=False)
+        consumer_corp_external_id = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod
@@ -44,7 +44,7 @@ class DeleteSegmentContact(Mutation):
 
     class Arguments:
         segment_uuid = String(required=True)
-        contact_uuid = String(required=True)
+        email = String(required=True)
 
     @staticmethod
     def mutate(

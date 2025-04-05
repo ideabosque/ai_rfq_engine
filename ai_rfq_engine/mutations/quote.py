@@ -7,7 +7,6 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, Field, Float, Mutation, String
-
 from silvaengine_utility import JSON
 
 from ..models.quote import delete_quote, insert_update_quote
@@ -20,7 +19,7 @@ class InsertUpdateQuote(Mutation):
     class Arguments:
         request_uuid = String(required=True)
         quote_uuid = String(required=False)
-        provider_corporate_uuid = String(required=False)
+        provider_corp_external_Id = String(required=False)
         contact_uuid = String(required=False)
         billing_address = JSON(required=False)
         shipping_address = JSON(required=False)

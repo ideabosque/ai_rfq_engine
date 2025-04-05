@@ -7,7 +7,6 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, Field, Float, Mutation, String
-
 from silvaengine_utility import JSON
 
 from ..models.provider_item import delete_provider_item, insert_update_provider_item
@@ -20,7 +19,7 @@ class InsertUpdateProviderItem(Mutation):
     class Arguments:
         provider_item_uuid = String(required=False)
         item_uuid = String(required=False)
-        provider_corporation_uuid = String(required=False)
+        provider_corp_external_Id = String(required=False)
         external_id = String(required=False)
         base_price_per_uom = Float(required=False)
         item_spec = JSON(required=False)
