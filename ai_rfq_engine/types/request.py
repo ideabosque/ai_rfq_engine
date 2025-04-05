@@ -13,7 +13,7 @@ from silvaengine_utility import JSON
 class RequestType(ObjectType):
     endpoint_id = String()
     request_uuid = String()
-    contact_uuid = String()
+    email = String()
     request_title = String()
     request_description = String()
     items = List(JSON)

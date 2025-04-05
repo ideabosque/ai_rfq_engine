@@ -31,7 +31,7 @@ from silvaengine_utility import Utility
 from ..types.request import RequestListType, RequestType
 
 
-class ContactUuidIndex(LocalSecondaryIndex):
+class EmailIndex(LocalSecondaryIndex):
     """
     This class represents a local secondary index
     """
@@ -40,10 +40,10 @@ class ContactUuidIndex(LocalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "contact_uuid-index"
+        index_name = "email-index"
 
     endpoint_id = UnicodeAttribute(hash_key=True)
-    contact_uuid = UnicodeAttribute(range_key=True)
+    email = UnicodeAttribute(range_key=True)
 
 
 class RequestModel(BaseModel):
@@ -52,16 +52,16 @@ class RequestModel(BaseModel):
 
     endpoint_id = UnicodeAttribute(hash_key=True)
     request_uuid = UnicodeAttribute(range_key=True)
-    contact_uuid = UnicodeAttribute()
+    email = UnicodeAttribute()
     request_title = UnicodeAttribute()
     request_description = UnicodeAttribute(null=True)
     items = ListAttribute(of=MapAttribute, default=[])
     status = UnicodeAttribute(default="initial")
-    expired_at = UTCDateTimeAttribute()
+    expired_at = UTCDateTimeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
-    contact_uuid_index = ContactUuidIndex()
+    email_index = EmailIndex()
 
 
 def create_request_table(logger: logging.Logger) -> bool:
@@ -99,19 +99,19 @@ def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:
     return get_request_type(
         info,
-        get_request(kwargs["endpoint_id"], kwargs["request_uuid"]),
+        get_request(info.context["endpoint_id"], kwargs["request_uuid"]),
     )
 
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["endpoint_id", "request_uuid", "contact_uuid"],
+    attributes_to_get=["endpoint_id", "request_uuid", "email"],
     list_type_class=RequestListType,
     type_funct=get_request_type,
 )
 def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     endpoint_id = kwargs.get("endpoint_id")
-    contact_uuid = kwargs.get("contact_uuid")
+    email = kwargs.get("email")
     request_title = kwargs.get("request_title")
     request_description = kwargs.get("request_description")
     statuses = kwargs.get("statuses")
@@ -124,10 +124,10 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     if endpoint_id:
         args = [endpoint_id, None]
         inquiry_funct = RequestModel.query
-        if contact_uuid:
-            count_funct = RequestModel.contact_uuid_index.count
-            args[1] = RequestModel.contact_uuid == contact_uuid
-            inquiry_funct = RequestModel.contact_uuid_index.query
+        if email:
+            count_funct = RequestModel.email_index.count
+            args[1] = RequestModel.email == email
+            inquiry_funct = RequestModel.email_index.query
 
     the_filters = None
     if request_title:
@@ -163,7 +163,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "updated_at": pendulum.now("UTC"),
         }
         for key in [
-            "contact_uuid",
+            "email",
             "request_title",
             "request_description",
             "items",
@@ -187,7 +187,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
 
     # Map of kwargs keys to RequestModel attributes
     field_map = {
-        "contact_uuid": RequestModel.contact_uuid,
+        "email": RequestModel.email,
         "request_title": RequestModel.request_title,
         "request_description": RequestModel.request_description,
         "items": RequestModel.items,

@@ -17,6 +17,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -25,7 +27,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote import QuoteListType, QuoteType
 
@@ -67,7 +68,7 @@ class QuoteModel(BaseModel):
     request_uuid = UnicodeAttribute(hash_key=True)
     quote_uuid = UnicodeAttribute(range_key=True)
     provider_corp_external_Id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
-    contact_uuid = UnicodeAttribute()
+    email = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     billing_address = MapAttribute(null=True)
     shipping_address = MapAttribute(null=True)
@@ -137,7 +138,7 @@ def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:
 def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     request_uuid = kwargs.get("request_uuid")
     provider_corp_external_Id = kwargs.get("provider_corp_external_Id")
-    contact_uuid = kwargs.get("contact_uuid")
+    email = kwargs.get("email")
     shipping_methods = kwargs.get("shipping_methods")
     max_shipping_amount = kwargs.get("max_shipping_amount")
     min_shipping_amount = kwargs.get("min_shipping_amount")
@@ -165,8 +166,8 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         count_funct = QuoteModel.provider_corp_external_Id_quote_uuid_index.count
 
     the_filters = None
-    if contact_uuid:
-        the_filters &= QuoteModel.contact_uuid == contact_uuid
+    if email:
+        the_filters &= QuoteModel.email == email
     if shipping_methods:
         the_filters &= QuoteModel.shipping_method.exists()
         the_filters &= QuoteModel.shipping_method.is_in(*shipping_methods)
@@ -219,7 +220,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         }
         for key in [
             "provider_corp_external_Id",
-            "contact_uuid",
+            "email",
             "billing_address",
             "shipping_address",
             "shipping_method",
@@ -248,7 +249,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     # Map of kwargs keys to QuoteModel attributes
     field_map = {
         "provider_corp_external_Id": QuoteModel.provider_corp_external_Id,
-        "contact_uuid": QuoteModel.contact_uuid,
+        "email": QuoteModel.email,
         "billing_address": QuoteModel.billing_address,
         "shipping_address": QuoteModel.shipping_address,
         "shipping_method": QuoteModel.shipping_method,

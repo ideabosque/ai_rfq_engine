@@ -26,7 +26,7 @@ from silvaengine_utility import Utility
 from ..types.file import FileListType, FileType
 
 
-class ContactUuidIndex(LocalSecondaryIndex):
+class EmailIndex(LocalSecondaryIndex):
     """
     This class represents a local secondary index
     """
@@ -35,10 +35,10 @@ class ContactUuidIndex(LocalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "contact_uuid-index"
+        index_name = "email-index"
 
     request_uuid = UnicodeAttribute(hash_key=True)
-    contact_uuid = UnicodeAttribute(range_key=True)
+    email = UnicodeAttribute(range_key=True)
 
 
 class FileModel(BaseModel):
@@ -47,12 +47,12 @@ class FileModel(BaseModel):
 
     request_uuid = UnicodeAttribute(hash_key=True)
     file_name = UnicodeAttribute(range_key=True)
-    contact_uuid = UnicodeAttribute()
+    email = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
-    contact_uuid_index = ContactUuidIndex()
+    email_index = EmailIndex()
 
 
 def create_file_table(logger: logging.Logger) -> bool:
@@ -96,13 +96,13 @@ def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType:
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["request_uuid", "file_name", "contact_uuid"],
+    attributes_to_get=["request_uuid", "file_name", "email"],
     list_type_class=FileListType,
     type_funct=get_file_type,
 )
 def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     request_uuid = kwargs.get("request_uuid")
-    contact_uuid = kwargs.get("contact_uuid")
+    email = kwargs.get("email")
     endpoint_id = info.context.get("endpoint_id")
 
     args = []
@@ -111,14 +111,14 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     if request_uuid:
         args = [request_uuid, None]
         inquiry_funct = FileModel.query
-        if contact_uuid:
-            inquiry_funct = FileModel.contact_uuid_index.query
-            args[1] = FileModel.contact_uuid == contact_uuid
-            count_funct = FileModel.contact_uuid_index.count
+        if email:
+            inquiry_funct = FileModel.email_index.query
+            args[1] = FileModel.email == email
+            count_funct = FileModel.email_index.count
 
     the_filters = None
-    if contact_uuid and not request_uuid:
-        the_filters &= FileModel.contact_uuid == contact_uuid
+    if email and not request_uuid:
+        the_filters &= FileModel.email == email
     if endpoint_id:
         the_filters &= FileModel.endpoint_id == endpoint_id
     if the_filters is not None:
@@ -147,8 +147,8 @@ def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
         }
-        if "contact_uuid" in kwargs:
-            cols["contact_uuid"] = kwargs["contact_uuid"]
+        if "email" in kwargs:
+            cols["email"] = kwargs["email"]
 
         FileModel(
             request_uuid,
@@ -165,7 +165,7 @@ def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
 
     # Map of kwargs keys to FileModel attributes
     field_map = {
-        "contact_uuid": FileModel.contact_uuid,
+        "email": FileModel.email,
     }
 
     # Add actions dynamically based on the presence of keys in kwargs

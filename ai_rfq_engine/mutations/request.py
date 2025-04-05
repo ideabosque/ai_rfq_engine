@@ -19,7 +19,7 @@ class InsertUpdateRequest(Mutation):
 
     class Arguments:
         request_uuid = String(required=False)
-        contact_uuid = String(required=False)
+        email = String(required=False)
         request_title = String(required=False)
         request_description = String(required=False)
         items = List(JSON, required=False)

@@ -5,6 +5,7 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Float, List, ObjectType, String
+
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
@@ -13,7 +14,7 @@ class QuoteType(ObjectType):
     request_uuid = String()
     quote_uuid = String()
     provider_corp_external_Id = String()
-    contact_uuid = String()
+    email = String()
     endpoint_id = String()
     billing_address = JSON()
     shipping_address = JSON()
