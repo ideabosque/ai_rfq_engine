@@ -18,7 +18,7 @@ class InsertUpdateFile(Mutation):
     class Arguments:
         request_uuid = String(required=True)
         file_name = String(required=True)
-        contact_uuid = String(required=False)
+        email = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod
@@ -37,7 +37,8 @@ class DeleteFile(Mutation):
     ok = Boolean()
 
     class Arguments:
-        file_uuid = String(required=True)
+        request_uuid = String(required=True)
+        file_name = String(required=True)
 
     @staticmethod
     def mutate(root: Any, info: Any, **kwargs: Dict[str, Any]) -> "DeleteFile":

@@ -12,7 +12,7 @@ from silvaengine_dynamodb_base import ListObjectType
 class FileType(ObjectType):
     request_uuid = String()
     file_name = String()
-    contact_uuid = String()
+    email = String()
     endpoint_id = String()
     created_at = DateTime()
     updated_by = String()

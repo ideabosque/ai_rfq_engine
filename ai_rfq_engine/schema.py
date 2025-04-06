@@ -286,7 +286,7 @@ class Query(ObjectType):
         page_number=Int(required=False),
         limit=Int(required=False),
         request_uuid=String(required=False),
-        contact_uuid=String(required=False),
+        email=String(required=False),
     )
 
     def resolve_ping(self, info: ResolveInfo) -> str:
