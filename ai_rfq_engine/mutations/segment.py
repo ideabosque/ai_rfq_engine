@@ -17,7 +17,7 @@ class InsertUpdateSegment(Mutation):
 
     class Arguments:
         segment_uuid = String(required=False)
-        provider_corp_external_Id = String(required=False)
+        provider_corp_external_id = String(required=False)
         segment_name = String(required=False)
         segment_description = String(required=False)
         updated_by = String(required=True)

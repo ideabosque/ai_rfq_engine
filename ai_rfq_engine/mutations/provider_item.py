@@ -19,7 +19,7 @@ class InsertUpdateProviderItem(Mutation):
     class Arguments:
         provider_item_uuid = String(required=False)
         item_uuid = String(required=False)
-        provider_corp_external_Id = String(required=False)
+        provider_corp_external_id = String(required=False)
         external_id = String(required=False)
         base_price_per_uom = Float(required=False)
         item_spec = JSON(required=False)

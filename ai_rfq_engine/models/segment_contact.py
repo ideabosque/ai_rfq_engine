@@ -23,6 +23,7 @@ from silvaengine_utility import Utility
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.segment_contact import SegmentContactListType, SegmentContactType
+from .utils import _get_segment
 
 
 class ConsumerCorpExternalIdIndex(LocalSecondaryIndex):
@@ -97,7 +98,13 @@ def get_segment_contact_type(
     info: ResolveInfo, segment_contact: SegmentContactModel
 ) -> SegmentContactType:
     try:
+        segment = _get_segment(
+            info.context["endpoint_id"], segment_contact.segment_uuid
+        )
         segment_contact = segment_contact.__dict__["attribute_values"]
+        segment_contact["segment"] = segment
+        segment_contact.pop("endpoint_id")
+        segment_contact.pop("segment_uuid")
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)

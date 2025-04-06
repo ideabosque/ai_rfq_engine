@@ -5,17 +5,15 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Float, List, ObjectType, String
-
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
 
 class QuoteItemType(ObjectType):
-    quote_uuid = String()
+    quote = JSON()
     quote_item_uuid = String()
     provider_item_uuid = String()
     item_uuid = String()
-    request_uuid = String()
     endpoint_id = String()
     request_data = JSON()
     price_per_uom = Float()

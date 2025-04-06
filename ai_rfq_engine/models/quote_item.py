@@ -17,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,8 +25,10 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote_item import QuoteItemListType, QuoteItemType
+from .utils import _get_quote
 
 
 class ProviderItemUuidIndex(LocalSecondaryIndex):
@@ -110,7 +110,11 @@ def get_quote_item_count(quote_uuid: str, quote_item_uuid: str) -> int:
 
 def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteItemType:
     try:
+        quote = _get_quote(quote_item.request_uuid, quote_item.quote_uuid)
         quote_item = quote_item.__dict__["attribute_values"]
+        quote_item["quote"] = quote
+        quote_item.pop("request_uuid")
+        quote_item.pop("quote_uuid")
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)

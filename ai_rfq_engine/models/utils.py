@@ -32,3 +32,87 @@ def _initialize_tables(logger: logging.Logger) -> None:
     create_installment_table(logger)
     create_discount_rule_table(logger)
     return
+
+
+def _get_item(endpoint_id: str, item_uuid: str) -> Dict[str, Any]:
+    from .item import get_item
+
+    item = get_item(endpoint_id, item_uuid)
+
+    return {
+        "endpoint_id": item.endpoint_id,
+        "item_uuid": item.item_uuid,
+        "item_type": item.item_type,
+        "item_name": item.item_name,
+        "item_description": item.item_description,
+        "uom": item.uom,
+    }
+
+
+def _get_segment(endpoint_id: str, segment_uuid: str) -> Dict[str, Any]:
+    from .segment import get_segment
+
+    segment = get_segment(endpoint_id, segment_uuid)
+
+    return {
+        "endpoint_id": segment.endpoint_id,
+        "segment_uuid": segment.segment_uuid,
+        "provider_corp_external_id": segment.provider_corp_external_id,
+        "segment_name": segment.segment_name,
+        "segment_description": segment.segment_description,
+    }
+
+
+def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, Any]:
+    from .provider_item import get_provider_item
+
+    provider_item = get_provider_item(endpoint_id, provider_item_uuid)
+
+    return {
+        "endpoint_id": provider_item.endpoint_id,
+        "provider_item_uuid": provider_item.provider_item_uuid,
+        "item": _get_item(provider_item.endpoint_id, provider_item.item_uuid),
+        "provider_corp_external_id": provider_item.provider_corp_external_id,
+        "external_id": provider_item.external_id,
+        "base_price_per_uom": provider_item.base_price_per_uom,
+        "item_spec": provider_item.item_spec,
+    }
+
+
+def _get_request(endpoint_id: str, request_uuid: str) -> Dict[str, Any]:
+    from .request import get_request
+
+    request = get_request(endpoint_id, request_uuid)
+
+    return {
+        "endpoint_id": request.endpoint_id,
+        "request_uuid": request.request_uuid,
+        "email": request.email,
+        "request_title": request.request_title,
+        "request_description": request.request_description,
+        "items": request.items,
+        "status": request.status,
+        "expired_at": request.expired_at,
+    }
+
+
+def _get_quote(request_uuid: str, quote_uuid: str) -> Dict[str, Any]:
+    from .quote import get_quote
+
+    quote = get_quote(request_uuid, quote_uuid)
+
+    return {
+        "request": _get_request(quote.endpoint_id, quote.request_uuid),
+        "quote_uuid": quote.quote_uuid,
+        "provider_corp_external_id": quote.provider_corp_external_id,
+        "email": quote.email,
+        "billing_address": quote.billing_address,
+        "shipping_address": quote.shipping_address,
+        "shipping_method": quote.shipping_method,
+        "shipping_amount": quote.shipping_amount,
+        "total_amount": quote.total_amount,
+        "total_discount_percentage": quote.total_discount_percentage,
+        "final_total_amount": quote.final_total_amount,
+        "notes": quote.notes,
+        "status": quote.status,
+    }

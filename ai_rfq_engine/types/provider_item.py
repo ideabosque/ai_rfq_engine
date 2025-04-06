@@ -11,10 +11,9 @@ from silvaengine_utility import JSON
 
 
 class ProviderItemType(ObjectType):
-    endpoint_id = String()
+    item = JSON()
     provider_item_uuid = String()
-    item_uuid = String()
-    provider_corp_external_Id = String()
+    provider_corp_external_id = String()
     external_id = String()
     base_price_per_uom = Float()
     item_spec = JSON()

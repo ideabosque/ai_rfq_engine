@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,8 +20,10 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
+from .utils import _get_provider_item, _get_segment
 
 
 class ProviderItemUuidIndex(LocalSecondaryIndex):
@@ -105,7 +105,23 @@ def get_item_price_tier_type(
     info: ResolveInfo, item_price_tier: ItemPriceTierModel
 ) -> ItemPriceTierType:
     try:
+        provider_item = _get_provider_item(
+            item_price_tier.item_uuid, item_price_tier.provider_item_uuid
+        )
+        segment = _get_segment(
+            info.context["endpoint_id"], item_price_tier.segment_uuid
+        )
         item_price_tier = item_price_tier.__dict__["attribute_values"]
+        item_price_tier.update(
+            {
+                "provider_item": provider_item,
+                "segment": segment,
+            }
+        )
+        item_price_tier.pop("endpoint_id")
+        item_price_tier.pop("provider_item_uuid")
+        item_price_tier.pop("segment_uuid")
+        item_price_tier.pop("item_uuid")
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)

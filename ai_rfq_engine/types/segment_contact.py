@@ -6,14 +6,14 @@ __author__ = "bibow"
 
 from graphene import DateTime, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
+from silvaengine_utility import JSON
 
 
 class SegmentContactType(ObjectType):
-    segment_uuid = String()
+    segment = JSON()
     email = String()
     contact_uuid = String()
     consumer_corp_external_id = String()
-    endpoint_id = String()
     created_at = DateTime()
     updated_by = String()
     updated_at = DateTime()

@@ -5,16 +5,14 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Float, List, ObjectType, String
-
 from silvaengine_dynamodb_base import ListObjectType
+from silvaengine_utility import JSON
 
 
 class DiscountRuleType(ObjectType):
-    item_uuid = String()
+    provider_item = JSON()
     discount_rule_uuid = String()
-    provider_item_uuid = String()
-    segment_uuid = String()
-    endpoint_id = String()
+    segment = JSON()
     subtotal_greater_than = Float()
     subtotal_less_than = Float()
     max_discount_percentage = Float()

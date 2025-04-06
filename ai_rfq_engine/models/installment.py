@@ -16,8 +16,6 @@ from pynamodb.attributes import (
     UnicodeAttribute,
     UTCDateTimeAttribute,
 )
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -26,8 +24,10 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.installment import InstallmentListType, InstallmentType
+from .utils import _get_quote
 
 
 class InstallmentModel(BaseModel):
@@ -78,7 +78,11 @@ def get_installment_type(
     info: ResolveInfo, installment: InstallmentModel
 ) -> InstallmentType:
     try:
+        quote = _get_quote(installment.request_uuid, installment.quote_uuid)
         installment = installment.__dict__["attribute_values"]
+        installment["quote"] = quote
+        installment.pop("request_uuid")
+        installment.pop("quote_uuid")
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)

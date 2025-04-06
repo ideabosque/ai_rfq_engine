@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,8 +20,10 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.file import FileListType, FileType
+from .utils import _get_request
 
 
 class EmailIndex(LocalSecondaryIndex):
@@ -79,7 +79,11 @@ def get_file_count(request_uuid: str, file_name: str) -> int:
 
 def get_file_type(info: ResolveInfo, file: FileModel) -> FileType:
     try:
+        request = _get_request(info.context["endpoint_id"], file.request_uuid)
         file = file.__dict__["attribute_values"]
+        file["request"] = request
+        file.pop("endpoint_id")
+        file.pop("request_uuid")
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)

@@ -17,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,8 +25,10 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote import QuoteListType, QuoteType
+from .utils import _get_request
 
 
 class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
@@ -40,10 +40,10 @@ class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "provider_corp_external_Id-index"
+        index_name = "provider_corp_external_id-index"
 
     request_uuid = UnicodeAttribute(hash_key=True)
-    provider_corp_external_Id = UnicodeAttribute(range_key=True)
+    provider_corp_external_id = UnicodeAttribute(range_key=True)
 
 
 class ProviderCorpExternalIdQuoteUuidIndex(GlobalSecondaryIndex):
@@ -55,9 +55,9 @@ class ProviderCorpExternalIdQuoteUuidIndex(GlobalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "provider_corp_external_Id-quote_uuid-index"
+        index_name = "provider_corp_external_id-quote_uuid-index"
 
-    provider_corp_external_Id = UnicodeAttribute(hash_key=True)
+    provider_corp_external_id = UnicodeAttribute(hash_key=True)
     quote_uuid = UnicodeAttribute(range_key=True)
 
 
@@ -67,7 +67,7 @@ class QuoteModel(BaseModel):
 
     request_uuid = UnicodeAttribute(hash_key=True)
     quote_uuid = UnicodeAttribute(range_key=True)
-    provider_corp_external_Id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
+    provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
     email = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     billing_address = MapAttribute(null=True)
@@ -82,8 +82,8 @@ class QuoteModel(BaseModel):
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
-    provider_corp_external_Id_index = ProviderCorpExternalIdIndex()
-    provider_corp_external_Id_quote_uuid_index = ProviderCorpExternalIdQuoteUuidIndex()
+    provider_corp_external_id_index = ProviderCorpExternalIdIndex()
+    provider_corp_external_id_quote_uuid_index = ProviderCorpExternalIdQuoteUuidIndex()
 
 
 def create_quote_table(logger: logging.Logger) -> bool:
@@ -110,7 +110,11 @@ def get_quote_count(request_uuid: str, quote_uuid: str) -> int:
 
 def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
     try:
+        request = _get_request(info.context["endpoint_id"], quote.request_uuid)
         quote = quote.__dict__["attribute_values"]
+        quote["request"] = request
+        quote.pop("endpoint_id")
+        quote.pop("request_uuid")
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
@@ -130,14 +134,14 @@ def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:
     attributes_to_get=[
         "request_uuid",
         "quote_uuid",
-        "provider_corp_external_Id",
+        "provider_corp_external_id",
     ],
     list_type_class=QuoteListType,
     type_funct=get_quote_type,
 )
 def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     request_uuid = kwargs.get("request_uuid")
-    provider_corp_external_Id = kwargs.get("provider_corp_external_Id")
+    provider_corp_external_id = kwargs.get("provider_corp_external_id")
     email = kwargs.get("email")
     shipping_methods = kwargs.get("shipping_methods")
     max_shipping_amount = kwargs.get("max_shipping_amount")
@@ -156,14 +160,14 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     if request_uuid:
         args = [request_uuid, None]
         inquiry_funct = QuoteModel.query
-        if provider_corp_external_Id:
-            inquiry_funct = QuoteModel.provider_corp_external_Id_index.query
-            args[1] = QuoteModel.provider_corp_external_Id == provider_corp_external_Id
-            count_funct = QuoteModel.provider_corp_external_Id_index.count
-    if provider_corp_external_Id and not request_uuid:
-        args = [provider_corp_external_Id, None]
-        inquiry_funct = QuoteModel.provider_corp_external_Id_quote_uuid_index.query
-        count_funct = QuoteModel.provider_corp_external_Id_quote_uuid_index.count
+        if provider_corp_external_id:
+            inquiry_funct = QuoteModel.provider_corp_external_id_index.query
+            args[1] = QuoteModel.provider_corp_external_id == provider_corp_external_id
+            count_funct = QuoteModel.provider_corp_external_id_index.count
+    if provider_corp_external_id and not request_uuid:
+        args = [provider_corp_external_id, None]
+        inquiry_funct = QuoteModel.provider_corp_external_id_quote_uuid_index.query
+        count_funct = QuoteModel.provider_corp_external_id_quote_uuid_index.count
 
     the_filters = None
     if email:
@@ -219,7 +223,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "updated_at": pendulum.now("UTC"),
         }
         for key in [
-            "provider_corp_external_Id",
+            "provider_corp_external_id",
             "email",
             "billing_address",
             "shipping_address",
@@ -248,7 +252,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
 
     # Map of kwargs keys to QuoteModel attributes
     field_map = {
-        "provider_corp_external_Id": QuoteModel.provider_corp_external_Id,
+        "provider_corp_external_id": QuoteModel.provider_corp_external_id,
         "email": QuoteModel.email,
         "billing_address": QuoteModel.billing_address,
         "shipping_address": QuoteModel.shipping_address,
