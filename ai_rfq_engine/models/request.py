@@ -29,6 +29,8 @@ from silvaengine_dynamodb_base import (
 from silvaengine_utility import Utility
 
 from ..types.request import RequestListType, RequestType
+from .file import resolve_file_list
+from .quote import resolve_quote_list
 
 
 class EmailIndex(LocalSecondaryIndex):
@@ -213,5 +215,17 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     model_funct=get_request,
 )
 def delete_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    quote_list = resolve_quote_list(
+        info, **{"request_uuid": kwargs.get("entity").request_uuid}
+    )
+    if quote_list.total > 0:
+        return False
+
+    file_list = resolve_file_list(
+        info, **{"request_uuid": kwargs.get("entity").request_uuid}
+    )
+    if file_list.total > 0:
+        return False
+
     kwargs.get("entity").delete()
     return True

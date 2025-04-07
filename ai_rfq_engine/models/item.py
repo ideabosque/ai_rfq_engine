@@ -24,6 +24,8 @@ from silvaengine_dynamodb_base import (
 from silvaengine_utility import Utility
 
 from ..types.item import ItemListType, ItemType
+from .provider_item import resolve_provider_item_list
+from .request import resolve_request_list
 
 
 class ItemTypeIndex(LocalSecondaryIndex):
@@ -193,5 +195,15 @@ def insert_update_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     model_funct=get_item,
 )
 def delete_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    provider_item_list = resolve_provider_item_list(
+        info,
+        **{
+            "endpoint_id": kwargs.get("entity").endpoint_id,
+            "item_uuid": kwargs.get("entity").item_uuid,
+        },
+    )
+    if provider_item_list.total > 0:
+        return False
+
     kwargs.get("entity").delete()
     return True

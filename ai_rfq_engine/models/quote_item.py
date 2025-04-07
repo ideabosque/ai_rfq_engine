@@ -17,6 +17,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -25,9 +27,9 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote_item import QuoteItemListType, QuoteItemType
+from .installment import resolve_installment_list
 from .utils import _get_quote
 
 
@@ -61,6 +63,21 @@ class ItemUuidIndex(LocalSecondaryIndex):
     item_uuid = UnicodeAttribute(range_key=True)
 
 
+class ItemUuidProviderItemUuidIndex(GlobalSecondaryIndex):
+    """
+    This class represents a Global secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "item_uuid-provider_item_uuid-index"
+
+    item_uuid = UnicodeAttribute(hash_key=True)
+    provider_item_uuid = UnicodeAttribute(range_key=True)
+
+
 class QuoteItemModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-quote_items"
@@ -82,6 +99,7 @@ class QuoteItemModel(BaseModel):
     updated_at = UTCDateTimeAttribute()
     provider_item_uuid_index = ProviderItemUuidIndex()
     item_uuid_index = ItemUuidIndex()
+    item_uuid_provider_item_uuid_index = ItemUuidProviderItemUuidIndex()
 
 
 def create_quote_item_table(logger: logging.Logger) -> bool:
@@ -170,6 +188,10 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
             inquiry_funct = QuoteItemModel.item_uuid_index.query
             args[1] = QuoteItemModel.item_uuid == item_uuid
             count_funct = QuoteItemModel.item_uuid_index.count
+    if item_uuid and not quote_uuid:
+        args = [item_uuid, None]
+        inquiry_funct = QuoteItemModel.item_uuid_provider_item_uuid_index.query
+        count_funct = QuoteItemModel.item_uuid_provider_item_uuid_index.count
 
     the_filters = None
     if request_uuid:
@@ -277,5 +299,15 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
     model_funct=get_quote_item,
 )
 def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    installment_list = resolve_installment_list(
+        info,
+        **{
+            "quote_uuid": kwargs.get("entity").quote_uuid,
+            "quote_item_uuid": kwargs.get("entity").quote_item_uuid,
+        },
+    )
+    if installment_list.total > 0:
+        return False
+
     kwargs.get("entity").delete()
     return True

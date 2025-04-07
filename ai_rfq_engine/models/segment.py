@@ -24,6 +24,7 @@ from silvaengine_dynamodb_base import (
 from silvaengine_utility import Utility
 
 from ..types.segment import SegmentListType, SegmentType
+from .segment_contact import resolve_segment_contact_list
 
 
 class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
@@ -198,5 +199,11 @@ def insert_update_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     model_funct=get_segment,
 )
 def delete_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    segment_contact_list = resolve_segment_contact_list(
+        info, **{"segment_uuid": kwargs.get("entity").segment_uuid}
+    )
+    if segment_contact_list.total > 0:
+        return False
+
     kwargs.get("entity").delete()
     return True

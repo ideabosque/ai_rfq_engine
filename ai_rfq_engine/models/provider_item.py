@@ -17,6 +17,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -25,9 +27,11 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.provider_item import ProviderItemListType, ProviderItemType
+from .discount_rule import resolve_discount_rule_list
+from .item_price_tier import resolve_item_price_tier_list
+from .quote_item import resolve_quote_item_list
 from .utils import _get_item
 
 
@@ -263,5 +267,35 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
     model_funct=get_provider_item,
 )
 def delete_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    discount_rule_list = resolve_discount_rule_list(
+        info,
+        **{
+            "item_uuid": kwargs.get("entity").item_uuid,
+            "provider_item_uuid": kwargs.get("entity").provider_item_uuid,
+        },
+    )
+    if discount_rule_list.total > 0:
+        return False
+
+    item_price_tier_list = resolve_item_price_tier_list(
+        info,
+        **{
+            "item_uuid": kwargs.get("entity").item_uuid,
+            "provider_item_uuid": kwargs.get("entity").provider_item_uuid,
+        },
+    )
+    if item_price_tier_list.total > 0:
+        return False
+
+    quote_item_list = resolve_quote_item_list(
+        info,
+        **{
+            "item_uuid": kwargs.get("entity").item_uuid,
+            "provider_item_uuid": kwargs.get("entity").provider_item_uuid,
+        },
+    )
+    if quote_item_list.total > 0:
+        return False
+
     kwargs.get("entity").delete()
     return True

@@ -17,6 +17,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -25,9 +27,10 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote import QuoteListType, QuoteType
+from .installment import resolve_installment_list
+from .quote_item import resolve_quote_item_list
 from .utils import _get_request
 
 
@@ -283,5 +286,17 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     model_funct=get_quote,
 )
 def delete_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    quote_item_list = resolve_quote_item_list(
+        info, **{"quote_uuid": kwargs.get("entity").quote_uuid}
+    )
+    if quote_item_list.total > 0:
+        return False
+
+    installment_list = resolve_installment_list(
+        info, **{"quote_uuid": kwargs.get("entity").quote_uuid}
+    )
+    if installment_list.total > 0:
+        return False
+
     kwargs.get("entity").delete()
     return True
