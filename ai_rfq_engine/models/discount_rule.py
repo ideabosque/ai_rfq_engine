@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -20,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.discount_rule import DiscountRuleListType, DiscountRuleType
 from .utils import _get_provider_item, _get_segment
@@ -104,7 +105,7 @@ def get_discount_rule_type(
 ) -> DiscountRuleType:
     try:
         provider_item = _get_provider_item(
-            discount_rule.item_uuid, discount_rule.provider_item_uuid
+            info.context["endpoint_id"], discount_rule.provider_item_uuid
         )
         segment = _get_segment(info.context["endpoint_id"], discount_rule.segment_uuid)
         discount_rule = discount_rule.__dict__["attribute_values"]
