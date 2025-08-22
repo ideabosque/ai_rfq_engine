@@ -42,6 +42,21 @@ class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
     provider_corp_external_id = UnicodeAttribute(range_key=True)
 
 
+class UpdateAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    endpoint_id = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
+
+
 class SegmentModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-segments"
@@ -55,6 +70,7 @@ class SegmentModel(BaseModel):
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
     provider_corp_external_id_index = ProviderCorpExternalIdIndex()
+    updated_at_index = UpdateAtIndex()
 
 
 def create_segment_table(logger: logging.Logger) -> bool:
@@ -102,6 +118,7 @@ def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType:
         "endpoint_id",
         "segment_uuid",
         "provider_corp_external_id",
+        "updated_at",
     ],
     list_type_class=SegmentListType,
     type_funct=get_segment_type,
@@ -117,7 +134,8 @@ def resolve_segment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     count_funct = SegmentModel.count
     if endpoint_id:
         args = [endpoint_id, None]
-        inquiry_funct = SegmentModel.query
+        inquiry_funct = SegmentModel.updated_at_index.query
+        count_funct = SegmentModel.updated_at_index.count
         if provider_corp_external_id:
             count_funct = SegmentModel.provider_corp_external_id_index.count
             args[1] = (

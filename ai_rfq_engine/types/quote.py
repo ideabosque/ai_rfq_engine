@@ -14,6 +14,7 @@ class QuoteType(ObjectType):
     quote_uuid = String()
     provider_corp_external_id = String()
     email = String()
+    sales_rep_email = String()
     billing_address = JSON()
     shipping_address = JSON()
     shipping_method = String()

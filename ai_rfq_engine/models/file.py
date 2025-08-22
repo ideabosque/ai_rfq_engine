@@ -42,6 +42,21 @@ class EmailIndex(LocalSecondaryIndex):
     email = UnicodeAttribute(range_key=True)
 
 
+class UpdateAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    request_uuid = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
+
+
 class FileModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-files"
@@ -54,6 +69,7 @@ class FileModel(BaseModel):
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
     email_index = EmailIndex()
+    updated_at_index = UpdateAtIndex()
 
 
 def create_file_table(logger: logging.Logger) -> bool:
@@ -101,7 +117,7 @@ def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType:
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["request_uuid", "file_name", "email"],
+    attributes_to_get=["request_uuid", "file_name", "email", "updated_at"],
     list_type_class=FileListType,
     type_funct=get_file_type,
 )
@@ -115,7 +131,8 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     count_funct = FileModel.count
     if request_uuid:
         args = [request_uuid, None]
-        inquiry_funct = FileModel.query
+        inquiry_funct = FileModel.updated_at_index.query
+        count_funct = FileModel.updated_at_index.count
         if email:
             inquiry_funct = FileModel.email_index.query
             args[1] = FileModel.email == email

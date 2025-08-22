@@ -136,7 +136,7 @@ class Query(ObjectType):
         limit=Int(required=False),
         item_uuid=String(required=False),
         provider_corp_external_id=String(required=False),
-        external_id=String(required=False),
+        provider_item_external_id=String(required=False),
         min_base_price_per_uom=Float(required=False),
         max_base_price_per_uom=Float(required=False),
     )

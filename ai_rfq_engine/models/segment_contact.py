@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -20,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.segment_contact import SegmentContactListType, SegmentContactType
 from .utils import _get_segment
@@ -56,6 +57,21 @@ class ContactUuidIndex(LocalSecondaryIndex):
     contact_uuid = UnicodeAttribute(range_key=True)
 
 
+class UpdateAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    segment_uuid = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
+
+
 class SegmentContactModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-segment_contacts"
@@ -70,6 +86,7 @@ class SegmentContactModel(BaseModel):
     updated_at = UTCDateTimeAttribute()
     contact_uuid_index = ContactUuidIndex()
     consumer_corp_external_id_index = ConsumerCorpExternalIdIndex()
+    updated_at_index = UpdateAtIndex()
 
 
 def create_segment_contact_table(logger: logging.Logger) -> bool:
@@ -128,6 +145,7 @@ def resolve_segment_contact(
         "email",
         "contact_uuid",
         "consumer_corp_external_id",
+        "updated_at",
     ],
     list_type_class=SegmentContactListType,
     type_funct=get_segment_contact_type,
@@ -144,7 +162,8 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     count_funct = SegmentContactModel.count
     if segment_uuid:
         args = [segment_uuid, None]
-        inquiry_funct = SegmentContactModel.query
+        inquiry_funct = SegmentContactModel.updated_at_index.query
+        count_funct = SegmentContactModel.updated_at_index.count
         if consumer_corp_external_id:
             count_funct = SegmentContactModel.consumer_corp_external_id_index.count
             args[1] = (

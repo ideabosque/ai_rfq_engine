@@ -72,6 +72,7 @@ class QuoteModel(BaseModel):
     quote_uuid = UnicodeAttribute(range_key=True)
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
     email = UnicodeAttribute()
+    sales_rep_email = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     billing_address = MapAttribute(null=True)
     shipping_address = MapAttribute(null=True)
@@ -228,6 +229,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         for key in [
             "provider_corp_external_id",
             "email",
+            "sales_rep_email",
             "billing_address",
             "shipping_address",
             "shipping_method",
@@ -257,6 +259,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     field_map = {
         "provider_corp_external_id": QuoteModel.provider_corp_external_id,
         "email": QuoteModel.email,
+        "sales_rep_email": QuoteModel.sales_rep_email,
         "billing_address": QuoteModel.billing_address,
         "shipping_address": QuoteModel.shipping_address,
         "shipping_method": QuoteModel.shipping_method,

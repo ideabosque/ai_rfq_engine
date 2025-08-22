@@ -14,7 +14,7 @@ class ProviderItemType(ObjectType):
     item = JSON()
     provider_item_uuid = String()
     provider_corp_external_id = String()
-    external_id = String()
+    provider_item_external_id = String()
     base_price_per_uom = Float()
     item_spec = JSON()
     created_at = DateTime()

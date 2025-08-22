@@ -57,6 +57,21 @@ class SegmentUuidIndex(LocalSecondaryIndex):
     segment_uuid = UnicodeAttribute(range_key=True)
 
 
+class UpdateAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    item_uuid = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
+
+
 class DiscountRuleModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-discount_rules"
@@ -74,6 +89,7 @@ class DiscountRuleModel(BaseModel):
     updated_at = UTCDateTimeAttribute()
     provider_item_uuid_index = ProviderItemUuidIndex()
     segment_uuid_index = SegmentUuidIndex()
+    updated_at_index = UpdateAtIndex()
 
 
 def create_discount_rule_table(logger: logging.Logger) -> bool:
@@ -142,6 +158,7 @@ def resolve_discount_rule(
         "discount_rule_uuid",
         "provider_item_uuid",
         "segment_uuid",
+        "updated_at",
     ],
     list_type_class=DiscountRuleListType,
     type_funct=get_discount_rule_type,
@@ -163,7 +180,8 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     count_funct = DiscountRuleModel.count
     if item_uuid:
         args = [item_uuid, None]
-        inquiry_funct = DiscountRuleModel.query
+        inquiry_funct = DiscountRuleModel.updated_at_index.query
+        count_funct = DiscountRuleModel.updated_at_index.count
         if provider_item_uuid:
             count_funct = DiscountRuleModel.provider_item_uuid_index.count
             args[1] = DiscountRuleModel.provider_item_uuid == provider_item_uuid

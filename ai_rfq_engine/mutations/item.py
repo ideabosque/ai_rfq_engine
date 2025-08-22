@@ -21,6 +21,7 @@ class InsertUpdateItem(Mutation):
         item_name = String(required=False)
         item_description = String(required=False)
         uom = String(required=False)
+        item_external_id = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod

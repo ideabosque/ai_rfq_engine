@@ -21,6 +21,7 @@ class InsertUpdateQuote(Mutation):
         quote_uuid = String(required=False)
         provider_corp_external_id = String(required=False)
         email = String(required=False)
+        sales_rep_email = String(required=False)
         billing_address = JSON(required=False)
         shipping_address = JSON(required=False)
         shipping_method = String(required=False)

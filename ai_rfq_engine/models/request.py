@@ -48,6 +48,21 @@ class EmailIndex(LocalSecondaryIndex):
     email = UnicodeAttribute(range_key=True)
 
 
+class UpdateAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    endpoint_id = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
+
+
 class RequestModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-requests"
@@ -64,6 +79,7 @@ class RequestModel(BaseModel):
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
     email_index = EmailIndex()
+    updated_at_index = UpdateAtIndex()
 
 
 def create_request_table(logger: logging.Logger) -> bool:
@@ -107,7 +123,7 @@ def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["endpoint_id", "request_uuid", "email"],
+    attributes_to_get=["endpoint_id", "request_uuid", "email", "updated_at"],
     list_type_class=RequestListType,
     type_funct=get_request_type,
 )
@@ -125,7 +141,8 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     count_funct = RequestModel.count
     if endpoint_id:
         args = [endpoint_id, None]
-        inquiry_funct = RequestModel.query
+        inquiry_funct = RequestModel.updated_at_index.query
+        count_funct = RequestModel.updated_at_index.count
         if email:
             count_funct = RequestModel.email_index.count
             args[1] = RequestModel.email == email

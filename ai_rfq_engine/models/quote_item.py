@@ -78,6 +78,21 @@ class ItemUuidProviderItemUuidIndex(GlobalSecondaryIndex):
     provider_item_uuid = UnicodeAttribute(range_key=True)
 
 
+class UpdateAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    quote_uuid = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
+
+
 class QuoteItemModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-quote_items"
@@ -100,6 +115,7 @@ class QuoteItemModel(BaseModel):
     provider_item_uuid_index = ProviderItemUuidIndex()
     item_uuid_index = ItemUuidIndex()
     item_uuid_provider_item_uuid_index = ItemUuidProviderItemUuidIndex()
+    updated_at_index = UpdateAtIndex()
 
 
 def create_quote_item_table(logger: logging.Logger) -> bool:
@@ -154,6 +170,7 @@ def resolve_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteItem
         "quote_item_uuid",
         "provider_item_uuid",
         "item_uuid",
+        "updated_at",
     ],
     list_type_class=QuoteItemListType,
     type_funct=get_quote_item_type,
@@ -179,7 +196,8 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     count_funct = QuoteItemModel.count
     if quote_uuid:
         args = [quote_uuid, None]
-        inquiry_funct = QuoteItemModel.query
+        inquiry_funct = QuoteItemModel.updated_at_index.query
+        count_funct = QuoteItemModel.updated_at_index.count
         if provider_item_uuid:
             inquiry_funct = QuoteItemModel.provider_item_uuid_index.query
             args[1] = QuoteItemModel.provider_item_uuid == provider_item_uuid

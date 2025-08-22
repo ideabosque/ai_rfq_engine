@@ -43,6 +43,21 @@ class ItemTypeIndex(LocalSecondaryIndex):
     item_type = UnicodeAttribute(range_key=True)
 
 
+class UpdateAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    endpoint_id = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
+
+
 class ItemModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-items"
@@ -53,10 +68,12 @@ class ItemModel(BaseModel):
     item_name = UnicodeAttribute()
     item_description = UnicodeAttribute(null=True)
     uom = UnicodeAttribute()
+    item_external_id = UnicodeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
     item_type_index = ItemTypeIndex()
+    updated_at_index = UpdateAtIndex()
 
 
 def create_item_table(logger: logging.Logger) -> bool:
@@ -100,7 +117,7 @@ def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["endpoint_id", "item_uuid", "item_type"],
+    attributes_to_get=["endpoint_id", "item_uuid", "item_type", "updated_at"],
     list_type_class=ItemListType,
     type_funct=get_item_type,
 )
@@ -116,7 +133,8 @@ def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     count_funct = ItemModel.count
     if endpoint_id:
         args = [endpoint_id, None]
-        inquiry_funct = ItemModel.query
+        inquiry_funct = ItemModel.updated_at_index.query
+        count_funct = ItemModel.updated_at_index.count
         if item_type:
             count_funct = ItemModel.item_type_index.count
             args[1] = ItemModel.item_type == item_type
@@ -153,7 +171,13 @@ def insert_update_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
         }
-        for key in ["item_type", "item_name", "item_description", "uom"]:
+        for key in [
+            "item_type",
+            "item_name",
+            "item_description",
+            "uom",
+            "item_external_id",
+        ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
         ItemModel(
@@ -175,6 +199,7 @@ def insert_update_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         "item_name": ItemModel.item_name,
         "item_description": ItemModel.item_description,
         "uom": ItemModel.uom,
+        "item_external_id": ItemModel.item_external_id,
     }
 
     # Add actions dynamically based on the presence of keys in kwargs

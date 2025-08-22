@@ -65,7 +65,7 @@ class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
     provider_corp_external_id = UnicodeAttribute(range_key=True)
 
 
-class ExternalIdIndex(LocalSecondaryIndex):
+class ProviderItemExternalIdIndex(LocalSecondaryIndex):
     """
     This class represents a local secondary index
     """
@@ -74,10 +74,25 @@ class ExternalIdIndex(LocalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "external_id-index"
+        index_name = "provider_item_external_id-index"
 
     endpoint_id = UnicodeAttribute(hash_key=True)
-    external_id = UnicodeAttribute(range_key=True)
+    provider_item_external_id = UnicodeAttribute(range_key=True)
+
+
+class UpdateAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    endpoint_id = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
 
 
 class ProviderItemModel(BaseModel):
@@ -88,7 +103,7 @@ class ProviderItemModel(BaseModel):
     provider_item_uuid = UnicodeAttribute(range_key=True)
     item_uuid = UnicodeAttribute()
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
-    external_id = UnicodeAttribute()
+    provider_item_external_id = UnicodeAttribute()
     base_price_per_uom = NumberAttribute()
     item_spec = MapAttribute(default={})
     created_at = UTCDateTimeAttribute()
@@ -96,7 +111,8 @@ class ProviderItemModel(BaseModel):
     updated_at = UTCDateTimeAttribute()
     item_uuid_index = ItemUuidIndex()
     provider_corp_external_id_index = ProviderCorpExternalIdIndex()
-    external_id_index = ExternalIdIndex()
+    provider_item_external_id_index = ProviderItemExternalIdIndex()
+    updated_at_index = UpdateAtIndex()
 
 
 def create_provider_item_table(logger: logging.Logger) -> bool:
@@ -155,7 +171,8 @@ def resolve_provider_item(
         "provider_item_uuid",
         "item_uuid",
         "provider_corp_external_id",
-        "external_id",
+        "provider_item_external_id",
+        "updated_at",
     ],
     list_type_class=ProviderItemListType,
     type_funct=get_provider_item_type,
@@ -164,7 +181,7 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     endpoint_id = info.context["endpoint_id"]
     item_uuid = kwargs.get("item_uuid")
     provider_corp_external_id = kwargs.get("provider_corp_external_id")
-    external_id = kwargs.get("external_id")
+    provider_item_external_id = kwargs.get("provider_item_external_id")
     min_base_price_per_uom = kwargs.get("min_base_price_per_uom")
     max_base_price_per_uom = kwargs.get("max_base_price_per_uom")
 
@@ -173,7 +190,8 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     count_funct = ProviderItemModel.count
     if endpoint_id:
         args = [endpoint_id, None]
-        inquiry_funct = ProviderItemModel.query
+        inquiry_funct = ProviderItemModel.updated_at_index.query
+        count_funct = ProviderItemModel.updated_at_index.count
         if item_uuid:
             count_funct = ProviderItemModel.item_uuid_index.count
             args[1] = ProviderItemModel.item_uuid == item_uuid
@@ -184,10 +202,12 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
                 ProviderItemModel.provider_corp_external_id == provider_corp_external_id
             )
             inquiry_funct = ProviderItemModel.provider_corp_external_id_index.query
-        elif external_id:
-            count_funct = ProviderItemModel.external_id_index.count
-            args[1] = ProviderItemModel.external_id == external_id
-            inquiry_funct = ProviderItemModel.external_id_index.query
+        elif provider_item_external_id:
+            count_funct = ProviderItemModel.provider_item_external_id_index.count
+            args[1] = (
+                ProviderItemModel.provider_item_external_id == provider_item_external_id
+            )
+            inquiry_funct = ProviderItemModel.provider_corp_external_id_index.query
 
     the_filters = None  # We can add filters for the query
     if min_base_price_per_uom:
@@ -221,7 +241,7 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
         for key in [
             "item_uuid",
             "provider_corp_external_id",
-            "external_id",
+            "provider_item_external_id",
             "base_price_per_uom",
             "item_spec",
         ]:
@@ -244,7 +264,7 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
     field_map = {
         "item_uuid": ProviderItemModel.item_uuid,
         "provider_corp_external_id": ProviderItemModel.provider_corp_external_id,
-        "external_id": ProviderItemModel.external_id,
+        "provider_item_external_id": ProviderItemModel.provider_item_external_id,
         "base_price_per_uom": ProviderItemModel.base_price_per_uom,
         "item_spec": ProviderItemModel.item_spec,
     }

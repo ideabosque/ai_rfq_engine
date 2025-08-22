@@ -57,6 +57,21 @@ class SegmentUuidIndex(LocalSecondaryIndex):
     segment_uuid = UnicodeAttribute(range_key=True)
 
 
+class UpdateAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    item_uuid = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
+
+
 class ItemPriceTierModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-item_price_tiers"
@@ -74,6 +89,7 @@ class ItemPriceTierModel(BaseModel):
     updated_at = UTCDateTimeAttribute()
     provider_item_uuid_index = ProviderItemUuidIndex()
     segment_uuid_index = SegmentUuidIndex()
+    updated_at_index = UpdateAtIndex()
 
 
 def create_item_price_tier_table(logger: logging.Logger) -> bool:
@@ -146,6 +162,7 @@ def resolve_item_price_tier(
         "item_price_tier_uuid",
         "provider_item_uuid",
         "segment_uuid",
+        "updated_at",
     ],
     list_type_class=ItemPriceTierListType,
     type_funct=get_item_price_tier_type,
@@ -167,7 +184,8 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     count_funct = ItemPriceTierModel.count
     if item_uuid:
         args = [item_uuid, None]
-        inquiry_funct = ItemPriceTierModel.query
+        inquiry_funct = ItemPriceTierModel.updated_at_index.query
+        count_funct = ItemPriceTierModel.updated_at_index.count
         if provider_item_uuid:
             count_funct = ItemPriceTierModel.provider_item_uuid_index.count
             args[1] = ItemPriceTierModel.provider_item_uuid == provider_item_uuid
