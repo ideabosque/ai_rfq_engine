@@ -123,7 +123,7 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return QuoteType(**Utility.json_loads(Utility.json_dumps(quote)))
+    return QuoteType(**Utility.json_normalize(quote))
 
 
 def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:

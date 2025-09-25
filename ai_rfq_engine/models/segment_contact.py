@@ -126,7 +126,7 @@ def get_segment_contact_type(
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return SegmentContactType(**Utility.json_loads(Utility.json_dumps(segment_contact)))
+    return SegmentContactType(**Utility.json_normalize(segment_contact))
 
 
 def resolve_segment_contact(

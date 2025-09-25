@@ -111,7 +111,7 @@ def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return RequestType(**Utility.json_loads(Utility.json_dumps(request)))
+    return RequestType(**Utility.json_normalize(request))
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:

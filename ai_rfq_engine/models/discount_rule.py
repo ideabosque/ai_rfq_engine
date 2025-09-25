@@ -139,7 +139,7 @@ def get_discount_rule_type(
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return DiscountRuleType(**Utility.json_loads(Utility.json_dumps(discount_rule)))
+    return DiscountRuleType(**Utility.json_normalize(discount_rule))
 
 
 def resolve_discount_rule(

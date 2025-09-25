@@ -105,7 +105,7 @@ def get_file_type(info: ResolveInfo, file: FileModel) -> FileType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return FileType(**Utility.json_loads(Utility.json_dumps(file)))
+    return FileType(**Utility.json_normalize(file))
 
 
 def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType:

@@ -152,7 +152,7 @@ def get_provider_item_type(
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return ProviderItemType(**Utility.json_loads(Utility.json_dumps(provider_item)))
+    return ProviderItemType(**Utility.json_normalize(provider_item))
 
 
 def resolve_provider_item(
