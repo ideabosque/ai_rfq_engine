@@ -105,7 +105,7 @@ class ProviderItemModel(BaseModel):
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
     provider_item_external_id = UnicodeAttribute()
     base_price_per_uom = NumberAttribute()
-    item_spec = MapAttribute(default={})
+    item_spec = MapAttribute()
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -234,6 +234,7 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
     provider_item_uuid = kwargs.get("provider_item_uuid")
     if kwargs.get("entity") is None:
         cols = {
+            "item_spec": {},
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),

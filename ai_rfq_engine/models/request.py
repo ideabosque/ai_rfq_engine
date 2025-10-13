@@ -18,6 +18,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -26,7 +28,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.request import RequestListType, RequestType
 from .file import resolve_file_list
@@ -74,7 +75,7 @@ class RequestModel(BaseModel):
     request_description = UnicodeAttribute(null=True)
     billing_address = MapAttribute(null=True)
     shipping_address = MapAttribute(null=True)
-    items = ListAttribute(of=MapAttribute, default=[])
+    items = ListAttribute(of=MapAttribute)
     total_amount = NumberAttribute(null=True)
     total_discount = NumberAttribute(null=True)
     final_total_amount = NumberAttribute(null=True)
@@ -182,6 +183,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     request_uuid = kwargs.get("request_uuid")
     if kwargs.get("entity") is None:
         cols = {
+            "items": [],
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
