@@ -27,7 +27,7 @@ class InsertUpdateQuoteItem(Mutation):
         price_per_uom = Float(required=False)
         qty = Float(required=False)
         subtotal = Float(required=False)
-        discount_percentage = Float(required=False)
+        subtotal_discount = Float(required=False)
         final_subtotal = Float(required=False)
         updated_by = String(required=True)
 

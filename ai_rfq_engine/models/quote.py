@@ -17,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,6 +25,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote import QuoteListType, QuoteType
 from .installment import resolve_installment_list
@@ -71,16 +70,13 @@ class QuoteModel(BaseModel):
     request_uuid = UnicodeAttribute(hash_key=True)
     quote_uuid = UnicodeAttribute(range_key=True)
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
-    email = UnicodeAttribute()
     sales_rep_email = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
-    billing_address = MapAttribute(null=True)
-    shipping_address = MapAttribute(null=True)
     shipping_method = UnicodeAttribute(null=True)
     shipping_amount = NumberAttribute(null=True)
-    total_amount = NumberAttribute()
-    total_discount_percentage = NumberAttribute(null=True)
-    final_total_amount = NumberAttribute()
+    total_quote_amount = NumberAttribute()
+    total_quote_discount = NumberAttribute(null=True)
+    final_total_quote_amount = NumberAttribute()
     notes = UnicodeAttribute(null=True)
     status = UnicodeAttribute(default="initial")
     created_at = UTCDateTimeAttribute()
@@ -146,16 +142,15 @@ def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:
 def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     request_uuid = kwargs.get("request_uuid")
     provider_corp_external_id = kwargs.get("provider_corp_external_id")
-    email = kwargs.get("email")
     shipping_methods = kwargs.get("shipping_methods")
     max_shipping_amount = kwargs.get("max_shipping_amount")
     min_shipping_amount = kwargs.get("min_shipping_amount")
-    max_total_amount = kwargs.get("max_total_amount")
-    min_total_amount = kwargs.get("min_total_amount")
-    max_total_discount_percentage = kwargs.get("max_total_discount_percentage")
-    min_total_discount_percentage = kwargs.get("min_total_discount_percentage")
-    max_final_total_amount = kwargs.get("max_final_total_amount")
-    min_final_total_amount = kwargs.get("min_final_total_amount")
+    max_total_quote_amount = kwargs.get("max_total_quote_amount")
+    min_total_quote_amount = kwargs.get("min_total_quote_amount")
+    max_total_quote_discount = kwargs.get("max_total_quote_discount")
+    min_total_quote_discount = kwargs.get("min_total_quote_discount")
+    max_final_total_quote_amount = kwargs.get("max_final_total_quote_amount")
+    min_final_total_quote_amount = kwargs.get("min_final_total_quote_amount")
     statuses = kwargs.get("statuses")
 
     args = []
@@ -174,8 +169,6 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         count_funct = QuoteModel.provider_corp_external_id_quote_uuid_index.count
 
     the_filters = None
-    if email:
-        the_filters &= QuoteModel.email == email
     if shipping_methods:
         the_filters &= QuoteModel.shipping_method.exists()
         the_filters &= QuoteModel.shipping_method.is_in(*shipping_methods)
@@ -184,20 +177,20 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         the_filters &= QuoteModel.shipping_amount.between(
             min_shipping_amount, max_shipping_amount
         )
-    if max_total_amount and min_total_amount:
-        the_filters &= QuoteModel.total_amount.exists()
-        the_filters &= QuoteModel.total_amount.between(
-            min_total_amount, max_total_amount
+    if max_total_quote_amount and min_total_quote_amount:
+        the_filters &= QuoteModel.total_quote_amount.exists()
+        the_filters &= QuoteModel.total_quote_amount.between(
+            min_total_quote_amount, max_total_quote_amount
         )
-    if max_total_discount_percentage and min_total_discount_percentage:
-        the_filters &= QuoteModel.total_discount_percentage.exists()
-        the_filters &= QuoteModel.total_discount_percentage.between(
-            min_total_discount_percentage, max_total_discount_percentage
+    if max_total_quote_discount and min_total_quote_discount:
+        the_filters &= QuoteModel.total_quote_discount.exists()
+        the_filters &= QuoteModel.total_quote_discount.between(
+            min_total_quote_discount, max_total_quote_discount
         )
-    if max_final_total_amount and min_final_total_amount:
-        the_filters &= QuoteModel.final_total_amount.exists()
-        the_filters &= QuoteModel.final_total_amount.between(
-            min_final_total_amount, max_final_total_amount
+    if max_final_total_quote_amount and min_final_total_quote_amount:
+        the_filters &= QuoteModel.final_total_quote_amount.exists()
+        the_filters &= QuoteModel.final_total_quote_amount.between(
+            min_final_total_quote_amount, max_final_total_quote_amount
         )
     if statuses:
         the_filters &= QuoteModel.status.is_in(*statuses)
@@ -228,15 +221,12 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         }
         for key in [
             "provider_corp_external_id",
-            "email",
             "sales_rep_email",
-            "billing_address",
-            "shipping_address",
             "shipping_method",
             "shipping_amount",
-            "total_amount",
-            "total_discount_percentage",
-            "final_total_amount",
+            "total_quote_amount",
+            "total_quote_discount",
+            "final_total_quote_amount",
             "notes",
             "status",
         ]:
@@ -258,15 +248,12 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     # Map of kwargs keys to QuoteModel attributes
     field_map = {
         "provider_corp_external_id": QuoteModel.provider_corp_external_id,
-        "email": QuoteModel.email,
         "sales_rep_email": QuoteModel.sales_rep_email,
-        "billing_address": QuoteModel.billing_address,
-        "shipping_address": QuoteModel.shipping_address,
         "shipping_method": QuoteModel.shipping_method,
         "shipping_amount": QuoteModel.shipping_amount,
-        "total_amount": QuoteModel.total_amount,
-        "total_discount_percentage": QuoteModel.total_discount_percentage,
-        "final_total_amount": QuoteModel.final_total_amount,
+        "total_quote_amount": QuoteModel.total_quote_amount,
+        "total_quote_discount": QuoteModel.total_quote_discount,
+        "final_total_quote_amount": QuoteModel.final_total_quote_amount,
         "notes": QuoteModel.notes,
         "status": QuoteModel.status,
     }

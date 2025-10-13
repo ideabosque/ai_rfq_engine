@@ -16,7 +16,6 @@ class InstallmentType(ObjectType):
     priority = Int()
     salesorder_no = String()
     scheduled_date = DateTime()
-    quote_item_uuids = List(String)
     installment_ratio = Float()
     installment_amount = Float()
     status = String()

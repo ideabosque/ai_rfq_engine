@@ -6,7 +6,7 @@ __author__ = "bibow"
 import traceback
 from typing import Any, Dict
 
-from graphene import Boolean, DateTime, Field, List, Mutation, String
+from graphene import Boolean, DateTime, Field, Float, List, Mutation, String
 
 from silvaengine_utility import JSON
 
@@ -22,7 +22,12 @@ class InsertUpdateRequest(Mutation):
         email = String(required=False)
         request_title = String(required=False)
         request_description = String(required=False)
+        billing_address = JSON(required=False)
+        shipping_address = JSON(required=False)
         items = List(JSON, required=False)
+        total_amount = Float(required=False)
+        total_discount = Float(required=False)
+        final_total_amount = Float(required=False)
         status = String(required=False)
         expired_at = DateTime(required=False)
         updated_by = String(required=True)

@@ -21,7 +21,6 @@ class InsertUpdateInstallment(Mutation):
         priority = Int(required=False)
         salesorder_no = String(required=False)
         scheduled_date = DateTime(required=False)
-        quote_item_uuids = List(String, required=False)
         installment_ratio = Float(required=False)
         installment_amount = Float(required=False)
         status = String(required=False)

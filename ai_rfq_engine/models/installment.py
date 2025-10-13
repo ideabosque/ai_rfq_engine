@@ -17,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,6 +25,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.installment import InstallmentListType, InstallmentType
 from .utils import _get_quote
@@ -58,7 +57,6 @@ class InstallmentModel(BaseModel):
     priority = NumberAttribute()
     salesorder_no = UnicodeAttribute(null=True)
     scheduled_date = UTCDateTimeAttribute(null=True)
-    quote_item_uuids = ListAttribute(null=True)
     installment_ratio = NumberAttribute(null=True)
     installment_amount = NumberAttribute(null=True)
     status = UnicodeAttribute(default="initial")
@@ -129,7 +127,6 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
     salesorder_no = kwargs.get("salesorder_no")
     from_scheduled_date = kwargs.get("from_scheduled_date")
     to_scheduled_date = kwargs.get("to_scheduled_date")
-    quote_item_uuid = kwargs.get("quote_item_uuid")
     max_installment_ratio = kwargs.get("max_installment_ratio")
     min_installment_ratio = kwargs.get("min_installment_ratio")
     max_installment_amount = kwargs.get("max_installment_amount")
@@ -157,8 +154,6 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
         the_filters &= InstallmentModel.scheduled_date.between(
             from_scheduled_date, to_scheduled_date
         )
-    if quote_item_uuid:
-        the_filters &= InstallmentModel.quote_item_uuids.contains(quote_item_uuid)
     if max_installment_ratio and min_installment_ratio:
         the_filters &= InstallmentModel.installment_ratio.exists()
         the_filters &= InstallmentModel.installment_ratio.between(
@@ -201,7 +196,6 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
             "priority",
             "salesorder_no",
             "scheduled_date",
-            "quote_item_uuids",
             "installment_ratio",
             "installment_amount",
             "status",
@@ -227,7 +221,6 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
         "priority": InstallmentModel.priority,
         "salesorder_no": InstallmentModel.salesorder_no,
         "scheduled_date": InstallmentModel.scheduled_date,
-        "quote_item_uuids": InstallmentModel.quote_item_uuids,
         "installment_ratio": InstallmentModel.installment_ratio,
         "installment_amount": InstallmentModel.installment_amount,
         "status": InstallmentModel.status,

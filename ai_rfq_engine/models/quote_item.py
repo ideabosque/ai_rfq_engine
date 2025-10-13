@@ -17,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,6 +25,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote_item import QuoteItemListType, QuoteItemType
 from .installment import resolve_installment_list
@@ -107,7 +106,7 @@ class QuoteItemModel(BaseModel):
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()
     subtotal = NumberAttribute()
-    discount_percentage = NumberAttribute(null=True)
+    subtotal_discount = NumberAttribute(null=True)
     final_subtotal = NumberAttribute()
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
@@ -186,8 +185,8 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     min_qty = kwargs.get("min_qty")
     max_subtotal = kwargs.get("max_subtotal")
     min_subtotal = kwargs.get("min_subtotal")
-    max_discount_percentage = kwargs.get("max_discount_percentage")
-    min_discount_percentage = kwargs.get("min_discount_percentage")
+    max_subtotal_discount = kwargs.get("max_subtotal_discount")
+    min_subtotal_discount = kwargs.get("min_subtotal_discount")
     max_final_subtotal = kwargs.get("max_final_subtotal")
     min_final_subtotal = kwargs.get("min_final_subtotal")
 
@@ -225,10 +224,10 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     if max_subtotal and min_subtotal:
         the_filters &= QuoteItemModel.subtotal.exists()
         the_filters &= QuoteItemModel.subtotal.between(min_subtotal, max_subtotal)
-    if max_discount_percentage and min_discount_percentage:
-        the_filters &= QuoteItemModel.discount_percentage.exists()
-        the_filters &= QuoteItemModel.discount_percentage.between(
-            min_discount_percentage, max_discount_percentage
+    if max_subtotal_discount and min_subtotal_discount:
+        the_filters &= QuoteItemModel.subtotal_discount.exists()
+        the_filters &= QuoteItemModel.subtotal_discount.between(
+            min_subtotal_discount, max_subtotal_discount
         )
     if max_final_subtotal and min_final_subtotal:
         the_filters &= QuoteItemModel.final_subtotal.exists()
@@ -268,7 +267,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
             "price_per_uom",
             "qty",
             "subtotal",
-            "discount_percentage",
+            "subtotal_discount",
             "final_subtotal",
         ]:
             if key in kwargs:
@@ -295,7 +294,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         "price_per_uom": QuoteItemModel.price_per_uom,
         "qty": QuoteItemModel.qty,
         "subtotal": QuoteItemModel.subtotal,
-        "discount_percentage": QuoteItemModel.discount_percentage,
+        "subtotal_discount": QuoteItemModel.subtotal_discount,
         "final_subtotal": QuoteItemModel.final_subtotal,
     }
 

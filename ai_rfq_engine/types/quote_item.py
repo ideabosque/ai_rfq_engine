@@ -19,7 +19,7 @@ class QuoteItemType(ObjectType):
     price_per_uom = Float()
     qty = Float()
     subtotal = Float()
-    discount_percentage = Float()
+    subtotal_discount = Float()
     final_subtotal = Float()
     created_at = DateTime()
     updated_by = String()
