@@ -63,7 +63,7 @@ class SegmentModel(BaseModel):
 
     endpoint_id = UnicodeAttribute(hash_key=True)
     segment_uuid = UnicodeAttribute(range_key=True)
-    provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
+    provider_corp_external_id = UnicodeAttribute(null=True)
     segment_name = UnicodeAttribute()
     segment_description = UnicodeAttribute(null=True)
     created_at = UTCDateTimeAttribute()

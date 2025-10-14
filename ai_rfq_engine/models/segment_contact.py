@@ -78,8 +78,8 @@ class SegmentContactModel(BaseModel):
 
     segment_uuid = UnicodeAttribute(hash_key=True)
     email = UnicodeAttribute(range_key=True)
-    contact_uuid = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
-    consumer_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
+    contact_uuid = UnicodeAttribute(null=True)
+    consumer_corp_external_id = UnicodeAttribute(null=True)
     endpoint_id = UnicodeAttribute()
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()

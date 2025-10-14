@@ -73,7 +73,7 @@ def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, A
         "provider_item_uuid": provider_item.provider_item_uuid,
         "item": _get_item(provider_item.endpoint_id, provider_item.item_uuid),
         "provider_corp_external_id": provider_item.provider_corp_external_id,
-        "external_id": provider_item.external_id,
+        "external_id": provider_item.provider_item_external_id,
         "base_price_per_uom": provider_item.base_price_per_uom,
         "item_spec": provider_item.item_spec,
     }
