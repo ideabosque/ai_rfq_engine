@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 
 def _initialize_tables(logger: logging.Logger) -> None:
     from .discount_rule import create_discount_rule_table
-    from . import create_file_table
+    from .file import create_file_table
     from .installment import create_installment_table
     from .item import create_item_table
     from .item_price_tier import create_item_price_tier_table
