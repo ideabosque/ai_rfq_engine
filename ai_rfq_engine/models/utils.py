@@ -14,6 +14,7 @@ def _initialize_tables(logger: logging.Logger) -> None:
     from .item import create_item_table
     from .item_price_tier import create_item_price_tier_table
     from .provider_item import create_provider_item_table
+    from .provider_item_batches import create_provider_item_batch_table
     from .quote import create_quote_table
     from .quote_item import create_quote_item_table
     from .request import create_request_table
@@ -22,6 +23,7 @@ def _initialize_tables(logger: logging.Logger) -> None:
 
     create_item_table(logger)
     create_provider_item_table(logger)
+    create_provider_item_batch_table(logger)
     create_item_price_tier_table(logger)
     create_segment_table(logger)
     create_segment_contact_table(logger)

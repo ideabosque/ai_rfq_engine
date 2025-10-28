@@ -22,6 +22,7 @@ class InsertUpdateQuoteItem(Mutation):
         quote_item_uuid = String(required=False)
         provider_item_uuid = String(required=False)
         item_uuid = String(required=False)
+        batch_no = Float(required=False)
         request_uuid = String(required=False)
         request_data = JSON(required=False)
         price_per_uom = Float(required=False)

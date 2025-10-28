@@ -28,6 +28,7 @@ class InsertUpdateRequest(Mutation):
         total_amount = Float(required=False)
         total_discount = Float(required=False)
         final_total_amount = Float(required=False)
+        notes = String(required=False)
         status = String(required=False)
         expired_at = DateTime(required=False)
         updated_by = String(required=True)

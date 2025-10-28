@@ -14,6 +14,7 @@ class QuoteItemType(ObjectType):
     quote_item_uuid = String()
     provider_item_uuid = String()
     item_uuid = String()
+    batch_no = Float()
     endpoint_id = String()
     request_data = JSON()
     price_per_uom = Float()

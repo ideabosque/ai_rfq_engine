@@ -16,6 +16,7 @@ class DiscountRuleType(ObjectType):
     subtotal_greater_than = Float()
     subtotal_less_than = Float()
     max_discount_percentage = Float()
+    status = String()
     created_at = DateTime()
     updated_by = String()
     updated_at = DateTime()

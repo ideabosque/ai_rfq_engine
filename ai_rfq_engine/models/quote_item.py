@@ -100,6 +100,7 @@ class QuoteItemModel(BaseModel):
     quote_item_uuid = UnicodeAttribute(range_key=True)
     provider_item_uuid = UnicodeAttribute()
     item_uuid = UnicodeAttribute()
+    batch_no = NumberAttribute(null=True)
     request_uuid = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     request_data = MapAttribute()
@@ -189,19 +190,33 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     min_subtotal_discount = kwargs.get("min_subtotal_discount")
     max_final_subtotal = kwargs.get("max_final_subtotal")
     min_final_subtotal = kwargs.get("min_final_subtotal")
+    updated_at_gt = kwargs.get("updated_at_gt")
+    updated_at_lt = kwargs.get("updated_at_lt")
 
     args = []
     inquiry_funct = QuoteItemModel.scan
     count_funct = QuoteItemModel.count
     if quote_uuid:
-        args = [quote_uuid, None]
+        range_key_condition = None
+
+        # Build range key condition for updated_at when using updated_at_index
+        if updated_at_gt is not None and updated_at_lt is not None:
+            range_key_condition = QuoteItemModel.updated_at.between(
+                updated_at_gt, updated_at_lt
+            )
+        elif updated_at_gt is not None:
+            range_key_condition = QuoteItemModel.updated_at > updated_at_gt
+        elif updated_at_lt is not None:
+            range_key_condition = QuoteItemModel.updated_at < updated_at_lt
+
+        args = [quote_uuid, range_key_condition]
         inquiry_funct = QuoteItemModel.updated_at_index.query
         count_funct = QuoteItemModel.updated_at_index.count
-        if provider_item_uuid:
+        if provider_item_uuid and args[1] is None:
             inquiry_funct = QuoteItemModel.provider_item_uuid_index.query
             args[1] = QuoteItemModel.provider_item_uuid == provider_item_uuid
             count_funct = QuoteItemModel.provider_item_uuid_index.count
-        elif item_uuid:
+        elif item_uuid and args[1] is None:
             inquiry_funct = QuoteItemModel.item_uuid_index.query
             args[1] = QuoteItemModel.item_uuid == item_uuid
             count_funct = QuoteItemModel.item_uuid_index.count
@@ -213,6 +228,10 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     the_filters = None
     if request_uuid:
         the_filters &= QuoteItemModel.request_uuid == request_uuid
+    if provider_item_uuid and args[1] is not None and args[1] != (QuoteItemModel.provider_item_uuid == provider_item_uuid):
+        the_filters &= QuoteItemModel.provider_item_uuid == provider_item_uuid
+    if item_uuid and quote_uuid and args[1] is not None and args[1] != (QuoteItemModel.item_uuid == item_uuid):
+        the_filters &= QuoteItemModel.item_uuid == item_uuid
     if max_price_per_uom and min_price_per_uom:
         the_filters &= QuoteItemModel.price_per_uom.exists()
         the_filters &= QuoteItemModel.price_per_uom.between(
@@ -262,6 +281,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         for key in [
             "provider_item_uuid",
             "item_uuid",
+            "batch_no",
             "request_uuid",
             "request_data",
             "price_per_uom",
@@ -289,6 +309,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
     field_map = {
         "provider_item_uuid": QuoteItemModel.provider_item_uuid,
         "item_uuid": QuoteItemModel.item_uuid,
+        "batch_no": QuoteItemModel.batch_no,
         "request_uuid": QuoteItemModel.request_uuid,
         "request_data": QuoteItemModel.request_data,
         "price_per_uom": QuoteItemModel.price_per_uom,

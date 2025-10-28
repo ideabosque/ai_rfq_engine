@@ -30,7 +30,7 @@ from silvaengine_dynamodb_base import (
 from silvaengine_utility import Utility
 
 from ..types.request import RequestListType, RequestType
-from .file import resolve_file_list
+from . import resolve_file_list
 from .quote import resolve_quote_list
 
 
@@ -79,6 +79,7 @@ class RequestModel(BaseModel):
     total_amount = NumberAttribute(null=True)
     total_discount = NumberAttribute(null=True)
     final_total_amount = NumberAttribute(null=True)
+    notes = UnicodeAttribute(null=True)
     status = UnicodeAttribute(default="initial")
     expired_at = UTCDateTimeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
@@ -141,20 +142,36 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     statuses = kwargs.get("statuses")
     from_expired_at = kwargs.get("from_expired_at")
     to_expired_at = kwargs.get("to_expired_at")
+    updated_at_gt = kwargs.get("updated_at_gt")
+    updated_at_lt = kwargs.get("updated_at_lt")
 
     args = []
     inquiry_funct = RequestModel.scan
     count_funct = RequestModel.count
     if endpoint_id:
-        args = [endpoint_id, None]
+        range_key_condition = None
+
+        # Build range key condition for updated_at when using updated_at_index
+        if updated_at_gt is not None and updated_at_lt is not None:
+            range_key_condition = RequestModel.updated_at.between(
+                updated_at_gt, updated_at_lt
+            )
+        elif updated_at_gt is not None:
+            range_key_condition = RequestModel.updated_at > updated_at_gt
+        elif updated_at_lt is not None:
+            range_key_condition = RequestModel.updated_at < updated_at_lt
+
+        args = [endpoint_id, range_key_condition]
         inquiry_funct = RequestModel.updated_at_index.query
         count_funct = RequestModel.updated_at_index.count
-        if email:
+        if email and args[1] is None:
             count_funct = RequestModel.email_index.count
             args[1] = RequestModel.email == email
             inquiry_funct = RequestModel.email_index.query
 
     the_filters = None
+    if email and args[1] is not None and args[1] != (RequestModel.email == email):
+        the_filters &= RequestModel.email == email
     if request_title:
         the_filters &= RequestModel.request_title.contains(request_title)
     if request_description:
@@ -198,6 +215,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "total_amount",
             "total_discount",
             "final_total_amount",
+            "notes",
             "status",
             "expired_at",
         ]:
@@ -227,6 +245,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         "total_amount": RequestModel.total_amount,
         "total_discount": RequestModel.total_discount,
         "final_total_amount": RequestModel.final_total_amount,
+        "notes": RequestModel.notes,
         "status": RequestModel.status,
         "expired_at": RequestModel.expired_at,
     }

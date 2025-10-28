@@ -25,7 +25,9 @@ class InsertUpdateItemPriceTier(Mutation):
         segment_uuid = String(required=False)
         quantity_greater_then = Float(required=False)
         quantity_less_then = Float(required=False)
-        price = Float(required=False)
+        margin_per_uom = Float(required=False)
+        price_per_uom = Float(required=False)
+        status = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod

@@ -19,6 +19,7 @@ class QuoteType(ObjectType):
     total_quote_amount = Float()
     total_quote_discount = Float()
     final_total_quote_amount = Float()
+    negotiation_rounds = Float()
     notes = String()
     status = String()
     created_at = DateTime()

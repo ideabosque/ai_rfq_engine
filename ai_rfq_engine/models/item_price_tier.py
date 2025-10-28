@@ -83,7 +83,9 @@ class ItemPriceTierModel(BaseModel):
     endpoint_id = UnicodeAttribute()
     quantity_greater_then = NumberAttribute()
     quantity_less_then = NumberAttribute()
-    price = NumberAttribute()
+    margin_per_uom = NumberAttribute(null=True)
+    price_per_uom = NumberAttribute(null=True)
+    status = UnicodeAttribute(default="inreview")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -178,19 +180,33 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     min_quantity_less_then = kwargs.get("min_quantity_less_then")
     max_price = kwargs.get("max_price")
     min_price = kwargs.get("min_price")
+    updated_at_gt = kwargs.get("updated_at_gt")
+    updated_at_lt = kwargs.get("updated_at_lt")
 
     args = []
     inquiry_funct = ItemPriceTierModel.scan
     count_funct = ItemPriceTierModel.count
     if item_uuid:
-        args = [item_uuid, None]
+        range_key_condition = None
+
+        # Build range key condition for updated_at when using updated_at_index
+        if updated_at_gt is not None and updated_at_lt is not None:
+            range_key_condition = ItemPriceTierModel.updated_at.between(
+                updated_at_gt, updated_at_lt
+            )
+        elif updated_at_gt is not None:
+            range_key_condition = ItemPriceTierModel.updated_at > updated_at_gt
+        elif updated_at_lt is not None:
+            range_key_condition = ItemPriceTierModel.updated_at < updated_at_lt
+
+        args = [item_uuid, range_key_condition]
         inquiry_funct = ItemPriceTierModel.updated_at_index.query
         count_funct = ItemPriceTierModel.updated_at_index.count
-        if provider_item_uuid:
+        if provider_item_uuid and args[1] is None:
             count_funct = ItemPriceTierModel.provider_item_uuid_index.count
             args[1] = ItemPriceTierModel.provider_item_uuid == provider_item_uuid
             inquiry_funct = ItemPriceTierModel.provider_item_uuid_index.query
-        elif segment_uuid:
+        elif segment_uuid and args[1] is None:
             count_funct = ItemPriceTierModel.segment_uuid_index.count
             args[1] = ItemPriceTierModel.segment_uuid == segment_uuid
             inquiry_funct = ItemPriceTierModel.segment_uuid_index.query
@@ -198,6 +214,10 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     the_filters = None  # We can add filters for the query
     if endpoint_id:
         the_filters &= ItemPriceTierModel.endpoint_id == endpoint_id
+    if provider_item_uuid and args[1] is not None and args[1] != (ItemPriceTierModel.provider_item_uuid == provider_item_uuid):
+        the_filters &= ItemPriceTierModel.provider_item_uuid == provider_item_uuid
+    if segment_uuid and args[1] is not None and args[1] != (ItemPriceTierModel.segment_uuid == segment_uuid):
+        the_filters &= ItemPriceTierModel.segment_uuid == segment_uuid
     if max_quantity_greater_then and min_quantity_greater_then:
         the_filters &= ItemPriceTierModel.quantity_greater_then.between(
             min_quantity_greater_then, max_quantity_greater_then
@@ -207,7 +227,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
             min_quantity_less_then, max_quantity_less_then
         )
     if max_price and min_price:
-        the_filters &= ItemPriceTierModel.price.between(min_price, max_price)
+        the_filters &= ItemPriceTierModel.price_per_uom.between(min_price, max_price)
     if the_filters is not None:
         args.append(the_filters)
 
@@ -238,7 +258,9 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
             "segment_uuid",
             "quantity_greater_then",
             "quantity_less_then",
-            "price",
+            "margin_per_uom",
+            "price_per_uom",
+            "status",
         ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
@@ -261,7 +283,9 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
         "segment_uuid": ItemPriceTierModel.segment_uuid,
         "quantity_greater_then": ItemPriceTierModel.quantity_greater_then,
         "quantity_less_then": ItemPriceTierModel.quantity_less_then,
-        "price": ItemPriceTierModel.price,
+        "margin_per_uom": ItemPriceTierModel.margin_per_uom,
+        "price_per_uom": ItemPriceTierModel.price_per_uom,
+        "status": ItemPriceTierModel.status,
     }
 
     # Add actions dynamically based on the presence of keys in kwargs

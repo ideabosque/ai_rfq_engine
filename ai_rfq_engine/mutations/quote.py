@@ -26,6 +26,7 @@ class InsertUpdateQuote(Mutation):
         total_quote_amount = Float(required=False)
         total_quote_discount = Float(required=False)
         final_total_quote_amount = Float(required=False)
+        negotiation_rounds = Float(required=False)
         notes = String(required=False)
         status = String(required=False)
         updated_by = String(required=True)

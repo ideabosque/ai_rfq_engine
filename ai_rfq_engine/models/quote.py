@@ -11,7 +11,6 @@ from typing import Any, Dict
 import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import (
-    MapAttribute,
     NumberAttribute,
     UnicodeAttribute,
     UTCDateTimeAttribute,
@@ -63,6 +62,21 @@ class ProviderCorpExternalIdQuoteUuidIndex(GlobalSecondaryIndex):
     quote_uuid = UnicodeAttribute(range_key=True)
 
 
+class UpdatedAtIndex(LocalSecondaryIndex):
+    """
+    This class represents a local secondary index
+    """
+
+    class Meta:
+        billing_mode = "PAY_PER_REQUEST"
+        # All attributes are projected
+        projection = AllProjection()
+        index_name = "updated_at-index"
+
+    request_uuid = UnicodeAttribute(hash_key=True)
+    updated_at = UnicodeAttribute(range_key=True)
+
+
 class QuoteModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-quotes"
@@ -77,6 +91,7 @@ class QuoteModel(BaseModel):
     total_quote_amount = NumberAttribute()
     total_quote_discount = NumberAttribute(null=True)
     final_total_quote_amount = NumberAttribute()
+    negotiation_rounds = NumberAttribute(null=True)
     notes = UnicodeAttribute(null=True)
     status = UnicodeAttribute(default="initial")
     created_at = UTCDateTimeAttribute()
@@ -84,6 +99,7 @@ class QuoteModel(BaseModel):
     updated_at = UTCDateTimeAttribute()
     provider_corp_external_id_index = ProviderCorpExternalIdIndex()
     provider_corp_external_id_quote_uuid_index = ProviderCorpExternalIdQuoteUuidIndex()
+    updated_at_index = UpdatedAtIndex()
 
 
 def create_quote_table(logger: logging.Logger) -> bool:
@@ -135,6 +151,7 @@ def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:
         "request_uuid",
         "quote_uuid",
         "provider_corp_external_id",
+        "updated_at",
     ],
     list_type_class=QuoteListType,
     type_funct=get_quote_type,
@@ -152,14 +169,29 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     max_final_total_quote_amount = kwargs.get("max_final_total_quote_amount")
     min_final_total_quote_amount = kwargs.get("min_final_total_quote_amount")
     statuses = kwargs.get("statuses")
+    updated_at_gt = kwargs.get("updated_at_gt")
+    updated_at_lt = kwargs.get("updated_at_lt")
 
     args = []
     inquiry_funct = QuoteModel.scan
     count_funct = QuoteModel.count
     if request_uuid:
-        args = [request_uuid, None]
-        inquiry_funct = QuoteModel.query
-        if provider_corp_external_id:
+        range_key_condition = None
+
+        # Build range key condition for updated_at when using updated_at_index
+        if updated_at_gt is not None and updated_at_lt is not None:
+            range_key_condition = QuoteModel.updated_at.between(
+                updated_at_gt, updated_at_lt
+            )
+        elif updated_at_gt is not None:
+            range_key_condition = QuoteModel.updated_at > updated_at_gt
+        elif updated_at_lt is not None:
+            range_key_condition = QuoteModel.updated_at < updated_at_lt
+
+        args = [request_uuid, range_key_condition]
+        inquiry_funct = QuoteModel.updated_at_index.query
+        count_funct = QuoteModel.updated_at_index.count
+        if provider_corp_external_id and args[1] is None:
             inquiry_funct = QuoteModel.provider_corp_external_id_index.query
             args[1] = QuoteModel.provider_corp_external_id == provider_corp_external_id
             count_funct = QuoteModel.provider_corp_external_id_index.count
@@ -169,6 +201,8 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         count_funct = QuoteModel.provider_corp_external_id_quote_uuid_index.count
 
     the_filters = None
+    if provider_corp_external_id and request_uuid and args[1] is not None and args[1] != (QuoteModel.provider_corp_external_id == provider_corp_external_id):
+        the_filters &= QuoteModel.provider_corp_external_id == provider_corp_external_id
     if shipping_methods:
         the_filters &= QuoteModel.shipping_method.exists()
         the_filters &= QuoteModel.shipping_method.is_in(*shipping_methods)
@@ -227,6 +261,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "total_quote_amount",
             "total_quote_discount",
             "final_total_quote_amount",
+            "negotiation_rounds",
             "notes",
             "status",
         ]:
@@ -254,6 +289,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         "total_quote_amount": QuoteModel.total_quote_amount,
         "total_quote_discount": QuoteModel.total_quote_discount,
         "final_total_quote_amount": QuoteModel.final_total_quote_amount,
+        "negotiation_rounds": QuoteModel.negotiation_rounds,
         "notes": QuoteModel.notes,
         "status": QuoteModel.status,
     }

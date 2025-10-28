@@ -84,6 +84,7 @@ class DiscountRuleModel(BaseModel):
     subtotal_greater_than = NumberAttribute()
     subtotal_less_than = NumberAttribute()
     max_discount_percentage = NumberAttribute()
+    status = UnicodeAttribute(default="inreview")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -174,19 +175,33 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     min_subtotal_less_than = kwargs.get("min_subtotal_less_than")
     max_discount_percentage = kwargs.get("max_discount_percentage")
     min_discount_percentage = kwargs.get("min_discount_percentage")
+    updated_at_gt = kwargs.get("updated_at_gt")
+    updated_at_lt = kwargs.get("updated_at_lt")
 
     args = []
     inquiry_funct = DiscountRuleModel.scan
     count_funct = DiscountRuleModel.count
     if item_uuid:
-        args = [item_uuid, None]
+        range_key_condition = None
+
+        # Build range key condition for updated_at when using updated_at_index
+        if updated_at_gt is not None and updated_at_lt is not None:
+            range_key_condition = DiscountRuleModel.updated_at.between(
+                updated_at_gt, updated_at_lt
+            )
+        elif updated_at_gt is not None:
+            range_key_condition = DiscountRuleModel.updated_at > updated_at_gt
+        elif updated_at_lt is not None:
+            range_key_condition = DiscountRuleModel.updated_at < updated_at_lt
+
+        args = [item_uuid, range_key_condition]
         inquiry_funct = DiscountRuleModel.updated_at_index.query
         count_funct = DiscountRuleModel.updated_at_index.count
-        if provider_item_uuid:
+        if provider_item_uuid and args[1] is None:
             count_funct = DiscountRuleModel.provider_item_uuid_index.count
             args[1] = DiscountRuleModel.provider_item_uuid == provider_item_uuid
             inquiry_funct = DiscountRuleModel.provider_item_uuid_index.query
-        elif segment_uuid:
+        elif segment_uuid and args[1] is None:
             count_funct = DiscountRuleModel.segment_uuid_index.count
             args[1] = DiscountRuleModel.segment_uuid == segment_uuid
             inquiry_funct = DiscountRuleModel.segment_uuid_index.query
@@ -194,6 +209,10 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     the_filters = None  # We can add filters for the query
     if endpoint_id:
         the_filters &= DiscountRuleModel.endpoint_id == endpoint_id
+    if provider_item_uuid and args[1] is not None and args[1] != (DiscountRuleModel.provider_item_uuid == provider_item_uuid):
+        the_filters &= DiscountRuleModel.provider_item_uuid == provider_item_uuid
+    if segment_uuid and args[1] is not None and args[1] != (DiscountRuleModel.segment_uuid == segment_uuid):
+        the_filters &= DiscountRuleModel.segment_uuid == segment_uuid
     if max_subtotal_greater_than and min_subtotal_greater_than:
         the_filters &= DiscountRuleModel.subtotal_greater_than.between(
             min_subtotal_greater_than, max_subtotal_greater_than
@@ -237,6 +256,7 @@ def insert_update_discount_rule(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
             "subtotal_greater_than",
             "subtotal_less_than",
             "max_discount_percentage",
+            "status",
         ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
@@ -260,6 +280,7 @@ def insert_update_discount_rule(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
         "subtotal_greater_than": DiscountRuleModel.subtotal_greater_than,
         "subtotal_less_than": DiscountRuleModel.subtotal_less_than,
         "max_discount_percentage": DiscountRuleModel.max_discount_percentage,
+        "status": DiscountRuleModel.status,
     }
 
     # Add actions dynamically based on the presence of keys in kwargs

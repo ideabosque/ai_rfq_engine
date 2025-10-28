@@ -22,6 +22,7 @@ class RequestType(ObjectType):
     total_amount = Float()
     total_discount = Float()
     final_total_amount = Float()
+    notes = String()
     status = String()
     expired_at = DateTime()
     created_at = DateTime()

@@ -11,7 +11,6 @@ from typing import Any, Dict
 import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import (
-    ListAttribute,
     NumberAttribute,
     UnicodeAttribute,
     UTCDateTimeAttribute,
@@ -132,12 +131,26 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
     max_installment_amount = kwargs.get("max_installment_amount")
     min_installment_amount = kwargs.get("min_installment_amount")
     statuses = kwargs.get("statuses")
+    updated_at_gt = kwargs.get("updated_at_gt")
+    updated_at_lt = kwargs.get("updated_at_lt")
 
     args = []
     inquiry_funct = InstallmentModel.scan
     count_funct = InstallmentModel.count
     if quote_uuid:
-        args = [quote_uuid, None]
+        range_key_condition = None
+
+        # Build range key condition for updated_at when using updated_at_index
+        if updated_at_gt is not None and updated_at_lt is not None:
+            range_key_condition = InstallmentModel.updated_at.between(
+                updated_at_gt, updated_at_lt
+            )
+        elif updated_at_gt is not None:
+            range_key_condition = InstallmentModel.updated_at > updated_at_gt
+        elif updated_at_lt is not None:
+            range_key_condition = InstallmentModel.updated_at < updated_at_lt
+
+        args = [quote_uuid, range_key_condition]
         inquiry_funct = InstallmentModel.updated_at_index.query
         count_funct = InstallmentModel.updated_at_index.count
 

@@ -15,6 +15,10 @@ from .mutations.installment import DeleteInstallment, InsertUpdateInstallment
 from .mutations.item import DeleteItem, InsertUpdateItem
 from .mutations.item_price_tier import DeleteItemPriceTier, InsertUpdateItemPriceTier
 from .mutations.provider_item import DeleteProviderItem, InsertUpdateProviderItem
+from .mutations.provider_item_batches import (
+    DeleteProviderItemBatch,
+    InsertUpdateProviderItemBatch,
+)
 from .mutations.quote import DeleteQuote, InsertUpdateQuote
 from .mutations.quote_item import DeleteQuoteItem, InsertUpdateQuoteItem
 from .mutations.request import DeleteRequest, InsertUpdateRequest
@@ -29,6 +33,10 @@ from .queries.item_price_tier import (
     resolve_item_price_tier_list,
 )
 from .queries.provider_item import resolve_provider_item, resolve_provider_item_list
+from .queries.provider_item_batches import (
+    resolve_provider_item_batch,
+    resolve_provider_item_batch_list,
+)
 from .queries.quote import resolve_quote, resolve_quote_list
 from .queries.quote_item import resolve_quote_item, resolve_quote_item_list
 from .queries.request import resolve_request, resolve_request_list
@@ -43,6 +51,10 @@ from .types.installment import InstallmentListType, InstallmentType
 from .types.item import ItemListType, ItemType
 from .types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
 from .types.provider_item import ProviderItemListType, ProviderItemType
+from .types.provider_item_batches import (
+    ProviderItemBatchListType,
+    ProviderItemBatchType,
+)
 from .types.quote import QuoteListType, QuoteType
 from .types.quote_item import QuoteItemListType, QuoteItemType
 from .types.request import RequestListType, RequestType
@@ -64,6 +76,8 @@ def type_class():
         ItemPriceTierListType,
         ProviderItemType,
         ProviderItemListType,
+        ProviderItemBatchType,
+        ProviderItemBatchListType,
         QuoteType,
         QuoteListType,
         QuoteItemType,
@@ -139,6 +153,24 @@ class Query(ObjectType):
         provider_item_external_id=String(required=False),
         min_base_price_per_uom=Float(required=False),
         max_base_price_per_uom=Float(required=False),
+    )
+
+    provider_item_batch = Field(
+        ProviderItemBatchType,
+        provider_item_uuid=String(required=True),
+        batch_no=String(required=True),
+    )
+
+    provider_item_batch_list = Field(
+        ProviderItemBatchListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        provider_item_uuid=String(required=False),
+        item_uuid=String(required=False),
+        min_cost_per_uom=Float(required=False),
+        max_cost_per_uom=Float(required=False),
+        min_total_cost_per_uom=Float(required=False),
+        max_total_cost_per_uom=Float(required=False),
     )
 
     item_price_tier = Field(
@@ -329,6 +361,16 @@ class Query(ObjectType):
     ) -> ProviderItemListType:
         return resolve_provider_item_list(info, **kwargs)
 
+    def resolve_provider_item_batch(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ProviderItemBatchType:
+        return resolve_provider_item_batch(info, **kwargs)
+
+    def resolve_provider_item_batch_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ProviderItemBatchListType:
+        return resolve_provider_item_batch_list(info, **kwargs)
+
     def resolve_item_price_tier(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
     ) -> ItemPriceTierType:
@@ -405,6 +447,8 @@ class Mutations(ObjectType):
     delete_segment_contact = DeleteSegmentContact.Field()
     insert_update_provider_item = InsertUpdateProviderItem.Field()
     delete_provider_item = DeleteProviderItem.Field()
+    insert_update_provider_item_batch = InsertUpdateProviderItemBatch.Field()
+    delete_provider_item_batch = DeleteProviderItemBatch.Field()
     insert_update_item_price_tier = InsertUpdateItemPriceTier.Field()
     delete_item_price_tier = DeleteItemPriceTier.Field()
     insert_update_discount_rule = InsertUpdateDiscountRule.Field()

@@ -59,6 +59,14 @@ def deploy() -> List:
                             "label": "View Provider Item List",
                         },
                         {
+                            "action": "providerItemBatch",
+                            "label": "View Provider Item Batch",
+                        },
+                        {
+                            "action": "providerItemBatchList",
+                            "label": "View Provider Item Batch List",
+                        },
+                        {
                             "action": "itemPriceTier",
                             "label": "View Item Price Tier",
                         },
@@ -147,6 +155,14 @@ def deploy() -> List:
                         {
                             "action": "deleteProviderItem",
                             "label": "Delete Provider Item",
+                        },
+                        {
+                            "action": "insertUpdateProviderItemBatch",
+                            "label": "Create Update Provider Item Batch",
+                        },
+                        {
+                            "action": "deleteProviderItemBatch",
+                            "label": "Delete Provider Item Batch",
                         },
                         {
                             "action": "insertUpdateItemPriceTier",

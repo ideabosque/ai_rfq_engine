@@ -23,6 +23,7 @@ class InsertUpdateDiscountRule(Mutation):
         subtotal_greater_than = Float(required=False)
         subtotal_less_than = Float(required=False)
         max_discount_percentage = Float(required=False)
+        status = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod

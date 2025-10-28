@@ -184,32 +184,52 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     provider_item_external_id = kwargs.get("provider_item_external_id")
     min_base_price_per_uom = kwargs.get("min_base_price_per_uom")
     max_base_price_per_uom = kwargs.get("max_base_price_per_uom")
+    updated_at_gt = kwargs.get("updated_at_gt")
+    updated_at_lt = kwargs.get("updated_at_lt")
 
     args = []
     inquiry_funct = ProviderItemModel.scan
     count_funct = ProviderItemModel.count
     if endpoint_id:
-        args = [endpoint_id, None]
+        range_key_condition = None
+
+        # Build range key condition for updated_at when using updated_at_index
+        if updated_at_gt is not None and updated_at_lt is not None:
+            range_key_condition = ProviderItemModel.updated_at.between(
+                updated_at_gt, updated_at_lt
+            )
+        elif updated_at_gt is not None:
+            range_key_condition = ProviderItemModel.updated_at > updated_at_gt
+        elif updated_at_lt is not None:
+            range_key_condition = ProviderItemModel.updated_at < updated_at_lt
+
+        args = [endpoint_id, range_key_condition]
         inquiry_funct = ProviderItemModel.updated_at_index.query
         count_funct = ProviderItemModel.updated_at_index.count
-        if item_uuid:
+        if item_uuid and args[1] is None:
             count_funct = ProviderItemModel.item_uuid_index.count
             args[1] = ProviderItemModel.item_uuid == item_uuid
             inquiry_funct = ProviderItemModel.item_uuid_index.query
-        elif provider_corp_external_id:
+        elif provider_corp_external_id and args[1] is None:
             count_funct = ProviderItemModel.provider_corp_external_id_index.count
             args[1] = (
                 ProviderItemModel.provider_corp_external_id == provider_corp_external_id
             )
             inquiry_funct = ProviderItemModel.provider_corp_external_id_index.query
-        elif provider_item_external_id:
+        elif provider_item_external_id and args[1] is None:
             count_funct = ProviderItemModel.provider_item_external_id_index.count
             args[1] = (
                 ProviderItemModel.provider_item_external_id == provider_item_external_id
             )
-            inquiry_funct = ProviderItemModel.provider_corp_external_id_index.query
+            inquiry_funct = ProviderItemModel.provider_item_external_id_index.query
 
     the_filters = None  # We can add filters for the query
+    if item_uuid and args[1] is not None and args[1] != ProviderItemModel.item_uuid == item_uuid:
+        the_filters &= ProviderItemModel.item_uuid == item_uuid
+    if provider_corp_external_id and args[1] is not None and args[1] != (ProviderItemModel.provider_corp_external_id == provider_corp_external_id):
+        the_filters &= ProviderItemModel.provider_corp_external_id == provider_corp_external_id
+    if provider_item_external_id and args[1] is not None and args[1] != (ProviderItemModel.provider_item_external_id == provider_item_external_id):
+        the_filters &= ProviderItemModel.provider_item_external_id == provider_item_external_id
     if min_base_price_per_uom:
         the_filters &= ProviderItemModel.base_price_per_uom >= min_base_price_per_uom
     if max_base_price_per_uom:
@@ -288,6 +308,8 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
     model_funct=get_provider_item,
 )
 def delete_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    from .provider_item_batches import resolve_provider_item_batch_list
+
     discount_rule_list = resolve_discount_rule_list(
         info,
         **{
@@ -316,6 +338,15 @@ def delete_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
         },
     )
     if quote_item_list.total > 0:
+        return False
+
+    provider_item_batch_list = resolve_provider_item_batch_list(
+        info,
+        **{
+            "provider_item_uuid": kwargs.get("entity").provider_item_uuid,
+        },
+    )
+    if provider_item_batch_list.total > 0:
         return False
 
     kwargs.get("entity").delete()
