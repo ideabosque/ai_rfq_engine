@@ -30,7 +30,7 @@ from silvaengine_dynamodb_base import (
 from silvaengine_utility import Utility
 
 from ..types.request import RequestListType, RequestType
-from . import resolve_file_list
+from .file import resolve_file_list
 from .quote import resolve_quote_list
 
 
