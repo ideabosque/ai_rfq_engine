@@ -4,7 +4,6 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import logging
-import os
 from typing import Any, Dict
 
 import boto3
@@ -20,9 +19,11 @@ class Config:
     Manages shared configuration variables across the application.
     """
 
+    # Class attributes
     aws_lambda = None
     schemas = {}
 
+    # Public methods
     @classmethod
     def initialize(cls, logger: logging.Logger, **setting: Dict[str, Any]) -> None:
         """
@@ -41,45 +42,6 @@ class Config:
             logger.exception("Failed to initialize configuration.")
             raise e
 
-    @classmethod
-    def _set_parameters(cls, setting: Dict[str, Any]) -> None:
-        """
-        Set application-level parameters.
-        Args:
-            setting (Dict[str, Any]): Configuration dictionary.
-        """
-        cls.source_email = setting.get("source_email")
-
-    @classmethod
-    def _initialize_tables(cls, logger: logging.Logger) -> None:
-        """
-        Initialize database tables by calling the utils._initialize_tables() method.
-        This is an internal method used during configuration setup.
-        """
-        utils._initialize_tables(logger)
-
-    @classmethod
-    def _initialize_aws_services(cls, setting: Dict[str, Any]) -> None:
-        """
-        Initialize AWS services, such as the S3 client.
-        Args:
-            setting (Dict[str, Any]): Configuration dictionary.
-        """
-        if all(
-            setting.get(k)
-            for k in ["region_name", "aws_access_key_id", "aws_secret_access_key"]
-        ):
-            aws_credentials = {
-                "region_name": setting["region_name"],
-                "aws_access_key_id": setting["aws_access_key_id"],
-                "aws_secret_access_key": setting["aws_secret_access_key"],
-            }
-        else:
-            aws_credentials = {}
-
-        cls.aws_lambda = boto3.client("lambda", **aws_credentials)
-
-    # Fetches and caches GraphQL schema for a given function
     @classmethod
     def fetch_graphql_schema(
         cls,
@@ -111,3 +73,42 @@ class Config:
                 test_mode=setting.get("test_mode"),
             )
         return Config.schemas[function_name]
+
+    # Private methods
+    @classmethod
+    def _set_parameters(cls, setting: Dict[str, Any]) -> None:
+        """
+        Set application-level parameters.
+        Args:
+            setting (Dict[str, Any]): Configuration dictionary.
+        """
+        cls.source_email = setting.get("source_email")
+
+    @classmethod
+    def _initialize_aws_services(cls, setting: Dict[str, Any]) -> None:
+        """
+        Initialize AWS services, such as the S3 client.
+        Args:
+            setting (Dict[str, Any]): Configuration dictionary.
+        """
+        if all(
+            setting.get(k)
+            for k in ["region_name", "aws_access_key_id", "aws_secret_access_key"]
+        ):
+            aws_credentials = {
+                "region_name": setting["region_name"],
+                "aws_access_key_id": setting["aws_access_key_id"],
+                "aws_secret_access_key": setting["aws_secret_access_key"],
+            }
+        else:
+            aws_credentials = {}
+
+        cls.aws_lambda = boto3.client("lambda", **aws_credentials)
+
+    @classmethod
+    def _initialize_tables(cls, logger: logging.Logger) -> None:
+        """
+        Initialize database tables by calling the utils._initialize_tables() method.
+        This is an internal method used during configuration setup.
+        """
+        utils._initialize_tables(logger)

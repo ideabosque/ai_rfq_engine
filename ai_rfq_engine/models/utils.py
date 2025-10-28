@@ -4,7 +4,7 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 
 def _initialize_tables(logger: logging.Logger) -> None:

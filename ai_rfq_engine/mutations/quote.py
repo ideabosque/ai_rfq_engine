@@ -7,7 +7,6 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, Field, Float, Mutation, String
-from silvaengine_utility import JSON
 
 from ..models.quote import delete_quote, insert_update_quote
 from ..types.quote import QuoteType

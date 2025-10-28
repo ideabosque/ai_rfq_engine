@@ -6,7 +6,7 @@ __author__ = "bibow"
 import traceback
 from typing import Any, Dict
 
-from graphene import Boolean, Field, Float, Mutation, String
+from graphene import Boolean, Field, Mutation, String
 
 from ..models.file import delete_file, insert_update_file
 from ..types.file import FileType
