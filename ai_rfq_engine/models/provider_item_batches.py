@@ -10,11 +10,7 @@ from typing import Any, Dict
 
 import pendulum
 from graphene import ResolveInfo
-from pynamodb.attributes import (
-    NumberAttribute,
-    UnicodeAttribute,
-    UTCDateTimeAttribute,
-)
+from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -117,9 +113,7 @@ def get_provider_item_batch_type(
     info: ResolveInfo, provider_item_batch: ProviderItemBatchModel
 ) -> ProviderItemBatchType:
     try:
-        item = _get_item(
-            info.context["endpoint_id"], provider_item_batch.item_uuid
-        )
+        item = _get_item(info.context["endpoint_id"], provider_item_batch.item_uuid)
         provider_item = _get_provider_item(
             info.context["endpoint_id"], provider_item_batch.provider_item_uuid
         )
@@ -207,9 +201,13 @@ def resolve_provider_item_batch_list(
     if max_cost_per_uom:
         the_filters &= ProviderItemBatchModel.cost_per_uom <= max_cost_per_uom
     if min_total_cost_per_uom:
-        the_filters &= ProviderItemBatchModel.total_cost_per_uom >= min_total_cost_per_uom
+        the_filters &= (
+            ProviderItemBatchModel.total_cost_per_uom >= min_total_cost_per_uom
+        )
     if max_total_cost_per_uom:
-        the_filters &= ProviderItemBatchModel.total_cost_per_uom <= max_total_cost_per_uom
+        the_filters &= (
+            ProviderItemBatchModel.total_cost_per_uom <= max_total_cost_per_uom
+        )
     if the_filters is not None:
         args.append(the_filters)
 
@@ -221,6 +219,7 @@ def resolve_provider_item_batch_list(
         "hash_key": "provider_item_uuid",
         "range_key": "batch_no",
     },
+    range_key_required=True,
     model_funct=get_provider_item_batch,
     count_funct=get_provider_item_batch_count,
     type_funct=get_provider_item_batch_type,
