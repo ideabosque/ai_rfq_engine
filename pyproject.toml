@@ -65,7 +65,25 @@ testpaths = ["ai_rfq_engine/tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-addopts = "-v --strict-markers"
+addopts = "-v --strict-markers --tb=short --color=yes"
+markers = [
+    "unit: Unit tests that don't require external dependencies",
+    "integration: Integration tests that require external services (DB, API, etc.)",
+    "slow: Tests that take significant time to run",
+    "skip: Tests that are temporarily disabled",
+]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+minversion = "7.0"
+console_output_style = "progress"
 
 [tool.mypy]
 python_version = "3.8"
