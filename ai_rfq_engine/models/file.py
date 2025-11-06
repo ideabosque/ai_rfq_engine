@@ -97,7 +97,7 @@ def get_file_count(request_uuid: str, file_name: str) -> int:
 def get_file_type(info: ResolveInfo, file: FileModel) -> FileType:
     try:
         request = _get_request(info.context["endpoint_id"], file.request_uuid)
-        file = file.__dict__["attribute_values"]
+        file: Dict = file.__dict__["attribute_values"]
         file["request"] = request
         file.pop("endpoint_id")
         file.pop("request_uuid")

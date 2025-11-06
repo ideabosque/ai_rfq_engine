@@ -125,7 +125,7 @@ def get_discount_rule_type(
             info.context["endpoint_id"], discount_rule.provider_item_uuid
         )
         segment = _get_segment(info.context["endpoint_id"], discount_rule.segment_uuid)
-        discount_rule = discount_rule.__dict__["attribute_values"]
+        discount_rule: Dict = discount_rule.__dict__["attribute_values"]
         discount_rule.update(
             {
                 "provider_item": provider_item,

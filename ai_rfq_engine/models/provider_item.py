@@ -144,7 +144,7 @@ def get_provider_item_type(
 ) -> ProviderItemType:
     try:
         item = _get_item(info.context["endpoint_id"], provider_item.item_uuid)
-        provider_item = provider_item.__dict__["attribute_values"]
+        provider_item: Dict = provider_item.__dict__["attribute_values"]
         provider_item["item"] = item
         provider_item.pop("endpoint_id")
         provider_item.pop("item_uuid")

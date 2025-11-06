@@ -5,6 +5,7 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Float, List, ObjectType, String
+
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
@@ -17,6 +18,7 @@ class ItemPriceTierType(ObjectType):
     quantity_less_then = Float()
     margin_per_uom = Float()
     price_per_uom = Float()
+    provider_item_batches = List(JSON)
     status = String()
     created_at = DateTime()
     updated_by = String()

@@ -27,9 +27,8 @@ class InsertUpdateProviderItemBatch(Mutation):
         cost_per_uom = Float(required=False)
         freight_cost_per_uom = Float(required=False)
         additional_cost_per_uom = Float(required=False)
-        total_cost_per_uom = Float(required=False)
         guardrail_margin_per_uom = Float(required=False)
-        guardrail_price_per_uom = Float(required=False)
+        in_stock = Boolean(required=False)
         updated_by = String(required=True)
 
     @staticmethod

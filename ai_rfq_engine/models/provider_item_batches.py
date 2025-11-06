@@ -2,15 +2,23 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+from sys import flags
+
 __author__ = "bibow"
 
 import logging
 import traceback
+from decimal import DefaultContext
 from typing import Any, Dict
 
 import pendulum
 from graphene import ResolveInfo
-from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
+from pynamodb.attributes import (
+    BooleanAttribute,
+    NumberAttribute,
+    UnicodeAttribute,
+    UTCDateTimeAttribute,
+)
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -74,8 +82,9 @@ class ProviderItemBatchModel(BaseModel):
     freight_cost_per_uom = NumberAttribute()
     additional_cost_per_uom = NumberAttribute()
     total_cost_per_uom = NumberAttribute()
-    guardrail_margin_per_uom = NumberAttribute()
+    guardrail_margin_per_uom = NumberAttribute(default=0)
     guardrail_price_per_uom = NumberAttribute()
+    in_stock = BooleanAttribute(default=True)
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -117,7 +126,7 @@ def get_provider_item_batch_type(
         provider_item = _get_provider_item(
             info.context["endpoint_id"], provider_item_batch.provider_item_uuid
         )
-        provider_item_batch = provider_item_batch.__dict__["attribute_values"]
+        provider_item_batch: Dict = provider_item_batch.__dict__["attribute_values"]
         provider_item_batch.update(
             {
                 "item": item,
@@ -160,18 +169,23 @@ def resolve_provider_item_batch_list(
     provider_item_uuid = kwargs.get("provider_item_uuid")
     item_uuid = kwargs.get("item_uuid")
     endpoint_id = info.context["endpoint_id"]
+    expired_at_gt = kwargs.get("expired_at_gt")
+    expired_at_lt = kwargs.get("expired_at_lt")
+    produced_at_gt = kwargs.get("produced_at_gt")
+    produced_at_lt = kwargs.get("produced_at_lt")
     min_cost_per_uom = kwargs.get("min_cost_per_uom")
     max_cost_per_uom = kwargs.get("max_cost_per_uom")
     min_total_cost_per_uom = kwargs.get("min_total_cost_per_uom")
     max_total_cost_per_uom = kwargs.get("max_total_cost_per_uom")
+    in_stock = kwargs.get("in_stock")
     updated_at_gt = kwargs.get("updated_at_gt")
     updated_at_lt = kwargs.get("updated_at_lt")
 
     args = []
     inquiry_funct = ProviderItemBatchModel.scan
     count_funct = ProviderItemBatchModel.count
+    range_key_condition = None
     if provider_item_uuid:
-        range_key_condition = None
 
         # Build range key condition for updated_at when using updated_at_index
         if updated_at_gt is not None and updated_at_lt is not None:
@@ -192,10 +206,18 @@ def resolve_provider_item_batch_list(
             inquiry_funct = ProviderItemBatchModel.item_uuid_index.query
 
     the_filters = None  # We can add filters for the query
-    if item_uuid and args[1] is not None:
+    if item_uuid and range_key_condition is not None:
         the_filters &= ProviderItemBatchModel.item_uuid == item_uuid
     if endpoint_id:
         the_filters &= ProviderItemBatchModel.endpoint_id == endpoint_id
+    if expired_at_gt:
+        the_filters &= ProviderItemBatchModel.expired_at >= expired_at_gt
+    if expired_at_lt:
+        the_filters &= ProviderItemBatchModel.expired_at < expired_at_lt
+    if produced_at_gt:
+        the_filters &= ProviderItemBatchModel.produced_at >= produced_at_gt
+    if produced_at_lt:
+        the_filters &= ProviderItemBatchModel.produced_at < produced_at_lt
     if min_cost_per_uom:
         the_filters &= ProviderItemBatchModel.cost_per_uom >= min_cost_per_uom
     if max_cost_per_uom:
@@ -208,6 +230,8 @@ def resolve_provider_item_batch_list(
         the_filters &= (
             ProviderItemBatchModel.total_cost_per_uom <= max_total_cost_per_uom
         )
+    if in_stock:
+        the_filters &= ProviderItemBatchModel.in_stock == in_stock
     if the_filters is not None:
         args.append(the_filters)
 
@@ -243,12 +267,20 @@ def insert_update_provider_item_batch(
             "cost_per_uom",
             "freight_cost_per_uom",
             "additional_cost_per_uom",
-            "total_cost_per_uom",
             "guardrail_margin_per_uom",
-            "guardrail_price_per_uom",
+            "in_stock",
         ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
+        cols["total_cost_per_uom"] = (
+            cols.get("cost_per_uom", 0)
+            + cols.get("freight_cost_per_uom", 0)
+            + cols.get("additional_cost_per_uom", 0)
+        )
+        cols["guardrail_price_per_uom"] = cols["total_cost_per_uom"] * (
+            100 + cols.get("guardrail_margin_per_uom", 0) / 100
+        )
+
         ProviderItemBatchModel(
             provider_item_uuid,
             batch_no,
@@ -273,7 +305,30 @@ def insert_update_provider_item_batch(
         "total_cost_per_uom": ProviderItemBatchModel.total_cost_per_uom,
         "guardrail_margin_per_uom": ProviderItemBatchModel.guardrail_margin_per_uom,
         "guardrail_price_per_uom": ProviderItemBatchModel.guardrail_price_per_uom,
+        "in_stock": ProviderItemBatchModel.in_stock,
     }
+
+    cost_per_uom: float = provider_item_batch.cost_per_uom
+    freight_cost_per_uom: float = provider_item_batch.freight_cost_per_uom
+    additional_cost_per_uom: float = provider_item_batch.additional_cost_per_uom
+    if "cost_per_uom" in kwargs:
+        cost_per_uom = float(kwargs["cost_per_uom"])
+    if "freight_cost_per_uom" in kwargs:
+        freight_cost_per_uom = float(kwargs["freight_cost_per_uom"])
+    if "additional_cost_per_uom" in kwargs:
+        additional_cost_per_uom = float(kwargs["additional_cost_per_uom"])
+
+    kwargs["total_cost_per_uom"] = (
+        cost_per_uom + freight_cost_per_uom + additional_cost_per_uom
+    )
+
+    guardrail_margin_per_uom: float = provider_item_batch.guardrail_margin_per_uom
+    if "guardrail_margin_per_uom" in kwargs:
+        guardrail_margin_per_uom = float(kwargs["guardrail_margin_per_uom"])
+
+    kwargs["guardrail_price_per_uom"] = kwargs["total_cost_per_uom"] * (
+        (1 + guardrail_margin_per_uom / 100)
+    )
 
     # Add actions dynamically based on the presence of keys in kwargs
     for key, field in field_map.items():

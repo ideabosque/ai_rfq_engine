@@ -10,12 +10,10 @@ from typing import Any, Dict
 
 import pendulum
 from graphene import ResolveInfo
-from pynamodb.attributes import (
-    NumberAttribute,
-    UnicodeAttribute,
-    UTCDateTimeAttribute,
-)
+from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -24,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.installment import InstallmentListType, InstallmentType
 from .utils import _get_quote
@@ -94,7 +91,7 @@ def get_installment_type(
 ) -> InstallmentType:
     try:
         quote = _get_quote(installment.request_uuid, installment.quote_uuid)
-        installment = installment.__dict__["attribute_values"]
+        installment: Dict = installment.__dict__["attribute_values"]
         installment["quote"] = quote
         installment.pop("request_uuid")
         installment.pop("quote_uuid")

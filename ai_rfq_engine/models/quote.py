@@ -127,7 +127,7 @@ def get_quote_count(request_uuid: str, quote_uuid: str) -> int:
 def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
     try:
         request = _get_request(info.context["endpoint_id"], quote.request_uuid)
-        quote = quote.__dict__["attribute_values"]
+        quote: Dict = quote.__dict__["attribute_values"]
         quote["request"] = request
         quote.pop("endpoint_id")
         quote.pop("request_uuid")

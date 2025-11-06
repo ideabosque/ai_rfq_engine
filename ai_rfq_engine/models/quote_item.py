@@ -145,7 +145,7 @@ def get_quote_item_count(quote_uuid: str, quote_item_uuid: str) -> int:
 def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteItemType:
     try:
         quote = _get_quote(quote_item.request_uuid, quote_item.quote_uuid)
-        quote_item = quote_item.__dict__["attribute_values"]
+        quote_item: Dict = quote_item.__dict__["attribute_values"]
         quote_item["quote"] = quote
         quote_item.pop("request_uuid")
         quote_item.pop("quote_uuid")

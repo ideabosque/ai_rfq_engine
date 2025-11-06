@@ -24,6 +24,7 @@ from silvaengine_dynamodb_base import (
 from silvaengine_utility import Utility
 
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
+from .provider_item_batches import resolve_provider_item_batch_list
 from .utils import _get_provider_item, _get_segment
 
 
@@ -130,13 +131,37 @@ def get_item_price_tier_type(
         segment = _get_segment(
             info.context["endpoint_id"], item_price_tier.segment_uuid
         )
-        item_price_tier = item_price_tier.__dict__["attribute_values"]
+
+        provider_item_batches = []
+        if item_price_tier.margin_per_uom is not None:
+            provider_item_batch_list = resolve_provider_item_batch_list(
+                info,
+                **{
+                    "item_uuid": item_price_tier.item_uuid,
+                    "provider_item_uuid": item_price_tier.provider_item_uuid,
+                    "in_stock": True,
+                    "expired_at_gt": pendulum.now("UTC"),
+                },
+            )
+            for (
+                provider_item_batch
+            ) in provider_item_batch_list.provider_item_batch_list:
+                provider_item_batch.price_per_uom = float(
+                    provider_item_batch.guardrail_price_per_uom
+                ) * (1 + float(item_price_tier.margin_per_uom) / 100)
+                provider_item_batches.append(provider_item_batch)
+
+        item_price_tier: Dict = item_price_tier.__dict__["attribute_values"]
         item_price_tier.update(
             {
                 "provider_item": provider_item,
                 "segment": segment,
             }
         )
+
+        if provider_item_batch_list.total > 0:
+            item_price_tier["provider_item_batches"] = provider_item_batches
+
         item_price_tier.pop("endpoint_id")
         item_price_tier.pop("provider_item_uuid")
         item_price_tier.pop("segment_uuid")
@@ -214,9 +239,17 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     the_filters = None  # We can add filters for the query
     if endpoint_id:
         the_filters &= ItemPriceTierModel.endpoint_id == endpoint_id
-    if provider_item_uuid and args[1] is not None and args[1] != (ItemPriceTierModel.provider_item_uuid == provider_item_uuid):
+    if (
+        provider_item_uuid
+        and args[1] is not None
+        and args[1] != (ItemPriceTierModel.provider_item_uuid == provider_item_uuid)
+    ):
         the_filters &= ItemPriceTierModel.provider_item_uuid == provider_item_uuid
-    if segment_uuid and args[1] is not None and args[1] != (ItemPriceTierModel.segment_uuid == segment_uuid):
+    if (
+        segment_uuid
+        and args[1] is not None
+        and args[1] != (ItemPriceTierModel.segment_uuid == segment_uuid)
+    ):
         the_filters &= ItemPriceTierModel.segment_uuid == segment_uuid
     if max_quantity_greater_then and min_quantity_greater_then:
         the_filters &= ItemPriceTierModel.quantity_greater_then.between(

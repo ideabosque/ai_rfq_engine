@@ -25,7 +25,6 @@ from silvaengine_utility import Utility
 
 from ..types.item import ItemListType, ItemType
 from .provider_item import resolve_provider_item_list
-from .request import resolve_request_list
 
 
 class ItemTypeIndex(LocalSecondaryIndex):

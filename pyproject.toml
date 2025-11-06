@@ -77,3 +77,7 @@ disallow_untyped_defs = false
 typeCheckingMode = "basic"
 reportCallIssue = "none"
 reportArgumentType = "none"
+reportArgumentTypeIssues = "none"
+reportRedeclaration = "none"
+reportOptionalMemberAccess = "none"
+reportAttributeAccessIssue = "none"

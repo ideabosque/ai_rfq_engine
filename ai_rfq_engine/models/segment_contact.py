@@ -118,7 +118,7 @@ def get_segment_contact_type(
         segment = _get_segment(
             info.context["endpoint_id"], segment_contact.segment_uuid
         )
-        segment_contact = segment_contact.__dict__["attribute_values"]
+        segment_contact: Dict = segment_contact.__dict__["attribute_values"]
         segment_contact["segment"] = segment
         segment_contact.pop("endpoint_id")
         segment_contact.pop("segment_uuid")
