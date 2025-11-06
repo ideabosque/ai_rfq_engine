@@ -73,12 +73,7 @@ def _call_method(
     arguments = arguments or {}
     op = label or method_name
     cid = uuid.uuid4().hex[:8]
-    logger.info(
-        "Method call: cid=%s op=%s arguments=%s",
-        cid,
-        op,
-        json.dumps(arguments, default=str, sort_keys=True),
-    )
+    logger.info(f"Method call: cid={cid} op={op} arguments={arguments}")
     t0 = time.perf_counter()
 
     try:
@@ -86,11 +81,7 @@ def _call_method(
     except AttributeError as exc:
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
         logger.info(
-            "Method response: cid=%s op=%s elapsed_ms=%s success=False error=%s",
-            cid,
-            op,
-            elapsed_ms,
-            str(exc),
+            f"Method response: cid={cid} op={op} elapsed_ms={elapsed_ms} success=False error={str(exc)}"
         )
         return None, exc
 
@@ -98,21 +89,13 @@ def _call_method(
         result = method(**arguments)
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
         logger.info(
-            "Method response: cid=%s op=%s elapsed_ms=%s success=True result=%s",
-            cid,
-            op,
-            elapsed_ms,
-            json.dumps(result, default=str, sort_keys=True),
+            f"Method response: cid={cid} op={op} elapsed_ms={elapsed_ms} success=True result={result}"
         )
         return result, None
     except Exception as exc:
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
         logger.info(
-            "Method response: cid=%s op=%s elapsed_ms=%s success=False error=%s",
-            cid,
-            op,
-            elapsed_ms,
-            str(exc),
+            f"Method response: cid={cid} op={op} elapsed_ms={elapsed_ms} success=False error={str(exc)}"
         )
         return None, exc
 
@@ -371,7 +354,7 @@ def test_graphql_insert_update_item_py(ai_rfq_engine, schema, test_data):
     """Test item insert/update operation."""
     query = Utility.generate_graphql_operation("insertUpdateItem", "Mutation", schema)
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -468,7 +451,7 @@ def test_graphql_insert_update_segment_py(ai_rfq_engine, schema, test_data):
         "insertUpdateSegment", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -544,7 +527,7 @@ def test_graphql_insert_update_segment_contact_py(ai_rfq_engine, schema, test_da
         "insertUpdateSegmentContact", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -623,7 +606,7 @@ def test_graphql_insert_update_provider_item_py(ai_rfq_engine, schema, test_data
         "insertUpdateProviderItem", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -699,7 +682,7 @@ def test_graphql_insert_update_provider_item_batch_py(ai_rfq_engine, schema, tes
         "insertUpdateProviderItemBatch", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -783,7 +766,7 @@ def test_graphql_insert_update_item_price_tier_py(ai_rfq_engine, schema, test_da
         "insertUpdateItemPriceTier", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -862,7 +845,7 @@ def test_graphql_insert_update_discount_rule_py(ai_rfq_engine, schema, test_data
         "insertUpdateDiscountRule", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -941,7 +924,7 @@ def test_graphql_insert_update_request_py(ai_rfq_engine, schema, test_data):
         "insertUpdateRequest", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -1014,7 +997,7 @@ def test_graphql_insert_update_quote_py(ai_rfq_engine, schema, test_data):
     """Test quote insert/update operation."""
     query = Utility.generate_graphql_operation("insertUpdateQuote", "Mutation", schema)
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -1093,7 +1076,7 @@ def test_graphql_insert_update_quote_item_py(ai_rfq_engine, schema, test_data):
         "insertUpdateQuoteItem", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -1172,7 +1155,7 @@ def test_graphql_insert_update_installment_py(ai_rfq_engine, schema, test_data):
         "insertUpdateInstallment", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -1249,7 +1232,7 @@ def test_graphql_insert_update_file_py(ai_rfq_engine, schema, test_data):
     """Test file insert/update operation."""
     query = Utility.generate_graphql_operation("insertUpdateFile", "Mutation", schema)
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {json.dumps(test_data, default=str)}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
