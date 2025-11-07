@@ -2,13 +2,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-from sys import flags
-
 __author__ = "bibow"
 
 import logging
 import traceback
-from decimal import DefaultContext
 from typing import Any, Dict
 
 import pendulum
@@ -20,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -30,6 +25,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.provider_item_batches import (
     ProviderItemBatchListType,
