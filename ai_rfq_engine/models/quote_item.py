@@ -17,6 +17,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -24,8 +26,7 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
+from silvaengine_utility import Utility, convert_decimal_to_number
 
 from ..types.quote_item import QuoteItemListType, QuoteItemType
 from .installment import resolve_installment_list
@@ -38,7 +39,7 @@ def get_price_per_uom(
     qty: float,
     segment_uuid: str,
     provider_item_uuid: str,
-    batch_no: str = None
+    batch_no: str = None,
 ) -> float | None:
     """
     Get the price per UOM based on item price tiers for the given quantity.
@@ -65,6 +66,7 @@ def get_price_per_uom(
         "item_uuid": item_uuid,
         "segment_uuid": segment_uuid,
         "provider_item_uuid": provider_item_uuid,
+        "status": "active",
     }
 
     # Retrieve price tiers
@@ -81,15 +83,15 @@ def get_price_per_uom(
                 return tier.price_per_uom
 
             # If tier has margin_per_uom with batches, find the matching batch price
-            if hasattr(tier, 'provider_item_batches') and tier.provider_item_batches:
+            if hasattr(tier, "provider_item_batches") and tier.provider_item_batches:
                 # If batch_no is specified, find that specific batch
                 if batch_no:
                     for batch in tier.provider_item_batches:
-                        if batch.batch_no == batch_no:
-                            return batch.price_per_uom
+                        if batch["batch_no"] == batch_no:
+                            return batch["price_per_uom"]
 
                 # Otherwise, return the first available batch price
-                return tier.provider_item_batches[0].price_per_uom
+                return tier.provider_item_batches[0]["price_per_uom"]
 
     return None
 
@@ -162,7 +164,7 @@ class QuoteItemModel(BaseModel):
     quote_item_uuid = UnicodeAttribute(range_key=True)
     provider_item_uuid = UnicodeAttribute()
     item_uuid = UnicodeAttribute()
-    batch_no = NumberAttribute(null=True)
+    batch_no = UnicodeAttribute(null=True)
     request_uuid = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     request_data = MapAttribute()
@@ -290,9 +292,18 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     the_filters = None
     if request_uuid:
         the_filters &= QuoteItemModel.request_uuid == request_uuid
-    if provider_item_uuid and args[1] is not None and args[1] != (QuoteItemModel.provider_item_uuid == provider_item_uuid):
+    if (
+        provider_item_uuid
+        and args[1] is not None
+        and args[1] != (QuoteItemModel.provider_item_uuid == provider_item_uuid)
+    ):
         the_filters &= QuoteItemModel.provider_item_uuid == provider_item_uuid
-    if item_uuid and quote_uuid and args[1] is not None and args[1] != (QuoteItemModel.item_uuid == item_uuid):
+    if (
+        item_uuid
+        and quote_uuid
+        and args[1] is not None
+        and args[1] != (QuoteItemModel.item_uuid == item_uuid)
+    ):
         the_filters &= QuoteItemModel.item_uuid == item_uuid
     if max_price_per_uom and min_price_per_uom:
         the_filters &= QuoteItemModel.price_per_uom.exists()
@@ -351,7 +362,9 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         item_uuid = kwargs.get("item_uuid")
         qty = kwargs.get("qty")
         segment_uuid = kwargs.get("segment_uuid")  # Required for tier pricing
-        provider_item_uuid = kwargs.get("provider_item_uuid")  # Required for tier pricing
+        provider_item_uuid = kwargs.get(
+            "provider_item_uuid"
+        )  # Required for tier pricing
         batch_no = kwargs.get("batch_no")  # Optional for specific batch selection
 
         # Validate required fields
@@ -366,12 +379,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
 
         # Calculate price_per_uom from tier pricing
         price_per_uom = get_price_per_uom(
-            info,
-            item_uuid,
-            qty,
-            segment_uuid,
-            provider_item_uuid,
-            batch_no
+            info, item_uuid, qty, segment_uuid, provider_item_uuid, batch_no
         )
 
         if price_per_uom is None:
@@ -403,7 +411,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         QuoteItemModel(
             quote_uuid,
             quote_item_uuid,
-            **cols,
+            **convert_decimal_to_number(cols),
         ).save()
 
         # Update quote totals after inserting new quote item
@@ -411,6 +419,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
             raise ValueError("request_uuid is required to update quote totals")
 
         from .quote import update_quote_totals
+
         update_quote_totals(info, request_uuid, quote_uuid)
 
     else:
@@ -424,7 +433,11 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
 
         # Only allow updating discount
         if "subtotal_discount" in kwargs:
-            subtotal_discount = None if kwargs["subtotal_discount"] == "null" else kwargs["subtotal_discount"]
+            subtotal_discount = (
+                None
+                if kwargs["subtotal_discount"] == "null"
+                else kwargs["subtotal_discount"]
+            )
             actions.append(QuoteItemModel.subtotal_discount.set(subtotal_discount))
 
             # Recalculate final_subtotal when discount changes
@@ -442,6 +455,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
                 raise ValueError("request_uuid is required to update quote totals")
 
             from .quote import update_quote_totals
+
             update_quote_totals(info, request_uuid, quote_uuid)
 
     return
@@ -473,6 +487,7 @@ def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 
     # Update quote totals after deleting quote item
     from .quote import update_quote_totals
+
     update_quote_totals(info, request_uuid, quote_uuid)
 
     return True

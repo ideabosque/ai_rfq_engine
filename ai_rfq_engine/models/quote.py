@@ -10,12 +10,10 @@ from typing import Any, Dict
 
 import pendulum
 from graphene import ResolveInfo
-from pynamodb.attributes import (
-    NumberAttribute,
-    UnicodeAttribute,
-    UTCDateTimeAttribute,
-)
+from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -24,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote import QuoteListType, QuoteType
 from .installment import resolve_installment_list
@@ -136,14 +133,10 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -
     quote = get_quote(request_uuid, quote_uuid)
 
     # Query all quote items for this quote using resolver
-    quote_item_list = resolve_quote_item_list(
-        info, **{"quote_uuid": quote_uuid}
-    )
+    quote_item_list = resolve_quote_item_list(info, **{"quote_uuid": quote_uuid})
 
     # Calculate totals from the quote item list
-    total_quote_amount = sum(
-        item.subtotal for item in quote_item_list.quote_item_list
-    )
+    total_quote_amount = sum(item.subtotal for item in quote_item_list.quote_item_list)
     total_quote_discount = sum(
         item.subtotal_discount if item.subtotal_discount is not None else 0
         for item in quote_item_list.quote_item_list
@@ -156,9 +149,11 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -
     shipping_amount = quote.shipping_amount if quote.shipping_amount is not None else 0
     final_total_quote_amount = items_final_total + shipping_amount
     actions = [
-        QuoteModel.total_quote_amount.set(total_quote_amount),
-        QuoteModel.total_quote_discount.set(total_quote_discount if total_quote_discount > 0 else None),
-        QuoteModel.final_total_quote_amount.set(final_total_quote_amount),
+        QuoteModel.total_quote_amount.set(float(total_quote_amount)),
+        QuoteModel.total_quote_discount.set(
+            float(total_quote_discount) if total_quote_discount > 0 else None
+        ),
+        QuoteModel.final_total_quote_amount.set(float(final_total_quote_amount)),
         QuoteModel.updated_at.set(pendulum.now("UTC")),
     ]
     quote.update(actions=actions)
@@ -241,7 +236,13 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         count_funct = QuoteModel.provider_corp_external_id_quote_uuid_index.count
 
     the_filters = None
-    if provider_corp_external_id and request_uuid and args[1] is not None and args[1] != (QuoteModel.provider_corp_external_id == provider_corp_external_id):
+    if (
+        provider_corp_external_id
+        and request_uuid
+        and args[1] is not None
+        and args[1]
+        != (QuoteModel.provider_corp_external_id == provider_corp_external_id)
+    ):
         the_filters &= QuoteModel.provider_corp_external_id == provider_corp_external_id
     if shipping_methods:
         the_filters &= QuoteModel.shipping_method.exists()
