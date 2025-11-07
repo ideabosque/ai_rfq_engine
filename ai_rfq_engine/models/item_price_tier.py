@@ -146,10 +146,19 @@ def get_item_price_tier_type(
             for (
                 provider_item_batch
             ) in provider_item_batch_list.provider_item_batch_list:
+                margin_per_uom = float(item_price_tier.margin_per_uom)
+                if provider_item_batch.slow_move_item:
+                    margin_per_uom = 0.0
                 provider_item_batch.price_per_uom = float(
                     provider_item_batch.guardrail_price_per_uom
-                ) * (1 + float(item_price_tier.margin_per_uom) / 100)
-                provider_item_batches.append(provider_item_batch)
+                ) * (1 + margin_per_uom / 100)
+                provider_item_batches.append(
+                    {
+                        "price_per_uom": provider_item_batch.price_per_uom,
+                        "slow_move_item": provider_item_batch.slow_move_item,
+                        "in_stock": provider_item_batch.in_stock,
+                    }
+                )
 
         item_price_tier: Dict = item_price_tier.__dict__["attribute_values"]
         item_price_tier.update(

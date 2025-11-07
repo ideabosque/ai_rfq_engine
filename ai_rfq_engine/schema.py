@@ -7,7 +7,17 @@ __author__ = "bibow"
 import time
 from typing import Any, Dict
 
-from graphene import Boolean, DateTime, Field, Float, Int, List, ObjectType, ResolveInfo, String
+from graphene import (
+    Boolean,
+    DateTime,
+    Field,
+    Float,
+    Int,
+    List,
+    ObjectType,
+    ResolveInfo,
+    String,
+)
 
 from .mutations.discount_rule import DeleteDiscountRule, InsertUpdateDiscountRule
 from .mutations.file import DeleteFile, InsertUpdateFile
@@ -175,6 +185,7 @@ class Query(ObjectType):
         max_cost_per_uom=Float(required=False),
         min_total_cost_per_uom=Float(required=False),
         max_total_cost_per_uom=Float(required=False),
+        slow_move_item=Boolean(required=False),
         in_stock=Boolean(required=False),
         updated_at_gt=DateTime(required=False),
         updated_at_lt=DateTime(required=False),

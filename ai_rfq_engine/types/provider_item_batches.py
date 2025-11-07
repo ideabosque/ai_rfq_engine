@@ -5,7 +5,6 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import Boolean, DateTime, Float, List, ObjectType, String
-
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
@@ -23,6 +22,7 @@ class ProviderItemBatchType(ObjectType):
     guardrail_margin_per_uom = Float()
     guardrail_price_per_uom = Float()
     price_per_uom = Float()
+    slow_move_item = Boolean()
     in_stock = Boolean()
     created_at = DateTime()
     updated_by = String()

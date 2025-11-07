@@ -80,6 +80,7 @@ class ProviderItemBatchModel(BaseModel):
     total_cost_per_uom = NumberAttribute()
     guardrail_margin_per_uom = NumberAttribute(default=0)
     guardrail_price_per_uom = NumberAttribute()
+    slow_move_item = BooleanAttribute(default=False)
     in_stock = BooleanAttribute(default=True)
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
@@ -173,6 +174,7 @@ def resolve_provider_item_batch_list(
     max_cost_per_uom = kwargs.get("max_cost_per_uom")
     min_total_cost_per_uom = kwargs.get("min_total_cost_per_uom")
     max_total_cost_per_uom = kwargs.get("max_total_cost_per_uom")
+    slow_move_item = kwargs.get("slow_move_item")
     in_stock = kwargs.get("in_stock")
     updated_at_gt = kwargs.get("updated_at_gt")
     updated_at_lt = kwargs.get("updated_at_lt")
@@ -226,6 +228,8 @@ def resolve_provider_item_batch_list(
         the_filters &= (
             ProviderItemBatchModel.total_cost_per_uom <= max_total_cost_per_uom
         )
+    if slow_move_item is not None:
+        the_filters &= ProviderItemBatchModel.slow_move_item == slow_move_item
     if in_stock:
         the_filters &= ProviderItemBatchModel.in_stock == in_stock
     if the_filters is not None:
@@ -264,6 +268,7 @@ def insert_update_provider_item_batch(
             "freight_cost_per_uom",
             "additional_cost_per_uom",
             "guardrail_margin_per_uom",
+            "slow_move_item",
             "in_stock",
         ]:
             if key in kwargs:
@@ -301,6 +306,7 @@ def insert_update_provider_item_batch(
         "total_cost_per_uom": ProviderItemBatchModel.total_cost_per_uom,
         "guardrail_margin_per_uom": ProviderItemBatchModel.guardrail_margin_per_uom,
         "guardrail_price_per_uom": ProviderItemBatchModel.guardrail_price_per_uom,
+        "slow_move_item": ProviderItemBatchModel.slow_move_item,
         "in_stock": ProviderItemBatchModel.in_stock,
     }
 
