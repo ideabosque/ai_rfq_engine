@@ -134,8 +134,8 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
     args = []
     inquiry_funct = InstallmentModel.scan
     count_funct = InstallmentModel.count
+    range_key_condition = None
     if quote_uuid:
-        range_key_condition = None
 
         # Build range key condition for updated_at when using updated_at_index
         if updated_at_gt is not None and updated_at_lt is not None:

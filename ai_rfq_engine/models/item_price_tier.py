@@ -211,8 +211,8 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     args = []
     inquiry_funct = ItemPriceTierModel.scan
     count_funct = ItemPriceTierModel.count
+    range_key_condition = None
     if item_uuid:
-        range_key_condition = None
 
         # Build range key condition for updated_at when using updated_at_index
         if updated_at_gt is not None and updated_at_lt is not None:

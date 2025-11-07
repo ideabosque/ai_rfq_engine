@@ -224,12 +224,30 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
             inquiry_funct = ProviderItemModel.provider_item_external_id_index.query
 
     the_filters = None  # We can add filters for the query
-    if item_uuid and args[1] is not None and args[1] != ProviderItemModel.item_uuid == item_uuid:
+    if (
+        item_uuid
+        and args[1] is not None
+        and args[1] != (ProviderItemModel.item_uuid == item_uuid)
+    ):
         the_filters &= ProviderItemModel.item_uuid == item_uuid
-    if provider_corp_external_id and args[1] is not None and args[1] != (ProviderItemModel.provider_corp_external_id == provider_corp_external_id):
-        the_filters &= ProviderItemModel.provider_corp_external_id == provider_corp_external_id
-    if provider_item_external_id and args[1] is not None and args[1] != (ProviderItemModel.provider_item_external_id == provider_item_external_id):
-        the_filters &= ProviderItemModel.provider_item_external_id == provider_item_external_id
+    if (
+        provider_corp_external_id
+        and args[1] is not None
+        and args[1]
+        != (ProviderItemModel.provider_corp_external_id == provider_corp_external_id)
+    ):
+        the_filters &= (
+            ProviderItemModel.provider_corp_external_id == provider_corp_external_id
+        )
+    if (
+        provider_item_external_id
+        and args[1] is not None
+        and args[1]
+        != (ProviderItemModel.provider_item_external_id == provider_item_external_id)
+    ):
+        the_filters &= (
+            ProviderItemModel.provider_item_external_id == provider_item_external_id
+        )
     if min_base_price_per_uom:
         the_filters &= ProviderItemModel.base_price_per_uom >= min_base_price_per_uom
     if max_base_price_per_uom:

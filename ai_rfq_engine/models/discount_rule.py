@@ -181,8 +181,8 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     args = []
     inquiry_funct = DiscountRuleModel.scan
     count_funct = DiscountRuleModel.count
+    range_key_condition = None
     if item_uuid:
-        range_key_condition = None
 
         # Build range key condition for updated_at when using updated_at_index
         if updated_at_gt is not None and updated_at_lt is not None:
@@ -209,9 +209,17 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     the_filters = None  # We can add filters for the query
     if endpoint_id:
         the_filters &= DiscountRuleModel.endpoint_id == endpoint_id
-    if provider_item_uuid and args[1] is not None and args[1] != (DiscountRuleModel.provider_item_uuid == provider_item_uuid):
+    if (
+        provider_item_uuid
+        and args[1] is not None
+        and args[1] != (DiscountRuleModel.provider_item_uuid == provider_item_uuid)
+    ):
         the_filters &= DiscountRuleModel.provider_item_uuid == provider_item_uuid
-    if segment_uuid and args[1] is not None and args[1] != (DiscountRuleModel.segment_uuid == segment_uuid):
+    if (
+        segment_uuid
+        and args[1] is not None
+        and args[1] != (DiscountRuleModel.segment_uuid == segment_uuid)
+    ):
         the_filters &= DiscountRuleModel.segment_uuid == segment_uuid
     if max_subtotal_greater_than and min_subtotal_greater_than:
         the_filters &= DiscountRuleModel.subtotal_greater_than.between(
