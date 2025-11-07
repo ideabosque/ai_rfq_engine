@@ -59,9 +59,8 @@ sys.path.insert(0, os.path.join(base_dir, "silvaengine_utility"))
 sys.path.insert(1, os.path.join(base_dir, "silvaengine_dynamodb_base"))
 sys.path.insert(2, os.path.join(base_dir, "ai_rfq_engine"))
 
-from silvaengine_utility import Utility
-
 from ai_rfq_engine import AIRFQEngine
+from silvaengine_utility import Utility
 
 
 def _call_method(
