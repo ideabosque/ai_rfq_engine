@@ -32,6 +32,68 @@ from .installment import resolve_installment_list
 from .utils import _get_quote
 
 
+def get_price_per_uom(
+    info: ResolveInfo,
+    item_uuid: str,
+    qty: float,
+    segment_uuid: str,
+    provider_item_uuid: str,
+    batch_no: str = None
+) -> float | None:
+    """
+    Get the price per UOM based on item price tiers for the given quantity.
+
+    Uses resolve_item_price_tier_list to retrieve tiers with calculated batch prices.
+
+    Parameters:
+    - item_uuid: Required - The item to get pricing for
+    - qty: Required - The quantity to match against tier ranges
+    - segment_uuid: Required - The segment to filter tiers
+    - provider_item_uuid: Required - The provider item to filter tiers
+    - batch_no: Optional - Specific batch to use for pricing
+
+    If the tier has:
+    - price_per_uom: Returns that direct price
+    - margin_per_uom with batches: Returns price from matching batch
+
+    Returns the calculated price_per_uom, or None if no tier matches.
+    """
+    from .item_price_tier import resolve_item_price_tier_list
+
+    # Build query parameters with required filters
+    query_params = {
+        "item_uuid": item_uuid,
+        "segment_uuid": segment_uuid,
+        "provider_item_uuid": provider_item_uuid,
+    }
+
+    # Retrieve price tiers
+    price_tier_list = resolve_item_price_tier_list(info, **query_params)
+
+    if price_tier_list.total == 0:
+        return None
+
+    # Find the first matching tier based on quantity
+    for tier in price_tier_list.item_price_tier_list:
+        if tier.quantity_greater_then <= qty < tier.quantity_less_then:
+            # If tier has direct price_per_uom, use it
+            if tier.price_per_uom is not None:
+                return tier.price_per_uom
+
+            # If tier has margin_per_uom with batches, find the matching batch price
+            if hasattr(tier, 'provider_item_batches') and tier.provider_item_batches:
+                # If batch_no is specified, find that specific batch
+                if batch_no:
+                    for batch in tier.provider_item_batches:
+                        if batch.batch_no == batch_no:
+                            return batch.price_per_uom
+
+                # Otherwise, return the first available batch price
+                return tier.provider_item_batches[0].price_per_uom
+
+    return None
+
+
 class ProviderItemUuidIndex(LocalSecondaryIndex):
     """
     This class represents a local secondary index
@@ -271,6 +333,12 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
 def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     quote_uuid = kwargs.get("quote_uuid")
     quote_item_uuid = kwargs.get("quote_item_uuid")
+    request_uuid = kwargs.get("request_uuid")
+
+    # request_uuid is required for new quote items to update quote totals
+    if kwargs.get("entity") is None and not request_uuid:
+        raise ValueError("request_uuid is required when creating a new quote item")
+
     if kwargs.get("entity") is None:
         cols = {
             "endpoint_id": info.context.get("endpoint_id"),
@@ -278,54 +346,104 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
         }
-        for key in [
-            "provider_item_uuid",
-            "item_uuid",
-            "batch_no",
-            "request_uuid",
-            "request_data",
-            "price_per_uom",
-            "qty",
-            "subtotal",
-            "subtotal_discount",
-            "final_subtotal",
-        ]:
-            if key in kwargs:
-                cols[key] = kwargs[key]
+
+        # Get required fields for tier pricing
+        item_uuid = kwargs.get("item_uuid")
+        qty = kwargs.get("qty")
+        segment_uuid = kwargs.get("segment_uuid")  # Required for tier pricing
+        provider_item_uuid = kwargs.get("provider_item_uuid")  # Required for tier pricing
+        batch_no = kwargs.get("batch_no")  # Optional for specific batch selection
+
+        # Validate required fields
+        if not (item_uuid and qty and segment_uuid and provider_item_uuid):
+            raise ValueError(
+                "item_uuid, qty, segment_uuid, and provider_item_uuid are required for tier pricing"
+            )
+
+        # Validate qty is positive
+        if float(qty) <= 0:
+            raise ValueError(f"qty must be greater than 0, got: {qty}")
+
+        # Calculate price_per_uom from tier pricing
+        price_per_uom = get_price_per_uom(
+            info,
+            item_uuid,
+            qty,
+            segment_uuid,
+            provider_item_uuid,
+            batch_no
+        )
+
+        if price_per_uom is None:
+            raise ValueError(
+                f"No price tier found for item_uuid={item_uuid}, qty={qty}, "
+                f"segment_uuid={segment_uuid}, provider_item_uuid={provider_item_uuid}"
+            )
+
+        # Set all required fields
+        cols["item_uuid"] = item_uuid
+        cols["provider_item_uuid"] = provider_item_uuid
+        cols["qty"] = qty
+        cols["request_uuid"] = request_uuid
+        cols["price_per_uom"] = price_per_uom
+
+        # Set optional fields
+        if batch_no:
+            cols["batch_no"] = batch_no
+        if "request_data" in kwargs:
+            cols["request_data"] = kwargs["request_data"]
+        if "subtotal_discount" in kwargs:
+            cols["subtotal_discount"] = kwargs["subtotal_discount"]
+
+        # Auto-calculate subtotal and final_subtotal
+        cols["subtotal"] = float(cols["price_per_uom"]) * float(cols["qty"])
+        subtotal_discount = cols.get("subtotal_discount", 0)
+        cols["final_subtotal"] = cols["subtotal"] - subtotal_discount
+
         QuoteItemModel(
             quote_uuid,
             quote_item_uuid,
             **cols,
         ).save()
-        return
 
-    quote_item = kwargs.get("entity")
-    actions = [
-        QuoteItemModel.updated_by.set(kwargs["updated_by"]),
-        QuoteItemModel.updated_at.set(pendulum.now("UTC")),
-    ]
+        # Update quote totals after inserting new quote item
+        if not request_uuid:
+            raise ValueError("request_uuid is required to update quote totals")
 
-    # Map of kwargs keys to QuoteItemModel attributes
-    field_map = {
-        "provider_item_uuid": QuoteItemModel.provider_item_uuid,
-        "item_uuid": QuoteItemModel.item_uuid,
-        "batch_no": QuoteItemModel.batch_no,
-        "request_uuid": QuoteItemModel.request_uuid,
-        "request_data": QuoteItemModel.request_data,
-        "price_per_uom": QuoteItemModel.price_per_uom,
-        "qty": QuoteItemModel.qty,
-        "subtotal": QuoteItemModel.subtotal,
-        "subtotal_discount": QuoteItemModel.subtotal_discount,
-        "final_subtotal": QuoteItemModel.final_subtotal,
-    }
+        from .quote import update_quote_totals
+        update_quote_totals(info, request_uuid, quote_uuid)
 
-    # Add actions dynamically based on the presence of keys in kwargs
-    for key, field in field_map.items():
-        if key in kwargs:  # Check if the key exists in kwargs
-            actions.append(field.set(None if kwargs[key] == "null" else kwargs[key]))
+    else:
+        quote_item = kwargs.get("entity")
+        request_uuid = quote_item.request_uuid
 
-    # Update the quote item
-    quote_item.update(actions=actions)
+        actions = [
+            QuoteItemModel.updated_by.set(kwargs["updated_by"]),
+            QuoteItemModel.updated_at.set(pendulum.now("UTC")),
+        ]
+
+        # Only allow updating discount
+        if "subtotal_discount" in kwargs:
+            subtotal_discount = None if kwargs["subtotal_discount"] == "null" else kwargs["subtotal_discount"]
+            actions.append(QuoteItemModel.subtotal_discount.set(subtotal_discount))
+
+            # Recalculate final_subtotal when discount changes
+            subtotal = quote_item.subtotal
+            discount = subtotal_discount if subtotal_discount is not None else 0
+            final_subtotal = subtotal - discount
+            actions.append(QuoteItemModel.final_subtotal.set(final_subtotal))
+
+        # Update the quote item
+        quote_item.update(actions=actions)
+
+        # Update quote totals only if discount changed (which affects totals)
+        if "subtotal_discount" in kwargs:
+            if not request_uuid:
+                raise ValueError("request_uuid is required to update quote totals")
+
+            from .quote import update_quote_totals
+            update_quote_totals(info, request_uuid, quote_uuid)
+
     return
 
 
@@ -347,5 +465,14 @@ def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     if installment_list.total > 0:
         return False
 
+    # Store values needed for updating quote totals
+    request_uuid = kwargs.get("entity").request_uuid
+    quote_uuid = kwargs.get("entity").quote_uuid
+
     kwargs.get("entity").delete()
+
+    # Update quote totals after deleting quote item
+    from .quote import update_quote_totals
+    update_quote_totals(info, request_uuid, quote_uuid)
+
     return True

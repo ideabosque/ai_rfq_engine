@@ -28,7 +28,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote import QuoteListType, QuoteType
 from .installment import resolve_installment_list
-from .quote_item import resolve_quote_item_list
 from .utils import _get_request
 
 
@@ -122,6 +121,47 @@ def get_quote(request_uuid: str, quote_uuid: str) -> QuoteModel:
 
 def get_quote_count(request_uuid: str, quote_uuid: str) -> int:
     return QuoteModel.count(request_uuid, QuoteModel.quote_uuid == quote_uuid)
+
+
+def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -> None:
+    """
+    Calculate and update quote totals based on related quote items.
+    Updates: total_quote_amount, total_quote_discount, final_total_quote_amount
+    final_total_quote_amount includes shipping_amount if present.
+    """
+    # Import here to avoid circular dependency
+    from .quote_item import resolve_quote_item_list
+
+    # Get the quote to access shipping_amount
+    quote = get_quote(request_uuid, quote_uuid)
+
+    # Query all quote items for this quote using resolver
+    quote_item_list = resolve_quote_item_list(
+        info, **{"quote_uuid": quote_uuid}
+    )
+
+    # Calculate totals from the quote item list
+    total_quote_amount = sum(
+        item.subtotal for item in quote_item_list.quote_item_list
+    )
+    total_quote_discount = sum(
+        item.subtotal_discount if item.subtotal_discount is not None else 0
+        for item in quote_item_list.quote_item_list
+    )
+    items_final_total = sum(
+        item.final_subtotal for item in quote_item_list.quote_item_list
+    )
+
+    # Add shipping amount to final total
+    shipping_amount = quote.shipping_amount if quote.shipping_amount is not None else 0
+    final_total_quote_amount = items_final_total + shipping_amount
+    actions = [
+        QuoteModel.total_quote_amount.set(total_quote_amount),
+        QuoteModel.total_quote_discount.set(total_quote_discount if total_quote_discount > 0 else None),
+        QuoteModel.final_total_quote_amount.set(final_total_quote_amount),
+        QuoteModel.updated_at.set(pendulum.now("UTC")),
+    ]
+    quote.update(actions=actions)
 
 
 def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
@@ -258,9 +298,6 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "sales_rep_email",
             "shipping_method",
             "shipping_amount",
-            "total_quote_amount",
-            "total_quote_discount",
-            "final_total_quote_amount",
             "negotiation_rounds",
             "notes",
             "status",
@@ -286,9 +323,6 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         "sales_rep_email": QuoteModel.sales_rep_email,
         "shipping_method": QuoteModel.shipping_method,
         "shipping_amount": QuoteModel.shipping_amount,
-        "total_quote_amount": QuoteModel.total_quote_amount,
-        "total_quote_discount": QuoteModel.total_quote_discount,
-        "final_total_quote_amount": QuoteModel.final_total_quote_amount,
         "negotiation_rounds": QuoteModel.negotiation_rounds,
         "notes": QuoteModel.notes,
         "status": QuoteModel.status,
@@ -312,6 +346,10 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     model_funct=get_quote,
 )
 def delete_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
+    # Import here to avoid circular dependency
+    from .quote_item import resolve_quote_item_list
+
+    # Check if there are any quote items
     quote_item_list = resolve_quote_item_list(
         info, **{"quote_uuid": kwargs.get("entity").quote_uuid}
     )
