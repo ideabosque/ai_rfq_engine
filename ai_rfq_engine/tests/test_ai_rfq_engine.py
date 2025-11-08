@@ -59,8 +59,9 @@ sys.path.insert(0, os.path.join(base_dir, "silvaengine_utility"))
 sys.path.insert(1, os.path.join(base_dir, "silvaengine_dynamodb_base"))
 sys.path.insert(2, os.path.join(base_dir, "ai_rfq_engine"))
 
-from ai_rfq_engine import AIRFQEngine
 from silvaengine_utility import Utility
+
+from ai_rfq_engine import AIRFQEngine
 
 
 def _call_method(
@@ -256,17 +257,42 @@ _TEST_DATA = _load_test_data()
 
 # Extract individual test data sets
 ITEM_TEST_DATA = _TEST_DATA.get("item_test_data", [])
+ITEM_GET_TEST_DATA = _TEST_DATA.get("item_get_test_data", [])
+ITEM_LIST_TEST_DATA = _TEST_DATA.get("item_list_test_data", [])
+ITEM_DELETE_TEST_DATA = _TEST_DATA.get("item_delete_test_data", [])
 SEGMENT_TEST_DATA = _TEST_DATA.get("segment_test_data", [])
+SEGMENT_GET_TEST_DATA = _TEST_DATA.get("segment_get_test_data", [])
+SEGMENT_LIST_TEST_DATA = _TEST_DATA.get("segment_list_test_data", [])
 SEGMENT_CONTACT_TEST_DATA = _TEST_DATA.get("segment_contact_test_data", [])
+SEGMENT_CONTACT_GET_TEST_DATA = _TEST_DATA.get("segment_contact_get_test_data", [])
+SEGMENT_CONTACT_LIST_TEST_DATA = _TEST_DATA.get("segment_contact_list_test_data", [])
 PROVIDER_ITEM_TEST_DATA = _TEST_DATA.get("provider_item_test_data", [])
+PROVIDER_ITEM_GET_TEST_DATA = _TEST_DATA.get("provider_item_get_test_data", [])
+PROVIDER_ITEM_LIST_TEST_DATA = _TEST_DATA.get("provider_item_list_test_data", [])
 PROVIDER_ITEM_BATCH_TEST_DATA = _TEST_DATA.get("provider_item_batch_test_data", [])
+PROVIDER_ITEM_BATCH_GET_TEST_DATA = _TEST_DATA.get("provider_item_batch_get_test_data", [])
+PROVIDER_ITEM_BATCH_LIST_TEST_DATA = _TEST_DATA.get("provider_item_batch_list_test_data", [])
 ITEM_PRICE_TIER_TEST_DATA = _TEST_DATA.get("item_price_tier_test_data", [])
+ITEM_PRICE_TIER_GET_TEST_DATA = _TEST_DATA.get("item_price_tier_get_test_data", [])
+ITEM_PRICE_TIER_LIST_TEST_DATA = _TEST_DATA.get("item_price_tier_list_test_data", [])
 DISCOUNT_RULE_TEST_DATA = _TEST_DATA.get("discount_rule_test_data", [])
+DISCOUNT_RULE_GET_TEST_DATA = _TEST_DATA.get("discount_rule_get_test_data", [])
+DISCOUNT_RULE_LIST_TEST_DATA = _TEST_DATA.get("discount_rule_list_test_data", [])
 REQUEST_TEST_DATA = _TEST_DATA.get("request_test_data", [])
+REQUEST_GET_TEST_DATA = _TEST_DATA.get("request_get_test_data", [])
+REQUEST_LIST_TEST_DATA = _TEST_DATA.get("request_list_test_data", [])
 QUOTE_TEST_DATA = _TEST_DATA.get("quote_test_data", [])
+QUOTE_GET_TEST_DATA = _TEST_DATA.get("quote_get_test_data", [])
+QUOTE_LIST_TEST_DATA = _TEST_DATA.get("quote_list_test_data", [])
 QUOTE_ITEM_TEST_DATA = _TEST_DATA.get("quote_item_test_data", [])
+QUOTE_ITEM_GET_TEST_DATA = _TEST_DATA.get("quote_item_get_test_data", [])
+QUOTE_ITEM_LIST_TEST_DATA = _TEST_DATA.get("quote_item_list_test_data", [])
 INSTALLMENT_TEST_DATA = _TEST_DATA.get("installment_test_data", [])
+INSTALLMENT_GET_TEST_DATA = _TEST_DATA.get("installment_get_test_data", [])
+INSTALLMENT_LIST_TEST_DATA = _TEST_DATA.get("installment_list_test_data", [])
 FILE_TEST_DATA = _TEST_DATA.get("file_test_data", [])
+FILE_GET_TEST_DATA = _TEST_DATA.get("file_get_test_data", [])
+FILE_LIST_TEST_DATA = _TEST_DATA.get("file_list_test_data", [])
 
 # ============================================================================
 # FIXTURES
@@ -371,18 +397,20 @@ def test_graphql_insert_update_item_py(ai_rfq_engine, schema, test_data):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", ITEM_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_item_py(ai_rfq_engine, schema):
+def test_graphql_get_item_py(ai_rfq_engine, schema, test_data):
     """Test get item operation."""
     query = Utility.generate_graphql_operation("item", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {"itemUuid": "89151803645574004864"},
+            "variables": test_data,
         },
         "get_item",
     )
@@ -392,22 +420,20 @@ def test_graphql_get_item_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", ITEM_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_list_items_py(ai_rfq_engine, schema):
+def test_graphql_list_items_py(ai_rfq_engine, schema, test_data):
     """Test list items operation."""
     query = Utility.generate_graphql_operation("itemList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "itemType": "raw_material",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_items",
     )
@@ -417,18 +443,20 @@ def test_graphql_list_items_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", ITEM_DELETE_TEST_DATA)
 @log_test_result
-def test_graphql_delete_item_py(ai_rfq_engine, schema):
+def test_graphql_delete_item_py(ai_rfq_engine, schema, test_data):
     """Test delete item operation."""
     query = Utility.generate_graphql_operation("deleteItem", "Mutation", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {"itemUuid": "test_item_uuid"},
+            "variables": test_data,
         },
         "delete_item",
     )
@@ -468,18 +496,20 @@ def test_graphql_insert_update_segment_py(ai_rfq_engine, schema, test_data):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", SEGMENT_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_segment_py(ai_rfq_engine, schema):
+def test_graphql_get_segment_py(ai_rfq_engine, schema, test_data):
     """Test get segment operation."""
     query = Utility.generate_graphql_operation("segment", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {"segmentUuid": "63586092742936117376"},
+            "variables": test_data,
         },
         "get_segment",
     )
@@ -489,22 +519,20 @@ def test_graphql_get_segment_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", SEGMENT_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_list_segments_py(ai_rfq_engine, schema):
+def test_graphql_list_segments_py(ai_rfq_engine, schema, test_data):
     """Test list segments operation."""
     query = Utility.generate_graphql_operation("segmentList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "segmentName": "Premium",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_segments",
     )
@@ -544,21 +572,20 @@ def test_graphql_insert_update_segment_contact_py(ai_rfq_engine, schema, test_da
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", SEGMENT_CONTACT_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_segment_contact_py(ai_rfq_engine, schema):
+def test_graphql_get_segment_contact_py(ai_rfq_engine, schema, test_data):
     """Test get segment contact operation."""
     query = Utility.generate_graphql_operation("segmentContact", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "segmentUuid": "63586092742936117376",
-                "email": "john.doe@abc.com",
-            },
+            "variables": test_data,
         },
         "get_segment_contact",
     )
@@ -568,22 +595,20 @@ def test_graphql_get_segment_contact_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", SEGMENT_CONTACT_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_list_segment_contacts_py(ai_rfq_engine, schema):
+def test_graphql_list_segment_contacts_py(ai_rfq_engine, schema, test_data):
     """Test list segment contacts operation."""
     query = Utility.generate_graphql_operation("segmentContactList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "segmentUuid": "63586092742936117376",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_segment_contacts",
     )
@@ -623,18 +648,20 @@ def test_graphql_insert_update_provider_item_py(ai_rfq_engine, schema, test_data
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", PROVIDER_ITEM_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_provider_item_py(ai_rfq_engine, schema):
+def test_graphql_get_provider_item_py(ai_rfq_engine, schema, test_data):
     """Test get provider item operation."""
     query = Utility.generate_graphql_operation("providerItem", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {"providerItemUuid": "06812599115120132224"},
+            "variables": test_data,
         },
         "get_provider_item",
     )
@@ -644,22 +671,20 @@ def test_graphql_get_provider_item_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", PROVIDER_ITEM_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_provider_item_list_py(ai_rfq_engine, schema):
+def test_graphql_provider_item_list_py(ai_rfq_engine, schema, test_data):
     """Test list provider items operation."""
     query = Utility.generate_graphql_operation("providerItemList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "itemUuid": "89151803645574004864",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_provider_items",
     )
@@ -699,21 +724,20 @@ def test_graphql_insert_update_provider_item_batch_py(ai_rfq_engine, schema, tes
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", PROVIDER_ITEM_BATCH_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_provider_item_batch_py(ai_rfq_engine, schema):
+def test_graphql_get_provider_item_batch_py(ai_rfq_engine, schema, test_data):
     """Test get provider item batch operation."""
     query = Utility.generate_graphql_operation("providerItemBatch", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "providerItemUuid": "06812599115120132224",
-                "batchNo": "BATCH-001",
-            },
+            "variables": test_data,
         },
         "get_provider_item_batch",
     )
@@ -723,27 +747,20 @@ def test_graphql_get_provider_item_batch_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", PROVIDER_ITEM_BATCH_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_provider_item_batch_list_py(ai_rfq_engine, schema):
+def test_graphql_provider_item_batch_list_py(ai_rfq_engine, schema, test_data):
     """Test list provider item batches operation."""
-    import pendulum
-
     query = Utility.generate_graphql_operation("providerItemBatchList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "itemUuid": "89151803645574004864",
-                "providerItemUuid": "06812599115120132224",
-                "inStock": True,
-                "expiredAtGt": pendulum.now("UTC"),
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_provider_item_batches",
     )
@@ -783,21 +800,20 @@ def test_graphql_insert_update_item_price_tier_py(ai_rfq_engine, schema, test_da
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", ITEM_PRICE_TIER_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_item_price_tier_py(ai_rfq_engine, schema):
+def test_graphql_get_item_price_tier_py(ai_rfq_engine, schema, test_data):
     """Test get item price tier operation."""
     query = Utility.generate_graphql_operation("itemPriceTier", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "itemUuid": "89151803645574004864",
-                "itemPriceTierUuid": "92517332397517193344",
-            },
+            "variables": test_data,
         },
         "get_item_price_tier",
     )
@@ -807,22 +823,20 @@ def test_graphql_get_item_price_tier_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", ITEM_PRICE_TIER_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_item_price_tier_list_py(ai_rfq_engine, schema):
+def test_graphql_item_price_tier_list_py(ai_rfq_engine, schema, test_data):
     """Test list item price tiers operation."""
     query = Utility.generate_graphql_operation("itemPriceTierList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "itemUuid": "89151803645574004864",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_item_price_tiers",
     )
@@ -862,21 +876,20 @@ def test_graphql_insert_update_discount_rule_py(ai_rfq_engine, schema, test_data
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", DISCOUNT_RULE_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_discount_rule_py(ai_rfq_engine, schema):
+def test_graphql_get_discount_rule_py(ai_rfq_engine, schema, test_data):
     """Test get discount rule operation."""
     query = Utility.generate_graphql_operation("discountRule", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "itemUuid": "89151803645574004864",
-                "discountRuleUuid": "03145193523092930688",
-            },
+            "variables": test_data,
         },
         "get_discount_rule",
     )
@@ -886,22 +899,20 @@ def test_graphql_get_discount_rule_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", DISCOUNT_RULE_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_discount_rule_list_py(ai_rfq_engine, schema):
+def test_graphql_discount_rule_list_py(ai_rfq_engine, schema, test_data):
     """Test list discount rules operation."""
     query = Utility.generate_graphql_operation("discountRuleList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "itemUuid": "89151803645574004864",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_discount_rules",
     )
@@ -941,18 +952,20 @@ def test_graphql_insert_update_request_py(ai_rfq_engine, schema, test_data):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", REQUEST_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_request_py(ai_rfq_engine, schema):
+def test_graphql_get_request_py(ai_rfq_engine, schema, test_data):
     """Test get request operation."""
     query = Utility.generate_graphql_operation("request", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {"requestUuid": "65747032911835578496"},
+            "variables": test_data,
         },
         "get_request",
     )
@@ -962,21 +975,20 @@ def test_graphql_get_request_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", REQUEST_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_request_list_py(ai_rfq_engine, schema):
+def test_graphql_request_list_py(ai_rfq_engine, schema, test_data):
     """Test list requests operation."""
     query = Utility.generate_graphql_operation("requestList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_requests",
     )
@@ -1014,21 +1026,20 @@ def test_graphql_insert_update_quote_py(ai_rfq_engine, schema, test_data):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", QUOTE_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_quote_py(ai_rfq_engine, schema):
+def test_graphql_get_quote_py(ai_rfq_engine, schema, test_data):
     """Test get quote operation."""
     query = Utility.generate_graphql_operation("quote", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "requestUuid": "65747032911835578496",
-                "quoteUuid": "25537170259049463936",
-            },
+            "variables": test_data,
         },
         "get_quote",
     )
@@ -1038,22 +1049,20 @@ def test_graphql_get_quote_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", QUOTE_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_quote_list_py(ai_rfq_engine, schema):
+def test_graphql_quote_list_py(ai_rfq_engine, schema, test_data):
     """Test list quotes operation."""
     query = Utility.generate_graphql_operation("quoteList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "requestUuid": "65747032911835578496",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_quotes",
     )
@@ -1093,21 +1102,20 @@ def test_graphql_insert_update_quote_item_py(ai_rfq_engine, schema, test_data):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", QUOTE_ITEM_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_quote_item_py(ai_rfq_engine, schema):
+def test_graphql_get_quote_item_py(ai_rfq_engine, schema, test_data):
     """Test get quote item operation."""
     query = Utility.generate_graphql_operation("quoteItem", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "quoteUuid": "25537170259049463936",
-                "quoteItemUuid": "61813702413159252096",
-            },
+            "variables": test_data,
         },
         "get_quote_item",
     )
@@ -1117,22 +1125,20 @@ def test_graphql_get_quote_item_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", QUOTE_ITEM_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_quote_item_list_py(ai_rfq_engine, schema):
+def test_graphql_quote_item_list_py(ai_rfq_engine, schema, test_data):
     """Test list quote items operation."""
     query = Utility.generate_graphql_operation("quoteItemList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "quoteUuid": "25537170259049463936",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_quote_items",
     )
@@ -1172,21 +1178,20 @@ def test_graphql_insert_update_installment_py(ai_rfq_engine, schema, test_data):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", INSTALLMENT_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_installment_py(ai_rfq_engine, schema):
+def test_graphql_get_installment_py(ai_rfq_engine, schema, test_data):
     """Test get installment operation."""
     query = Utility.generate_graphql_operation("installment", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "quoteUuid": "25537170259049463936",
-                "installmentUuid": "52848497367965515904",
-            },
+            "variables": test_data,
         },
         "get_installment",
     )
@@ -1196,22 +1201,20 @@ def test_graphql_get_installment_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", INSTALLMENT_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_installment_list_py(ai_rfq_engine, schema):
+def test_graphql_installment_list_py(ai_rfq_engine, schema, test_data):
     """Test list installments operation."""
     query = Utility.generate_graphql_operation("installmentList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "quoteUuid": "25537170259049463936",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_installments",
     )
@@ -1249,21 +1252,20 @@ def test_graphql_insert_update_file_py(ai_rfq_engine, schema, test_data):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", FILE_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_file_py(ai_rfq_engine, schema):
+def test_graphql_get_file_py(ai_rfq_engine, schema, test_data):
     """Test get file operation."""
     query = Utility.generate_graphql_operation("file", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "requestUuid": "65747032911835578496",
-                "fileName": "quote_document.pdf",
-            },
+            "variables": test_data,
         },
         "get_file",
     )
@@ -1273,22 +1275,20 @@ def test_graphql_get_file_py(ai_rfq_engine, schema):
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize("test_data", FILE_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_file_list_py(ai_rfq_engine, schema):
+def test_graphql_file_list_py(ai_rfq_engine, schema, test_data):
     """Test list files operation."""
     query = Utility.generate_graphql_operation("fileList", "Query", schema)
     logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
     result, error = _call_method(
         ai_rfq_engine,
         "ai_rfq_graphql",
         {
             "query": query,
-            "variables": {
-                "requestUuid": "65747032911835578496",
-                "limit": 10,
-                "offset": 0,
-            },
+            "variables": test_data,
         },
         "list_files",
     )
