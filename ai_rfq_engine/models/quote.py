@@ -161,16 +161,48 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -
 
 def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
     try:
+        # Import here to avoid circular dependency
+        from .quote_item import resolve_quote_item_list
+
         request = _get_request(info.context["endpoint_id"], quote.request_uuid)
-        quote: Dict = quote.__dict__["attribute_values"]
-        quote["request"] = request
-        quote.pop("endpoint_id")
-        quote.pop("request_uuid")
+        quote_dict: Dict = quote.__dict__["attribute_values"]
+
+        # Get quote items for this quote
+        quote_item_list = resolve_quote_item_list(
+            info, **{"quote_uuid": quote.quote_uuid}
+        )
+        quote_items = [
+            Utility.json_normalize(
+                {
+                    k: getattr(item, k, None)
+                    for k in [
+                        "quote_item_uuid",
+                        "provider_item_uuid",
+                        "item_uuid",
+                        "batch_no",
+                        "request_data",
+                        "slow_move_item",
+                        "guardrail_price_per_uom",
+                        "price_per_uom",
+                        "qty",
+                        "subtotal",
+                        "subtotal_discount",
+                        "final_subtotal",
+                    ]
+                }
+            )
+            for item in quote_item_list.quote_item_list
+        ]
+
+        quote_dict["request"] = request
+        quote_dict["quote_items"] = quote_items
+        quote_dict.pop("endpoint_id")
+        quote_dict.pop("request_uuid")
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return QuoteType(**Utility.json_normalize(quote))
+    return QuoteType(**Utility.json_normalize(quote_dict))
 
 
 def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:

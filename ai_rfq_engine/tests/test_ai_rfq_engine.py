@@ -1106,7 +1106,7 @@ def test_graphql_get_quote_item_py(ai_rfq_engine, schema):
             "query": query,
             "variables": {
                 "quoteUuid": "25537170259049463936",
-                "quoteItemUuid": "09970999569876533376",
+                "quoteItemUuid": "61813702413159252096",
             },
         },
         "get_quote_item",
