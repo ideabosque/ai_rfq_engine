@@ -361,13 +361,23 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         "status": QuoteModel.status,
     }
 
+    # Track if shipping_amount was updated
+    shipping_amount_updated = False
+
     # Add actions dynamically based on the presence of keys in kwargs
     for key, field in field_map.items():
         if key in kwargs:  # Check if the key exists in kwargs
             actions.append(field.set(None if kwargs[key] == "null" else kwargs[key]))
+            if key == "shipping_amount":
+                shipping_amount_updated = True
 
     # Update the quote
     quote.update(actions=actions)
+
+    # If shipping_amount was updated, recalculate final_total_quote_amount
+    if shipping_amount_updated:
+        update_quote_totals(info, request_uuid, quote_uuid)
+
     return
 
 
