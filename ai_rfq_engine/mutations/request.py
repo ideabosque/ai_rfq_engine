@@ -7,7 +7,6 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, DateTime, Field, Float, List, Mutation, String
-
 from silvaengine_utility import JSON
 
 from ..models.request import delete_request, insert_update_request
@@ -25,9 +24,6 @@ class InsertUpdateRequest(Mutation):
         billing_address = JSON(required=False)
         shipping_address = JSON(required=False)
         items = List(JSON, required=False)
-        total_amount = Float(required=False)
-        total_discount = Float(required=False)
-        final_total_amount = Float(required=False)
         notes = String(required=False)
         status = String(required=False)
         expired_at = DateTime(required=False)
