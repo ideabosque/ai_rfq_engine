@@ -27,12 +27,11 @@ classifiers = [
 ]
 
 dependencies = [
-    "graphene>=2.17.0",
-    "pynamodb>=5.0",
-    "pendulum>=2.0",
-    "tenacity>=8.0",
-    "silvaengine-dynamodb-base",
-    "silvaengine-utility",
+    "graphene",
+    "pendulum",
+    "tenacity",
+    "SilvaEngine-DynamoDB-Base",
+    "SilvaEngine-Utility",
 ]
 
 [project.optional-dependencies]
