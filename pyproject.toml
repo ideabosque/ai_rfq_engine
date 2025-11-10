@@ -48,8 +48,10 @@ test = [
     "python-dotenv>=1.0",
 ]
 
-[tool.setuptools]
-packages = ["ai_rfq_engine"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ai_rfq_engine*"]
+exclude = ["tests*", "*.tests*"]
 
 [tool.setuptools.package-data]
 ai_rfq_engine = ["py.typed"]
