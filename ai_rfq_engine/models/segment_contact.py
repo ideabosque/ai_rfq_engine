@@ -94,7 +94,7 @@ def create_segment_contact_table(logger: logging.Logger) -> bool:
     if not SegmentContactModel.exists():
         # Create with on-demand billing (PAY_PER_REQUEST)
         SegmentContactModel.create_table(billing_mode="PAY_PER_REQUEST", wait=True)
-        logger.info("The Segment Contact table has been created.")
+        logger.info("The SegmentContact table has been created.")
     return True
 
 
