@@ -119,6 +119,35 @@ def get_quote_count(request_uuid: str, quote_uuid: str) -> int:
     return QuoteModel.count(request_uuid, QuoteModel.quote_uuid == quote_uuid)
 
 
+def _get_next_round_number(request_uuid: str, provider_corp_external_id: str) -> int:
+    """
+    Get the next round number for a quote based on existing quotes
+    with the same request_uuid and provider_corp_external_id.
+
+    Args:
+        request_uuid: The request UUID
+        provider_corp_external_id: The provider corporation external ID
+
+    Returns:
+        The next round number (max existing rounds + 1, or 0 if no existing quotes)
+    """
+    max_rounds = -1
+
+    if request_uuid and provider_corp_external_id:
+        # Query existing quotes with the same request_uuid and provider_corp_external_id
+        existing_quotes = QuoteModel.provider_corp_external_id_index.query(
+            request_uuid,
+            QuoteModel.provider_corp_external_id == provider_corp_external_id
+        )
+
+        # Find the maximum rounds value
+        for quote in existing_quotes:
+            if quote.rounds is not None and quote.rounds > max_rounds:
+                max_rounds = quote.rounds
+
+    return max_rounds + 1
+
+
 def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -> None:
     """
     Calculate and update quote totals based on related quote items.
@@ -319,10 +348,9 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     request_uuid = kwargs.get("request_uuid")
     quote_uuid = kwargs.get("quote_uuid")
     if kwargs.get("entity") is None:
-        # If previous_quote_uuid is set, get the previous quote and increment rounds
-        if kwargs.get("previous_quote_uuid"):
-            previous_quote = get_quote(request_uuid, kwargs["previous_quote_uuid"])
-            kwargs["rounds"] = previous_quote.rounds + 1
+        # Calculate the next round number
+        provider_corp_external_id = kwargs.get("provider_corp_external_id")
+        kwargs["rounds"] = _get_next_round_number(request_uuid, provider_corp_external_id)
 
         cols = {
             "endpoint_id": info.context.get("endpoint_id"),

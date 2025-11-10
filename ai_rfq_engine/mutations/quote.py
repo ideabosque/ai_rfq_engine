@@ -18,7 +18,6 @@ class InsertUpdateQuote(Mutation):
     class Arguments:
         request_uuid = String(required=True)
         quote_uuid = String(required=False)
-        previous_quote_uuid = String(required=False)
         provider_corp_external_id = String(required=False)
         sales_rep_email = String(required=False)
         shipping_method = String(required=False)
