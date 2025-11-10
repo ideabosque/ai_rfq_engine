@@ -20,7 +20,7 @@ class QuoteType(ObjectType):
     total_quote_discount = Float()
     final_total_quote_amount = Float()
     quote_items = List(JSON)
-    negotiation_rounds = Float()
+    rounds = Float()
     notes = String()
     status = String()
     created_at = DateTime()

@@ -86,7 +86,7 @@ class QuoteModel(BaseModel):
     total_quote_amount = NumberAttribute()
     total_quote_discount = NumberAttribute(null=True)
     final_total_quote_amount = NumberAttribute()
-    negotiation_rounds = NumberAttribute(null=True)
+    rounds = NumberAttribute(default=0)
     notes = UnicodeAttribute(null=True)
     status = UnicodeAttribute(default="initial")
     created_at = UTCDateTimeAttribute()
@@ -319,6 +319,11 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     request_uuid = kwargs.get("request_uuid")
     quote_uuid = kwargs.get("quote_uuid")
     if kwargs.get("entity") is None:
+        # If previous_quote_uuid is set, get the previous quote and increment rounds
+        if kwargs.get("previous_quote_uuid"):
+            previous_quote = get_quote(request_uuid, kwargs["previous_quote_uuid"])
+            kwargs["rounds"] = previous_quote.rounds + 1
+
         cols = {
             "endpoint_id": info.context.get("endpoint_id"),
             "updated_by": kwargs["updated_by"],
@@ -328,7 +333,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         for key in [
             "provider_corp_external_id",
             "sales_rep_email",
-            "negotiation_rounds",
+            "rounds",
             "notes",
             "status",
         ]:
@@ -353,7 +358,6 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         "sales_rep_email": QuoteModel.sales_rep_email,
         "shipping_method": QuoteModel.shipping_method,
         "shipping_amount": QuoteModel.shipping_amount,
-        "negotiation_rounds": QuoteModel.negotiation_rounds,
         "notes": QuoteModel.notes,
         "status": QuoteModel.status,
     }
