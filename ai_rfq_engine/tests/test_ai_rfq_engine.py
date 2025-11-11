@@ -59,9 +59,8 @@ sys.path.insert(0, os.path.join(base_dir, "silvaengine_utility"))
 sys.path.insert(1, os.path.join(base_dir, "silvaengine_dynamodb_base"))
 sys.path.insert(2, os.path.join(base_dir, "ai_rfq_engine"))
 
-from silvaengine_utility import Utility
-
 from ai_rfq_engine import AIRFQEngine
+from silvaengine_utility import Utility
 
 
 def _call_method(
@@ -267,19 +266,29 @@ SEGMENT_DELETE_TEST_DATA = _TEST_DATA.get("segment_delete_test_data", [])
 SEGMENT_CONTACT_TEST_DATA = _TEST_DATA.get("segment_contact_test_data", [])
 SEGMENT_CONTACT_GET_TEST_DATA = _TEST_DATA.get("segment_contact_get_test_data", [])
 SEGMENT_CONTACT_LIST_TEST_DATA = _TEST_DATA.get("segment_contact_list_test_data", [])
-SEGMENT_CONTACT_DELETE_TEST_DATA = _TEST_DATA.get("segment_contact_delete_test_data", [])
+SEGMENT_CONTACT_DELETE_TEST_DATA = _TEST_DATA.get(
+    "segment_contact_delete_test_data", []
+)
 PROVIDER_ITEM_TEST_DATA = _TEST_DATA.get("provider_item_test_data", [])
 PROVIDER_ITEM_GET_TEST_DATA = _TEST_DATA.get("provider_item_get_test_data", [])
 PROVIDER_ITEM_LIST_TEST_DATA = _TEST_DATA.get("provider_item_list_test_data", [])
 PROVIDER_ITEM_DELETE_TEST_DATA = _TEST_DATA.get("provider_item_delete_test_data", [])
 PROVIDER_ITEM_BATCH_TEST_DATA = _TEST_DATA.get("provider_item_batch_test_data", [])
-PROVIDER_ITEM_BATCH_GET_TEST_DATA = _TEST_DATA.get("provider_item_batch_get_test_data", [])
-PROVIDER_ITEM_BATCH_LIST_TEST_DATA = _TEST_DATA.get("provider_item_batch_list_test_data", [])
-PROVIDER_ITEM_BATCH_DELETE_TEST_DATA = _TEST_DATA.get("provider_item_batch_delete_test_data", [])
+PROVIDER_ITEM_BATCH_GET_TEST_DATA = _TEST_DATA.get(
+    "provider_item_batch_get_test_data", []
+)
+PROVIDER_ITEM_BATCH_LIST_TEST_DATA = _TEST_DATA.get(
+    "provider_item_batch_list_test_data", []
+)
+PROVIDER_ITEM_BATCH_DELETE_TEST_DATA = _TEST_DATA.get(
+    "provider_item_batch_delete_test_data", []
+)
 ITEM_PRICE_TIER_TEST_DATA = _TEST_DATA.get("item_price_tier_test_data", [])
 ITEM_PRICE_TIER_GET_TEST_DATA = _TEST_DATA.get("item_price_tier_get_test_data", [])
 ITEM_PRICE_TIER_LIST_TEST_DATA = _TEST_DATA.get("item_price_tier_list_test_data", [])
-ITEM_PRICE_TIER_DELETE_TEST_DATA = _TEST_DATA.get("item_price_tier_delete_test_data", [])
+ITEM_PRICE_TIER_DELETE_TEST_DATA = _TEST_DATA.get(
+    "item_price_tier_delete_test_data", []
+)
 DISCOUNT_RULE_TEST_DATA = _TEST_DATA.get("discount_rule_test_data", [])
 DISCOUNT_RULE_GET_TEST_DATA = _TEST_DATA.get("discount_rule_get_test_data", [])
 DISCOUNT_RULE_LIST_TEST_DATA = _TEST_DATA.get("discount_rule_list_test_data", [])
@@ -656,7 +665,9 @@ def test_graphql_list_segment_contacts_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_segment_contact_py(ai_rfq_engine, schema, test_data):
     """Test delete segment contact operation."""
-    query = Utility.generate_graphql_operation("deleteSegmentContact", "Mutation", schema)
+    query = Utility.generate_graphql_operation(
+        "deleteSegmentContact", "Mutation", schema
+    )
     logger.info(f"Query: {query}")
     logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
@@ -854,7 +865,9 @@ def test_graphql_provider_item_batch_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_provider_item_batch_py(ai_rfq_engine, schema, test_data):
     """Test delete provider item batch operation."""
-    query = Utility.generate_graphql_operation("deleteProviderItemBatch", "Mutation", schema)
+    query = Utility.generate_graphql_operation(
+        "deleteProviderItemBatch", "Mutation", schema
+    )
     logger.info(f"Query: {query}")
     logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
@@ -953,7 +966,9 @@ def test_graphql_item_price_tier_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_item_price_tier_py(ai_rfq_engine, schema, test_data):
     """Test delete item price tier operation."""
-    query = Utility.generate_graphql_operation("deleteItemPriceTier", "Mutation", schema)
+    query = Utility.generate_graphql_operation(
+        "deleteItemPriceTier", "Mutation", schema
+    )
     logger.info(f"Query: {query}")
     logger.info(f"Test data: {Utility.json_dumps(test_data)}")
 
