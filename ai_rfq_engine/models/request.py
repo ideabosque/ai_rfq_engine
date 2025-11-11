@@ -212,10 +212,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "expired_at",
         ]:
             if key in kwargs:
-                if key == "items":
-                    cols[key] = convert_decimal_to_number(kwargs[key])
-                else:
-                    cols[key] = kwargs[key]
+                cols[key] = kwargs[key]
         RequestModel(
             endpoint_id,
             request_uuid,
