@@ -104,7 +104,7 @@ def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return ItemType(**Utility.json_normalize(item))
+    return ItemType(**Utility.json_normalize(item, parser_number=False))
 
 
 def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:

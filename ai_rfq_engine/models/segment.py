@@ -102,7 +102,7 @@ def get_segment_type(info: ResolveInfo, segment: SegmentModel) -> SegmentType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return SegmentType(**Utility.json_normalize(segment))
+    return SegmentType(**Utility.json_normalize(segment, parser_number=False))
 
 
 def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType:

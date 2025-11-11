@@ -179,7 +179,7 @@ def get_item_price_tier_type(
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return ItemPriceTierType(**Utility.json_normalize(item_price_tier))
+    return ItemPriceTierType(**Utility.json_normalize(item_price_tier, parser_number=False))
 
 
 def resolve_item_price_tier(

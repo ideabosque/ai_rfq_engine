@@ -247,7 +247,7 @@ def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteI
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return QuoteItemType(**Utility.json_normalize(quote_item_dict))
+    return QuoteItemType(**Utility.json_normalize(quote_item_dict, parser_number=False))
 
 
 def resolve_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteItemType:

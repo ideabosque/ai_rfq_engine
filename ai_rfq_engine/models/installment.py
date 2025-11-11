@@ -99,7 +99,7 @@ def get_installment_type(
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return InstallmentType(**Utility.json_normalize(installment))
+    return InstallmentType(**Utility.json_normalize(installment, parser_number=False))
 
 
 def resolve_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> InstallmentType:
