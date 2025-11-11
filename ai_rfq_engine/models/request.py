@@ -13,7 +13,6 @@ from graphene import ResolveInfo
 from pynamodb.attributes import (
     ListAttribute,
     MapAttribute,
-    NumberAttribute,
     UnicodeAttribute,
     UTCDateTimeAttribute,
 )
