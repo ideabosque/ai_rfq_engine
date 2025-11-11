@@ -137,7 +137,7 @@ def get_provider_item_batch_type(
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return ProviderItemBatchType(**Utility.json_normalize(provider_item_batch, parser_number=False))
+    return ProviderItemBatchType(**Utility.json_normalize(provider_item_batch))
 
 
 def resolve_provider_item_batch(

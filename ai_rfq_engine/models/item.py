@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,6 +20,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.item import ItemListType, ItemType
 from .provider_item import resolve_provider_item_list
@@ -104,7 +103,7 @@ def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return ItemType(**Utility.json_normalize(item, parser_number=False))
+    return ItemType(**Utility.json_normalize(item))
 
 
 def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:

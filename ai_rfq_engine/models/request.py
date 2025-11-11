@@ -17,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -26,7 +24,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
+from silvaengine_utility import Utility, convert_decimal_to_number
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.request import RequestListType, RequestType
 from .file import resolve_file_list
@@ -114,7 +113,7 @@ def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return RequestType(**Utility.json_normalize(request, parser_number=False))
+    return RequestType(**Utility.json_normalize(request))
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:
@@ -213,7 +212,10 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "expired_at",
         ]:
             if key in kwargs:
-                cols[key] = kwargs[key]
+                if key == "items":
+                    cols[key] = convert_decimal_to_number(kwargs[key])
+                else:
+                    cols[key] = kwargs[key]
         RequestModel(
             endpoint_id,
             request_uuid,

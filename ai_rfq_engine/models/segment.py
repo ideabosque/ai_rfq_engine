@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,6 +20,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.segment import SegmentListType, SegmentType
 from .segment_contact import resolve_segment_contact_list
@@ -102,7 +101,7 @@ def get_segment_type(info: ResolveInfo, segment: SegmentModel) -> SegmentType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return SegmentType(**Utility.json_normalize(segment, parser_number=False))
+    return SegmentType(**Utility.json_normalize(segment))
 
 
 def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType:

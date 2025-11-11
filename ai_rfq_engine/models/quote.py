@@ -137,7 +137,7 @@ def _get_next_round_number(request_uuid: str, provider_corp_external_id: str) ->
         # Query existing quotes with the same request_uuid and provider_corp_external_id
         existing_quotes = QuoteModel.provider_corp_external_id_index.query(
             request_uuid,
-            QuoteModel.provider_corp_external_id == provider_corp_external_id
+            QuoteModel.provider_corp_external_id == provider_corp_external_id,
         )
 
         # Find the maximum rounds value
@@ -230,7 +230,7 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return QuoteType(**Utility.json_normalize(quote_dict, parser_number=False))
+    return QuoteType(**Utility.json_normalize(quote_dict))
 
 
 def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:
@@ -350,7 +350,9 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     if kwargs.get("entity") is None:
         # Calculate the next round number
         provider_corp_external_id = kwargs.get("provider_corp_external_id")
-        kwargs["rounds"] = _get_next_round_number(request_uuid, provider_corp_external_id)
+        kwargs["rounds"] = _get_next_round_number(
+            request_uuid, provider_corp_external_id
+        )
 
         cols = {
             "endpoint_id": info.context.get("endpoint_id"),

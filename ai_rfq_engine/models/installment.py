@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,6 +20,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.installment import InstallmentListType, InstallmentType
 from .utils import _get_quote
@@ -99,7 +98,7 @@ def get_installment_type(
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return InstallmentType(**Utility.json_normalize(installment, parser_number=False))
+    return InstallmentType(**Utility.json_normalize(installment))
 
 
 def resolve_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> InstallmentType:
