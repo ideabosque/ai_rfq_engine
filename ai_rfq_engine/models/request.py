@@ -17,6 +17,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -24,8 +26,7 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
+from silvaengine_utility import Utility, convert_decimal_to_number
 
 from ..types.request import RequestListType, RequestType
 from .file import resolve_file_list
@@ -109,6 +110,7 @@ def get_request_count(endpoint_id: str, request_uuid: str) -> int:
 def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
     try:
         request = request.__dict__["attribute_values"]
+        request["items"] = convert_decimal_to_number(request["items"])
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)

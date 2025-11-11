@@ -166,7 +166,7 @@ class QuoteItemModel(BaseModel):
     batch_no = UnicodeAttribute(null=True)
     request_uuid = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
-    request_data = MapAttribute()
+    request_data = MapAttribute(null=True)
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()
     subtotal = NumberAttribute()
@@ -218,10 +218,11 @@ def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteI
 
             try:
                 batch = get_provider_item_batch(
-                    quote_item_dict["provider_item_uuid"],
-                    quote_item_dict["batch_no"]
+                    quote_item_dict["provider_item_uuid"], quote_item_dict["batch_no"]
                 )
-                slow_move_item = batch.slow_move_item if batch.slow_move_item is not None else False
+                slow_move_item = (
+                    batch.slow_move_item if batch.slow_move_item is not None else False
+                )
                 guardrail_price_per_uom = batch.guardrail_price_per_uom
             except Exception:
                 # If batch not found, use default values
@@ -233,7 +234,7 @@ def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteI
             try:
                 provider_item = get_provider_item(
                     quote_item_dict["endpoint_id"],
-                    quote_item_dict["provider_item_uuid"]
+                    quote_item_dict["provider_item_uuid"],
                 )
                 guardrail_price_per_uom = provider_item.base_price_per_uom
             except Exception:
