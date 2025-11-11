@@ -26,7 +26,7 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, convert_decimal_to_number
+from silvaengine_utility import Utility
 
 from ..types.request import RequestListType, RequestType
 from .file import resolve_file_list
