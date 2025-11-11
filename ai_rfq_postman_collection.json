@@ -1,0 +1,1936 @@
+{
+  "info": {
+    "name": "AI RFQ Engine GraphQL API",
+    "description": "Complete collection of GraphQL queries and mutations for the AI RFQ Engine. This collection includes all CRUD operations for managing items, segments, providers, quotes, requests, and related entities.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "ai-rfq-engine-collection",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "key",
+        "value": "x-api-key",
+        "type": "string"
+      },
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "api_url",
+      "value": "https://your-api-domain.com",
+      "type": "string"
+    },
+    {
+      "key": "area",
+      "value": "core",
+      "type": "string"
+    },
+    {
+      "key": "endpoint_id",
+      "value": "your-endpoint-id",
+      "type": "string"
+    },
+    {
+      "key": "funct",
+      "value": "ai_rfq_graphql",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "your-api-key-here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Ping",
+      "item": [
+        {
+          "name": "Ping",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  ping\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Simple ping query to test API connectivity"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Item",
+      "item": [
+        {
+          "name": "Insert/Update Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateItem($itemUuid: String, $itemType: String, $itemName: String, $itemDescription: String, $uom: String, $itemExternalId: String, $updatedBy: String!) {\n  insertUpdateItem(\n    itemUuid: $itemUuid, itemType: $itemType, itemName: $itemName, itemDescription: $itemDescription, uom: $uom, itemExternalId: $itemExternalId, updatedBy: $updatedBy\n  ) {\n    item {\n      itemUuid\n      itemType\n      itemName\n      itemDescription\n      uom\n      itemExternalId\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\",\n  \"itemType\": \"raw_material\",\n  \"itemName\": \"Steel Plate\",\n  \"itemDescription\": \"High grade steel plate\",\n  \"uom\": \"kg\",\n  \"itemExternalId\": \"EXT-123456\",\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update an item"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetItem($itemUuid: String!) {\n  item(itemUuid: $itemUuid) {\n    itemUuid\n    itemType\n    itemName\n    itemDescription\n    uom\n    itemExternalId\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific item by UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "List Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListItems($itemType: String, $limit: Int, $pageNumber: Int) {\n  itemList(itemType: $itemType, limit: $limit, pageNumber: $pageNumber) {\n    items {\n      itemUuid\n      itemType\n      itemName\n      itemDescription\n      uom\n      itemExternalId\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"itemType\": \"raw_material\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List items with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteItem($itemUuid: String!) {\n  deleteItem(\n    itemUuid: $itemUuid\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"test_item_uuid\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete an item by UUID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Segment",
+      "item": [
+        {
+          "name": "Insert/Update Segment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateSegment($segmentUuid: String, $providerCorpExternalId: String, $segmentName: String, $segmentDescription: String, $updatedBy: String!) {\n  insertUpdateSegment(\n    segmentUuid: $segmentUuid, providerCorpExternalId: $providerCorpExternalId, segmentName: $segmentName, segmentDescription: $segmentDescription, updatedBy: $updatedBy\n  ) {\n    segment {\n      segmentUuid\n      segmentName\n      segmentDescription\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"segmentUuid\": \"63586092742936117376\",\n  \"segmentName\": \"Premium Customers\",\n  \"segmentDescription\": \"High value customer segment\",\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update a segment"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Segment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetSegment($segmentUuid: String!) {\n  segment(segmentUuid: $segmentUuid) {\n    segmentUuid\n    segmentName\n    segmentDescription\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"segmentUuid\": \"63586092742936117376\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific segment by UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "List Segments",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListSegments($segmentName: String, $limit: Int, $pageNumber: Int) {\n  segmentList(segmentName: $segmentName, limit: $limit, pageNumber: $pageNumber) {\n    segments {\n      segmentUuid\n      segmentName\n      segmentDescription\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"segmentName\": \"Premium\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List segments with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Segment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteSegment($segmentUuid: String!) {\n  deleteSegment(\n    segmentUuid: $segmentUuid\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"segmentUuid\": \"test_segment_uuid\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete a segment by UUID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Segment Contact",
+      "item": [
+        {
+          "name": "Insert/Update Segment Contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateSegmentContact($segmentUuid: String!, $email: String!, $updatedBy: String!) {\n  insertUpdateSegmentContact(\n    segmentUuid: $segmentUuid, email: $email, updatedBy: $updatedBy\n  ) {\n    segmentContact {\n      segment\n      email\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"segmentUuid\": \"63586092742936117376\",\n  \"email\": \"john.doe@abc.com\",\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update a segment contact"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Segment Contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetSegmentContact($segmentUuid: String!, $email: String!) {\n  segmentContact(segmentUuid: $segmentUuid, email: $email) {\n    segmentUuid\n    email\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"segmentUuid\": \"63586092742936117376\",\n  \"email\": \"john.doe@abc.com\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific segment contact"
+          },
+          "response": []
+        },
+        {
+          "name": "List Segment Contacts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListSegmentContacts($segmentUuid: String, $limit: Int, $pageNumber: Int) {\n  segmentContactList(segmentUuid: $segmentUuid, limit: $limit, pageNumber: $pageNumber) {\n    segmentContacts {\n      segmentUuid\n      email\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"segmentUuid\": \"63586092742936117376\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List segment contacts with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Segment Contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteSegmentContact($segmentUuid: String!, $email: String!) {\n  deleteSegmentContact(\n    segmentUuid: $segmentUuid, email: $email\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"segmentUuid\": \"test_segment_uuid\",\n  \"email\": \"test@example.com\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete a segment contact"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Provider Item",
+      "item": [
+        {
+          "name": "Insert/Update Provider Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateProviderItem($providerItemUuid: String, $itemUuid: String!, $basePricePerUom: Float!, $itemSpec: JSON, $updatedBy: String!) {\n  insertUpdateProviderItem(\n    providerItemUuid: $providerItemUuid, itemUuid: $itemUuid, basePricePerUom: $basePricePerUom, itemSpec: $itemSpec, updatedBy: $updatedBy\n  ) {\n    providerItem {\n      item\n      providerItemUuid\n      basePricePerUom\n      itemSpec\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"providerItemUuid\": \"06812599115120132224\",\n  \"itemUuid\": \"89151803645574004864\",\n  \"basePricePerUom\": 100.12,\n  \"itemSpec\": {},\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update a provider item"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Provider Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetProviderItem($providerItemUuid: String!) {\n  providerItem(providerItemUuid: $providerItemUuid) {\n    providerItemUuid\n    itemUuid\n    basePricePerUom\n    itemSpec\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"providerItemUuid\": \"06812599115120132224\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific provider item by UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "List Provider Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListProviderItems($itemUuid: String, $limit: Int, $pageNumber: Int) {\n  providerItemList(itemUuid: $itemUuid, limit: $limit, pageNumber: $pageNumber) {\n    providerItems {\n      providerItemUuid\n      itemUuid\n      basePricePerUom\n      itemSpec\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List provider items with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Provider Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteProviderItem($providerItemUuid: String!) {\n  deleteProviderItem(\n    providerItemUuid: $providerItemUuid\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"providerItemUuid\": \"test_provider_item_uuid\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete a provider item by UUID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Provider Item Batch",
+      "item": [
+        {
+          "name": "Insert/Update Provider Item Batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateProviderItemBatch($providerItemUuid: String, $batchNo: String, $itemUuid: String, $expiredAt: DateTime, $producedAt: DateTime, $costPerUom: Float, $freightCostPerUom: Float, $additionalCostPerUom: Float, $guardrailMarginPerUom: Float, $slowMoveItem: Boolean, $inStock: Boolean, $updatedBy: String!) {\n  insertUpdateProviderItemBatch(\n    providerItemUuid: $providerItemUuid, batchNo: $batchNo, itemUuid: $itemUuid, expiredAt: $expiredAt, producedAt: $producedAt, costPerUom: $costPerUom, freightCostPerUom: $freightCostPerUom, additionalCostPerUom: $additionalCostPerUom, guardrailMarginPerUom: $guardrailMarginPerUom, slowMoveItem: $slowMoveItem, inStock: $inStock, updatedBy: $updatedBy\n  ) {\n    providerItemBatch {\n      providerItem\n      batchNo\n      item\n      expiredAt\n      producedAt\n      costPerUom\n      freightCostPerUom\n      additionalCostPerUom\n      guardrailMarginPerUom\n      slowMoveItem\n      inStock\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"providerItemUuid\": \"06812599115120132224\",\n  \"batchNo\": \"BATCH-001\",\n  \"itemUuid\": \"89151803645574004864\",\n  \"expiredAt\": \"2025-12-31T23:59:59+0000\",\n  \"producedAt\": \"2025-01-01T00:00:00+0000\",\n  \"costPerUom\": 50,\n  \"freightCostPerUom\": 5,\n  \"additionalCostPerUom\": 2.5,\n  \"guardrailMarginPerUom\": 10,\n  \"slowMoveItem\": false,\n  \"inStock\": true,\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update a provider item batch"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Provider Item Batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetProviderItemBatch($providerItemUuid: String!, $batchNo: String!) {\n  providerItemBatch(providerItemUuid: $providerItemUuid, batchNo: $batchNo) {\n    providerItemUuid\n    batchNo\n    itemUuid\n    expiredAt\n    producedAt\n    costPerUom\n    freightCostPerUom\n    additionalCostPerUom\n    guardrailMarginPerUom\n    slowMoveItem\n    inStock\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"providerItemUuid\": \"06812599115120132224\",\n  \"batchNo\": \"BATCH-001\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific provider item batch"
+          },
+          "response": []
+        },
+        {
+          "name": "List Provider Item Batches",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListProviderItemBatches($itemUuid: String, $providerItemUuid: String, $inStock: Boolean, $expiredAtGt: DateTime, $limit: Int, $pageNumber: Int) {\n  providerItemBatchList(\n    itemUuid: $itemUuid\n    providerItemUuid: $providerItemUuid\n    inStock: $inStock\n    expiredAtGt: $expiredAtGt\n    limit: $limit\n    pageNumber: $pageNumber\n  ) {\n    providerItemBatches {\n      providerItemUuid\n      batchNo\n      itemUuid\n      expiredAt\n      producedAt\n      costPerUom\n      freightCostPerUom\n      additionalCostPerUom\n      guardrailMarginPerUom\n      slowMoveItem\n      inStock\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\",\n  \"providerItemUuid\": \"06812599115120132224\",\n  \"inStock\": true,\n  \"expiredAtGt\": \"2025-11-07T00:00:00+0000\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List provider item batches with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Provider Item Batch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteProviderItemBatch($providerItemUuid: String!, $batchNo: String!) {\n  deleteProviderItemBatch(\n    providerItemUuid: $providerItemUuid, batchNo: $batchNo\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"providerItemUuid\": \"test_provider_item_uuid\",\n  \"batchNo\": \"test_batch\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete a provider item batch"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Item Price Tier",
+      "item": [
+        {
+          "name": "Insert/Update Item Price Tier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateItemPriceTier($itemUuid: String!, $itemPriceTierUuid: String, $providerItemUuid: String, $segmentUuid: String, $quantityGreaterThen: Float, $quantityLessThen: Float, $marginPerUom: Float, $pricePerUom: Float, $status: String, $updatedBy: String!) {\n  insertUpdateItemPriceTier(\n    itemUuid: $itemUuid, itemPriceTierUuid: $itemPriceTierUuid, providerItemUuid: $providerItemUuid, segmentUuid: $segmentUuid, quantityGreaterThen: $quantityGreaterThen, quantityLessThen: $quantityLessThen, marginPerUom: $marginPerUom, pricePerUom: $pricePerUom, status: $status, updatedBy: $updatedBy\n  ) {\n    itemPriceTier {\n      providerItem\n      itemPriceTierUuid\n      segment\n      quantityGreaterThen\n      quantityLessThen\n      marginPerUom\n      status\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\",\n  \"itemPriceTierUuid\": \"92517332397517193344\",\n  \"providerItemUuid\": \"06812599115120132224\",\n  \"segmentUuid\": \"63586092742936117376\",\n  \"quantityGreaterThen\": 0,\n  \"quantityLessThen\": 200,\n  \"marginPerUom\": 15.3,\n  \"status\": \"active\",\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update an item price tier"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Item Price Tier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetItemPriceTier($itemUuid: String!, $itemPriceTierUuid: String!) {\n  itemPriceTier(itemUuid: $itemUuid, itemPriceTierUuid: $itemPriceTierUuid) {\n    itemUuid\n    itemPriceTierUuid\n    providerItemUuid\n    segmentUuid\n    quantityGreaterThen\n    quantityLessThen\n    marginPerUom\n    status\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\",\n  \"itemPriceTierUuid\": \"92517332397517193344\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific item price tier"
+          },
+          "response": []
+        },
+        {
+          "name": "List Item Price Tiers",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListItemPriceTiers($itemUuid: String, $limit: Int, $pageNumber: Int) {\n  itemPriceTierList(itemUuid: $itemUuid, limit: $limit, pageNumber: $pageNumber) {\n    itemPriceTiers {\n      itemUuid\n      itemPriceTierUuid\n      providerItemUuid\n      segmentUuid\n      quantityGreaterThen\n      quantityLessThen\n      marginPerUom\n      status\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List item price tiers with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Item Price Tier",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteItemPriceTier($itemUuid: String!, $itemPriceTierUuid: String!) {\n  deleteItemPriceTier(\n    itemUuid: $itemUuid, itemPriceTierUuid: $itemPriceTierUuid\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"test_item_uuid\",\n  \"itemPriceTierUuid\": \"test_price_tier_uuid\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete an item price tier"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Discount Rule",
+      "item": [
+        {
+          "name": "Insert/Update Discount Rule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateDiscountRule($itemUuid: String!, $discountRuleUuid: String, $providerItemUuid: String, $segmentUuid: String, $subtotalGreaterThan: Float, $subtotalLessThan: Float, $maxDiscountPercentage: Float, $status: String, $updatedBy: String!) {\n  insertUpdateDiscountRule(\n    itemUuid: $itemUuid, discountRuleUuid: $discountRuleUuid, providerItemUuid: $providerItemUuid, segmentUuid: $segmentUuid, subtotalGreaterThan: $subtotalGreaterThan, subtotalLessThan: $subtotalLessThan, maxDiscountPercentage: $maxDiscountPercentage, status: $status, updatedBy: $updatedBy\n  ) {\n    discountRule {\n      providerItem\n      discountRuleUuid\n      segment\n      subtotalGreaterThan\n      subtotalLessThan\n      maxDiscountPercentage\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\",\n  \"discountRuleUuid\": \"03145193523092930688\",\n  \"providerItemUuid\": \"06812599115120132224\",\n  \"segmentUuid\": \"63586092742936117376\",\n  \"subtotalGreaterThan\": 10.5,\n  \"subtotalLessThan\": 15.5,\n  \"maxDiscountPercentage\": 10.5,\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update a discount rule"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Discount Rule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetDiscountRule($itemUuid: String!, $discountRuleUuid: String!) {\n  discountRule(itemUuid: $itemUuid, discountRuleUuid: $discountRuleUuid) {\n    itemUuid\n    discountRuleUuid\n    providerItemUuid\n    segmentUuid\n    subtotalGreaterThan\n    subtotalLessThan\n    maxDiscountPercentage\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\",\n  \"discountRuleUuid\": \"03145193523092930688\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific discount rule"
+          },
+          "response": []
+        },
+        {
+          "name": "List Discount Rules",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListDiscountRules($itemUuid: String, $limit: Int, $pageNumber: Int) {\n  discountRuleList(itemUuid: $itemUuid, limit: $limit, pageNumber: $pageNumber) {\n    discountRules {\n      itemUuid\n      discountRuleUuid\n      providerItemUuid\n      segmentUuid\n      subtotalGreaterThan\n      subtotalLessThan\n      maxDiscountPercentage\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"89151803645574004864\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List discount rules with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Discount Rule",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteDiscountRule($itemUuid: String!, $discountRuleUuid: String!) {\n  deleteDiscountRule(\n    itemUuid: $itemUuid, discountRuleUuid: $discountRuleUuid\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"itemUuid\": \"test_item_uuid\",\n  \"discountRuleUuid\": \"test_discount_rule_uuid\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete a discount rule"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Request",
+      "item": [
+        {
+          "name": "Insert/Update Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateRequest($requestUuid: String, $email: String, $requestTitle: String, $requestDescription: String, $billingAddress: JSON, $shippingAddress: JSON, $items: [JSON], $notes: String, $status: String, $expiredAt: DateTime, $updatedBy: String!) {\n  insertUpdateRequest(\n    requestUuid: $requestUuid, email: $email, requestTitle: $requestTitle, requestDescription: $requestDescription, billingAddress: $billingAddress, shippingAddress: $shippingAddress, items: $items, notes: $notes, status: $status, expiredAt: $expiredAt, updatedBy: $updatedBy\n  ) {\n    request {\n      requestUuid\n      email\n      requestTitle\n      requestDescription\n      billingAddress\n      shippingAddress\n      items\n      expiredAt\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"65747032911835578496\",\n  \"email\": \"john.doe@abc.com\",\n  \"requestTitle\": \"Steel Purchase Request\",\n  \"requestDescription\": \"Request for steel materials\",\n  \"billingAddress\": {\"street\": \"123 Main St\", \"city\": \"City\", \"state\": \"State\", \"zip\": \"12345\"},\n  \"shippingAddress\": {\"street\": \"456 Shipping Ave\", \"city\": \"City\", \"state\": \"State\", \"zip\": \"67890\"},\n  \"items\": [{\"item_uuid\": \"89151803645574004864\", \"item_name\": \"Steel Plate\", \"request_data\": {}, \"qty\": 100}],\n  \"expiredAt\": \"2025-04-05T01:44:36.759118+0000\",\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update a request"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetRequest($requestUuid: String!) {\n  request(requestUuid: $requestUuid) {\n    requestUuid\n    email\n    requestTitle\n    requestDescription\n    billingAddress\n    shippingAddress\n    items\n    expiredAt\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"65747032911835578496\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific request by UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "List Requests",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListRequests($limit: Int, $pageNumber: Int) {\n  requestList(limit: $limit, pageNumber: $pageNumber) {\n    requests {\n      requestUuid\n      email\n      requestTitle\n      requestDescription\n      billingAddress\n      shippingAddress\n      items\n      expiredAt\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List requests with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteRequest($requestUuid: String!) {\n  deleteRequest(\n    requestUuid: $requestUuid\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"test_request_uuid\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete a request by UUID"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Quote",
+      "item": [
+        {
+          "name": "Insert/Update Quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateQuote($requestUuid: String!, $quoteUuid: String, $providerCorpExternalId: String, $salesRepEmail: String, $shippingMethod: String, $shippingAmount: Float, $notes: String, $status: String, $updatedBy: String!) {\n  insertUpdateQuote(\n    requestUuid: $requestUuid, quoteUuid: $quoteUuid, providerCorpExternalId: $providerCorpExternalId, salesRepEmail: $salesRepEmail, shippingMethod: $shippingMethod, shippingAmount: $shippingAmount, notes: $notes, status: $status, updatedBy: $updatedBy\n  ) {\n    quote {\n      request\n      quoteUuid\n      providerCorpExternalId\n      salesRepEmail\n      shippingMethod\n      shippingAmount\n      notes\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"65747032911835578496\",\n  \"quoteUuid\": \"25537170259049463936\",\n  \"providerCorpExternalId\": \"PROVIDER-001\",\n  \"salesRepEmail\": \"sales.rep@xxx.xxx\",\n  \"shippingMethod\": \"LTL\",\n  \"shippingAmount\": 50,\n  \"notes\": \"Special pricing for bulk order\",\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update a quote"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetQuote($requestUuid: String!, $quoteUuid: String!) {\n  quote(requestUuid: $requestUuid, quoteUuid: $quoteUuid) {\n    requestUuid\n    quoteUuid\n    providerCorpExternalId\n    salesRepEmail\n    shippingMethod\n    shippingAmount\n    notes\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"65747032911835578496\",\n  \"quoteUuid\": \"25537170259049463936\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific quote"
+          },
+          "response": []
+        },
+        {
+          "name": "List Quotes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListQuotes($requestUuid: String, $limit: Int, $pageNumber: Int) {\n  quoteList(requestUuid: $requestUuid, limit: $limit, pageNumber: $pageNumber) {\n    quotes {\n      requestUuid\n      quoteUuid\n      providerCorpExternalId\n      salesRepEmail\n      shippingMethod\n      shippingAmount\n      notes\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"65747032911835578496\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List quotes with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Quote",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteQuote($requestUuid: String!, $quoteUuid: String!) {\n  deleteQuote(\n    requestUuid: $requestUuid, quoteUuid: $quoteUuid\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"test_request_uuid\",\n  \"quoteUuid\": \"test_quote_uuid\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete a quote"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Quote Item",
+      "item": [
+        {
+          "name": "Insert/Update Quote Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateQuoteItem($quoteUuid: String!, $quoteItemUuid: String, $providerItemUuid: String, $itemUuid: String, $segmentUuid: String, $requestUuid: String, $batchNo: String, $requestData: JSON, $qty: Float, $subtotalDiscount: Float, $updatedBy: String!) {\n  insertUpdateQuoteItem(\n    quoteUuid: $quoteUuid, quoteItemUuid: $quoteItemUuid, providerItemUuid: $providerItemUuid, itemUuid: $itemUuid, segmentUuid: $segmentUuid, requestUuid: $requestUuid, batchNo: $batchNo, requestData: $requestData, qty: $qty, subtotalDiscount: $subtotalDiscount, updatedBy: $updatedBy\n  ) {\n    quoteItem {\n      quoteUuid\n      quoteItemUuid\n      providerItemUuid\n      itemUuid\n      batchNo\n      requestUuid\n      requestData\n      qty\n      subtotalDiscount\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"quoteItemUuid\": \"61813702413159252096\",\n  \"providerItemUuid\": \"06812599115120132224\",\n  \"itemUuid\": \"89151803645574004864\",\n  \"segmentUuid\": \"63586092742936117376\",\n  \"requestUuid\": \"65747032911835578496\",\n  \"batchNo\": \"BATCH-001\",\n  \"requestData\": {},\n  \"qty\": 100.12,\n  \"subtotalDiscount\": 102.36,\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update a quote item"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Quote Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetQuoteItem($quoteUuid: String!, $quoteItemUuid: String!) {\n  quoteItem(quoteUuid: $quoteUuid, quoteItemUuid: $quoteItemUuid) {\n    quoteUuid\n    quoteItemUuid\n    providerItemUuid\n    itemUuid\n    segmentUuid\n    requestUuid\n    batchNo\n    requestData\n    qty\n    subtotalDiscount\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"quoteItemUuid\": \"61813702413159252096\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific quote item"
+          },
+          "response": []
+        },
+        {
+          "name": "List Quote Items",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListQuoteItems($quoteUuid: String, $limit: Int, $pageNumber: Int) {\n  quoteItemList(quoteUuid: $quoteUuid, limit: $limit, pageNumber: $pageNumber) {\n    quoteItems {\n      quoteUuid\n      quoteItemUuid\n      providerItemUuid\n      itemUuid\n      segmentUuid\n      requestUuid\n      batchNo\n      requestData\n      qty\n      subtotalDiscount\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List quote items with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Quote Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteQuoteItem($quoteUuid: String!, $quoteItemUuid: String!) {\n  deleteQuoteItem(\n    quoteUuid: $quoteUuid, quoteItemUuid: $quoteItemUuid\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"quoteUuid\": \"test_quote_uuid\",\n  \"quoteItemUuid\": \"test_quote_item_uuid\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete a quote item"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Installment",
+      "item": [
+        {
+          "name": "Insert/Update Installment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateInstallment($quoteUuid: String!, $installmentUuid: String, $requestUuid: String, $priority: Int, $salesorderNo: String, $scheduledDate: DateTime, $installmentRatio: Float, $installmentAmount: Float, $status: String, $updatedBy: String!) {\n  insertUpdateInstallment(\n    quoteUuid: $quoteUuid, installmentUuid: $installmentUuid, requestUuid: $requestUuid, priority: $priority, salesorderNo: $salesorderNo, scheduledDate: $scheduledDate, installmentRatio: $installmentRatio, installmentAmount: $installmentAmount, status: $status, updatedBy: $updatedBy\n  ) {\n    installment {\n      quote\n      installmentUuid\n      priority\n      salesorderNo\n      scheduledDate\n      installmentRatio\n      installmentAmount\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"installmentUuid\": \"52848497367965515904\",\n  \"requestUuid\": \"65747032911835578496\",\n  \"priority\": 0,\n  \"salesorderNo\": \"SO-XXXX\",\n  \"scheduledDate\": \"2025-04-06T00:44:50.625413+0000\",\n  \"installmentRatio\": 10.1,\n  \"installmentAmount\": 100.23,\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update an installment"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Installment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetInstallment($quoteUuid: String!, $installmentUuid: String!) {\n  installment(quoteUuid: $quoteUuid, installmentUuid: $installmentUuid) {\n    quoteUuid\n    installmentUuid\n    requestUuid\n    priority\n    salesorderNo\n    scheduledDate\n    installmentRatio\n    installmentAmount\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"installmentUuid\": \"52848497367965515904\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific installment"
+          },
+          "response": []
+        },
+        {
+          "name": "List Installments",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListInstallments($quoteUuid: String, $limit: Int, $pageNumber: Int) {\n  installmentList(quoteUuid: $quoteUuid, limit: $limit, pageNumber: $pageNumber) {\n    installments {\n      quoteUuid\n      installmentUuid\n      requestUuid\n      priority\n      salesorderNo\n      scheduledDate\n      installmentRatio\n      installmentAmount\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List installments with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Installment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteInstallment($quoteUuid: String!, $installmentUuid: String!) {\n  deleteInstallment(\n    quoteUuid: $quoteUuid, installmentUuid: $installmentUuid\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"quoteUuid\": \"test_quote_uuid\",\n  \"installmentUuid\": \"test_installment_uuid\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete an installment"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "File",
+      "item": [
+        {
+          "name": "Insert/Update File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation InsertUpdateFile($requestUuid: String!, $fileName: String!, $email: String, $updatedBy: String!) {\n  insertUpdateFile(\n    requestUuid: $requestUuid, fileName: $fileName, email: $email, updatedBy: $updatedBy\n  ) {\n    file {\n      request\n      fileName\n      email\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"65747032911835578496\",\n  \"fileName\": \"quote_document.pdf\",\n  \"email\": \"john.doe@xxx.xxx\",\n  \"updatedBy\": \"Bibo W.\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Create or update a file record"
+          },
+          "response": []
+        },
+        {
+          "name": "Get File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query GetFile($requestUuid: String!, $fileName: String!) {\n  file(requestUuid: $requestUuid, fileName: $fileName) {\n    requestUuid\n    fileName\n    email\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"65747032911835578496\",\n  \"fileName\": \"quote_document.pdf\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Get a specific file record"
+          },
+          "response": []
+        },
+        {
+          "name": "List Files",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query ListFiles($requestUuid: String, $limit: Int, $pageNumber: Int) {\n  fileList(requestUuid: $requestUuid, limit: $limit, pageNumber: $pageNumber) {\n    files {\n      requestUuid\n      fileName\n      email\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageNumber\n    totalPages\n    totalCount\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"65747032911835578496\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "List file records with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation DeleteFile($requestUuid: String!, $fileName: String!) {\n  deleteFile(\n    requestUuid: $requestUuid, fileName: $fileName\n  ) {\n    ok\n  }\n}",
+                "variables": "{\n  \"requestUuid\": \"test_request_uuid\",\n  \"fileName\": \"test_file.pdf\"\n}"
+              }
+            },
+            "url": {
+              "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
+              "host": [
+                "{{api_url}}"
+              ],
+              "path": [
+                "{{area}}",
+                "{{endpoint_id}}",
+                "{{funct}}"
+              ]
+            },
+            "description": "Delete a file record"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
