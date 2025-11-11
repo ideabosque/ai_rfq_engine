@@ -109,7 +109,7 @@ def get_request_count(endpoint_id: str, request_uuid: str) -> int:
 
 def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
     try:
-        request = convert_decimal_to_number(request.__dict__["attribute_values"])
+        request = request.__dict__["attribute_values"]
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
