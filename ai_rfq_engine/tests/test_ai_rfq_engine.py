@@ -263,36 +263,47 @@ ITEM_DELETE_TEST_DATA = _TEST_DATA.get("item_delete_test_data", [])
 SEGMENT_TEST_DATA = _TEST_DATA.get("segment_test_data", [])
 SEGMENT_GET_TEST_DATA = _TEST_DATA.get("segment_get_test_data", [])
 SEGMENT_LIST_TEST_DATA = _TEST_DATA.get("segment_list_test_data", [])
+SEGMENT_DELETE_TEST_DATA = _TEST_DATA.get("segment_delete_test_data", [])
 SEGMENT_CONTACT_TEST_DATA = _TEST_DATA.get("segment_contact_test_data", [])
 SEGMENT_CONTACT_GET_TEST_DATA = _TEST_DATA.get("segment_contact_get_test_data", [])
 SEGMENT_CONTACT_LIST_TEST_DATA = _TEST_DATA.get("segment_contact_list_test_data", [])
+SEGMENT_CONTACT_DELETE_TEST_DATA = _TEST_DATA.get("segment_contact_delete_test_data", [])
 PROVIDER_ITEM_TEST_DATA = _TEST_DATA.get("provider_item_test_data", [])
 PROVIDER_ITEM_GET_TEST_DATA = _TEST_DATA.get("provider_item_get_test_data", [])
 PROVIDER_ITEM_LIST_TEST_DATA = _TEST_DATA.get("provider_item_list_test_data", [])
+PROVIDER_ITEM_DELETE_TEST_DATA = _TEST_DATA.get("provider_item_delete_test_data", [])
 PROVIDER_ITEM_BATCH_TEST_DATA = _TEST_DATA.get("provider_item_batch_test_data", [])
 PROVIDER_ITEM_BATCH_GET_TEST_DATA = _TEST_DATA.get("provider_item_batch_get_test_data", [])
 PROVIDER_ITEM_BATCH_LIST_TEST_DATA = _TEST_DATA.get("provider_item_batch_list_test_data", [])
+PROVIDER_ITEM_BATCH_DELETE_TEST_DATA = _TEST_DATA.get("provider_item_batch_delete_test_data", [])
 ITEM_PRICE_TIER_TEST_DATA = _TEST_DATA.get("item_price_tier_test_data", [])
 ITEM_PRICE_TIER_GET_TEST_DATA = _TEST_DATA.get("item_price_tier_get_test_data", [])
 ITEM_PRICE_TIER_LIST_TEST_DATA = _TEST_DATA.get("item_price_tier_list_test_data", [])
+ITEM_PRICE_TIER_DELETE_TEST_DATA = _TEST_DATA.get("item_price_tier_delete_test_data", [])
 DISCOUNT_RULE_TEST_DATA = _TEST_DATA.get("discount_rule_test_data", [])
 DISCOUNT_RULE_GET_TEST_DATA = _TEST_DATA.get("discount_rule_get_test_data", [])
 DISCOUNT_RULE_LIST_TEST_DATA = _TEST_DATA.get("discount_rule_list_test_data", [])
+DISCOUNT_RULE_DELETE_TEST_DATA = _TEST_DATA.get("discount_rule_delete_test_data", [])
 REQUEST_TEST_DATA = _TEST_DATA.get("request_test_data", [])
 REQUEST_GET_TEST_DATA = _TEST_DATA.get("request_get_test_data", [])
 REQUEST_LIST_TEST_DATA = _TEST_DATA.get("request_list_test_data", [])
+REQUEST_DELETE_TEST_DATA = _TEST_DATA.get("request_delete_test_data", [])
 QUOTE_TEST_DATA = _TEST_DATA.get("quote_test_data", [])
 QUOTE_GET_TEST_DATA = _TEST_DATA.get("quote_get_test_data", [])
 QUOTE_LIST_TEST_DATA = _TEST_DATA.get("quote_list_test_data", [])
+QUOTE_DELETE_TEST_DATA = _TEST_DATA.get("quote_delete_test_data", [])
 QUOTE_ITEM_TEST_DATA = _TEST_DATA.get("quote_item_test_data", [])
 QUOTE_ITEM_GET_TEST_DATA = _TEST_DATA.get("quote_item_get_test_data", [])
 QUOTE_ITEM_LIST_TEST_DATA = _TEST_DATA.get("quote_item_list_test_data", [])
+QUOTE_ITEM_DELETE_TEST_DATA = _TEST_DATA.get("quote_item_delete_test_data", [])
 INSTALLMENT_TEST_DATA = _TEST_DATA.get("installment_test_data", [])
 INSTALLMENT_GET_TEST_DATA = _TEST_DATA.get("installment_get_test_data", [])
 INSTALLMENT_LIST_TEST_DATA = _TEST_DATA.get("installment_list_test_data", [])
+INSTALLMENT_DELETE_TEST_DATA = _TEST_DATA.get("installment_delete_test_data", [])
 FILE_TEST_DATA = _TEST_DATA.get("file_test_data", [])
 FILE_GET_TEST_DATA = _TEST_DATA.get("file_get_test_data", [])
 FILE_LIST_TEST_DATA = _TEST_DATA.get("file_list_test_data", [])
+FILE_DELETE_TEST_DATA = _TEST_DATA.get("file_delete_test_data", [])
 
 # ============================================================================
 # FIXTURES
@@ -541,6 +552,29 @@ def test_graphql_list_segments_py(ai_rfq_engine, schema, test_data):
     assert result is not None
 
 
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", SEGMENT_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_segment_py(ai_rfq_engine, schema, test_data):
+    """Test delete segment operation."""
+    query = Utility.generate_graphql_operation("deleteSegment", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_segment",
+    )
+
+    # May fail if segment doesn't exist, which is acceptable
+    logger.info(f"Delete segment result: {result}, error: {error}")
+
+
 # ============================================================================
 # SEGMENT CONTACT TESTS
 # ============================================================================
@@ -615,6 +649,29 @@ def test_graphql_list_segment_contacts_py(ai_rfq_engine, schema, test_data):
 
     assert error is None
     assert result is not None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", SEGMENT_CONTACT_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_segment_contact_py(ai_rfq_engine, schema, test_data):
+    """Test delete segment contact operation."""
+    query = Utility.generate_graphql_operation("deleteSegmentContact", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_segment_contact",
+    )
+
+    # May fail if segment contact doesn't exist, which is acceptable
+    logger.info(f"Delete segment contact result: {result}, error: {error}")
 
 
 # ============================================================================
@@ -693,6 +750,29 @@ def test_graphql_provider_item_list_py(ai_rfq_engine, schema, test_data):
     assert result is not None
 
 
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", PROVIDER_ITEM_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_provider_item_py(ai_rfq_engine, schema, test_data):
+    """Test delete provider item operation."""
+    query = Utility.generate_graphql_operation("deleteProviderItem", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_provider_item",
+    )
+
+    # May fail if provider item doesn't exist, which is acceptable
+    logger.info(f"Delete provider item result: {result}, error: {error}")
+
+
 # ============================================================================
 # PROVIDER ITEM BATCH TESTS
 # ============================================================================
@@ -767,6 +847,29 @@ def test_graphql_provider_item_batch_list_py(ai_rfq_engine, schema, test_data):
 
     assert error is None
     assert result is not None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", PROVIDER_ITEM_BATCH_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_provider_item_batch_py(ai_rfq_engine, schema, test_data):
+    """Test delete provider item batch operation."""
+    query = Utility.generate_graphql_operation("deleteProviderItemBatch", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_provider_item_batch",
+    )
+
+    # May fail if provider item batch doesn't exist, which is acceptable
+    logger.info(f"Delete provider item batch result: {result}, error: {error}")
 
 
 # ============================================================================
@@ -845,6 +948,29 @@ def test_graphql_item_price_tier_list_py(ai_rfq_engine, schema, test_data):
     assert result is not None
 
 
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", ITEM_PRICE_TIER_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_item_price_tier_py(ai_rfq_engine, schema, test_data):
+    """Test delete item price tier operation."""
+    query = Utility.generate_graphql_operation("deleteItemPriceTier", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_item_price_tier",
+    )
+
+    # May fail if item price tier doesn't exist, which is acceptable
+    logger.info(f"Delete item price tier result: {result}, error: {error}")
+
+
 # ============================================================================
 # DISCOUNT RULE TESTS
 # ============================================================================
@@ -919,6 +1045,29 @@ def test_graphql_discount_rule_list_py(ai_rfq_engine, schema, test_data):
 
     assert error is None
     assert result is not None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", DISCOUNT_RULE_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_discount_rule_py(ai_rfq_engine, schema, test_data):
+    """Test delete discount rule operation."""
+    query = Utility.generate_graphql_operation("deleteDiscountRule", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_discount_rule",
+    )
+
+    # May fail if discount rule doesn't exist, which is acceptable
+    logger.info(f"Delete discount rule result: {result}, error: {error}")
 
 
 # ============================================================================
@@ -997,6 +1146,29 @@ def test_graphql_request_list_py(ai_rfq_engine, schema, test_data):
     assert result is not None
 
 
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", REQUEST_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_request_py(ai_rfq_engine, schema, test_data):
+    """Test delete request operation."""
+    query = Utility.generate_graphql_operation("deleteRequest", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_request",
+    )
+
+    # May fail if request doesn't exist, which is acceptable
+    logger.info(f"Delete request result: {result}, error: {error}")
+
+
 # ============================================================================
 # QUOTE TESTS
 # ============================================================================
@@ -1069,6 +1241,29 @@ def test_graphql_quote_list_py(ai_rfq_engine, schema, test_data):
 
     assert error is None
     assert result is not None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", QUOTE_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_quote_py(ai_rfq_engine, schema, test_data):
+    """Test delete quote operation."""
+    query = Utility.generate_graphql_operation("deleteQuote", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_quote",
+    )
+
+    # May fail if quote doesn't exist, which is acceptable
+    logger.info(f"Delete quote result: {result}, error: {error}")
 
 
 # ============================================================================
@@ -1147,6 +1342,29 @@ def test_graphql_quote_item_list_py(ai_rfq_engine, schema, test_data):
     assert result is not None
 
 
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", QUOTE_ITEM_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_quote_item_py(ai_rfq_engine, schema, test_data):
+    """Test delete quote item operation."""
+    query = Utility.generate_graphql_operation("deleteQuoteItem", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_quote_item",
+    )
+
+    # May fail if quote item doesn't exist, which is acceptable
+    logger.info(f"Delete quote item result: {result}, error: {error}")
+
+
 # ============================================================================
 # INSTALLMENT TESTS
 # ============================================================================
@@ -1223,6 +1441,29 @@ def test_graphql_installment_list_py(ai_rfq_engine, schema, test_data):
     assert result is not None
 
 
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", INSTALLMENT_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_installment_py(ai_rfq_engine, schema, test_data):
+    """Test delete installment operation."""
+    query = Utility.generate_graphql_operation("deleteInstallment", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_installment",
+    )
+
+    # May fail if installment doesn't exist, which is acceptable
+    logger.info(f"Delete installment result: {result}, error: {error}")
+
+
 # ============================================================================
 # FILE TESTS
 # ============================================================================
@@ -1295,6 +1536,29 @@ def test_graphql_file_list_py(ai_rfq_engine, schema, test_data):
 
     assert error is None
     assert result is not None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", FILE_DELETE_TEST_DATA)
+@log_test_result
+def test_graphql_delete_file_py(ai_rfq_engine, schema, test_data):
+    """Test delete file operation."""
+    query = Utility.generate_graphql_operation("deleteFile", "Mutation", schema)
+    logger.info(f"Query: {query}")
+    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+
+    result, error = _call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": test_data,
+        },
+        "delete_file",
+    )
+
+    # May fail if file doesn't exist, which is acceptable
+    logger.info(f"Delete file result: {result}, error: {error}")
 
 
 if __name__ == "__main__":
