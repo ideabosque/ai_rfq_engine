@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -20,9 +22,9 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.installment import InstallmentListType, InstallmentType
+from .quote import get_quote
 from .utils import _get_quote
 
 
@@ -52,8 +54,8 @@ class InstallmentModel(BaseModel):
     priority = NumberAttribute()
     salesorder_no = UnicodeAttribute(null=True)
     scheduled_date = UTCDateTimeAttribute(null=True)
-    installment_ratio = NumberAttribute(null=True)
-    installment_amount = NumberAttribute(null=True)
+    installment_ratio = NumberAttribute(default=0)
+    installment_amount = NumberAttribute(default=0)
     status = UnicodeAttribute(default="initial")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
@@ -211,6 +213,24 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
         ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
+
+        # Calculate installment_ratio if installment_amount is provided
+        if "installment_amount" in cols and cols["installment_amount"] is not None:
+            try:
+                quote = get_quote(kwargs.get("request_uuid"), quote_uuid)
+                if (
+                    quote.final_total_quote_amount
+                    and quote.final_total_quote_amount > 0
+                ):
+                    cols["installment_ratio"] = (
+                        float(cols["installment_amount"])
+                        / float(quote.final_total_quote_amount)
+                    ) * 100
+            except Exception as e:
+                info.context.get("logger").warning(
+                    f"Failed to calculate installment_ratio: {str(e)}"
+                )
+
         InstallmentModel(
             quote_uuid,
             installment_uuid,
@@ -223,6 +243,22 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
         InstallmentModel.updated_by.set(kwargs["updated_by"]),
         InstallmentModel.updated_at.set(pendulum.now("UTC")),
     ]
+
+    # Calculate installment_ratio if installment_amount is being updated
+    if "installment_amount" in kwargs and kwargs["installment_amount"] is not None:
+        try:
+            quote = get_quote(installment.request_uuid, quote_uuid)
+            if quote.final_total_quote_amount and quote.final_total_quote_amount > 0:
+                calculated_ratio = (
+                    float(kwargs["installment_amount"])
+                    / float(quote.final_total_quote_amount)
+                ) * 100
+                # Override the installment_ratio with calculated value
+                kwargs["installment_ratio"] = calculated_ratio
+        except Exception as e:
+            info.context.get("logger").warning(
+                f"Failed to calculate installment_ratio: {str(e)}"
+            )
 
     # Map of kwargs keys to InstallmentModel attributes
     field_map = {
