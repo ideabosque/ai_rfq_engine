@@ -51,7 +51,7 @@ class InstallmentModel(BaseModel):
     installment_uuid = UnicodeAttribute(range_key=True)
     endpoint_id = UnicodeAttribute()
     request_uuid = UnicodeAttribute()
-    priority = NumberAttribute()
+    priority = NumberAttribute(default=0)
     salesorder_no = UnicodeAttribute(null=True)
     scheduled_date = UTCDateTimeAttribute(null=True)
     installment_ratio = NumberAttribute(default=0)
@@ -85,6 +85,35 @@ def get_installment_count(quote_uuid: str, installment_uuid: str) -> int:
     return InstallmentModel.count(
         quote_uuid, InstallmentModel.installment_uuid == installment_uuid
     )
+
+
+def _calculate_installment_ratio(
+    info: ResolveInfo,
+    request_uuid: str,
+    quote_uuid: str,
+    installment_amount: float,
+) -> float:
+    """
+    Calculate installment_ratio based on installment_amount and quote's final_total_quote_amount.
+
+    Args:
+        info: GraphQL resolve info containing logger
+        request_uuid: The request UUID
+        quote_uuid: The quote UUID
+        installment_amount: The installment amount
+
+    Returns:
+        The calculated installment_ratio as a percentage, or None if calculation fails
+    """
+    try:
+        quote = get_quote(request_uuid, quote_uuid)
+        if quote.final_total_quote_amount and quote.final_total_quote_amount > 0:
+            return (float(installment_amount) / float(quote.final_total_quote_amount)) * 100
+    except Exception as e:
+        info.context.get("logger").warning(
+            f"Failed to calculate installment_ratio: {str(e)}"
+        )
+    return None
 
 
 def get_installment_type(
@@ -216,20 +245,11 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
 
         # Calculate installment_ratio if installment_amount is provided
         if "installment_amount" in cols and cols["installment_amount"] is not None:
-            try:
-                quote = get_quote(kwargs.get("request_uuid"), quote_uuid)
-                if (
-                    quote.final_total_quote_amount
-                    and quote.final_total_quote_amount > 0
-                ):
-                    cols["installment_ratio"] = (
-                        float(cols["installment_amount"])
-                        / float(quote.final_total_quote_amount)
-                    ) * 100
-            except Exception as e:
-                info.context.get("logger").warning(
-                    f"Failed to calculate installment_ratio: {str(e)}"
-                )
+            calculated_ratio = _calculate_installment_ratio(
+                info, kwargs.get("request_uuid"), quote_uuid, cols["installment_amount"]
+            )
+            if calculated_ratio is not None:
+                cols["installment_ratio"] = calculated_ratio
 
         InstallmentModel(
             quote_uuid,
@@ -246,19 +266,12 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
 
     # Calculate installment_ratio if installment_amount is being updated
     if "installment_amount" in kwargs and kwargs["installment_amount"] is not None:
-        try:
-            quote = get_quote(installment.request_uuid, quote_uuid)
-            if quote.final_total_quote_amount and quote.final_total_quote_amount > 0:
-                calculated_ratio = (
-                    float(kwargs["installment_amount"])
-                    / float(quote.final_total_quote_amount)
-                ) * 100
-                # Override the installment_ratio with calculated value
-                kwargs["installment_ratio"] = calculated_ratio
-        except Exception as e:
-            info.context.get("logger").warning(
-                f"Failed to calculate installment_ratio: {str(e)}"
-            )
+        calculated_ratio = _calculate_installment_ratio(
+            info, installment.request_uuid, quote_uuid, kwargs["installment_amount"]
+        )
+        if calculated_ratio is not None:
+            # Override the installment_ratio with calculated value
+            kwargs["installment_ratio"] = calculated_ratio
 
     # Map of kwargs keys to InstallmentModel attributes
     field_map = {
