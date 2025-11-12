@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -20,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
 from .provider_item_batches import resolve_provider_item_batch_list
@@ -153,6 +154,7 @@ def get_item_price_tier_type(
                 ) * (1 + margin_per_uom / 100)
                 provider_item_batches.append(
                     {
+                        "batch_no": provider_item_batch.batch_no,
                         "price_per_uom": provider_item_batch.price_per_uom,
                         "slow_move_item": provider_item_batch.slow_move_item,
                         "in_stock": provider_item_batch.in_stock,
