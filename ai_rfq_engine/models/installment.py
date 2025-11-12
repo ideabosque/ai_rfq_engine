@@ -236,7 +236,6 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
             "priority",
             "salesorder_no",
             "scheduled_date",
-            "installment_ratio",
             "installment_amount",
             "status",
         ]:
@@ -270,8 +269,8 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
             info, installment.request_uuid, quote_uuid, kwargs["installment_amount"]
         )
         if calculated_ratio is not None:
-            # Override the installment_ratio with calculated value
-            kwargs["installment_ratio"] = calculated_ratio
+            # Apply the calculated installment_ratio
+            actions.append(InstallmentModel.installment_ratio.set(calculated_ratio))
 
     # Map of kwargs keys to InstallmentModel attributes
     field_map = {
@@ -279,7 +278,6 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
         "priority": InstallmentModel.priority,
         "salesorder_no": InstallmentModel.salesorder_no,
         "scheduled_date": InstallmentModel.scheduled_date,
-        "installment_ratio": InstallmentModel.installment_ratio,
         "installment_amount": InstallmentModel.installment_amount,
         "status": InstallmentModel.status,
     }
