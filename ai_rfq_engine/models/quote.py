@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -20,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.quote import QuoteListType, QuoteType
 from .installment import resolve_installment_list
@@ -82,10 +83,10 @@ class QuoteModel(BaseModel):
     sales_rep_email = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     shipping_method = UnicodeAttribute(null=True)
-    shipping_amount = NumberAttribute(null=True)
-    total_quote_amount = NumberAttribute()
-    total_quote_discount = NumberAttribute(null=True)
-    final_total_quote_amount = NumberAttribute()
+    shipping_amount = NumberAttribute(default=0)
+    total_quote_amount = NumberAttribute(default=0)
+    total_quote_discount = NumberAttribute(default=0)
+    final_total_quote_amount = NumberAttribute(default=0)
     rounds = NumberAttribute(default=0)
     notes = UnicodeAttribute(null=True)
     status = UnicodeAttribute(default="initial")

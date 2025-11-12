@@ -95,9 +95,6 @@ def _get_request(endpoint_id: str, request_uuid: str) -> Dict[str, Any]:
         "billing_address": request.billing_address,
         "shipping_address": request.shipping_address,
         "items": request.items,
-        "total_amount": request.total_amount,
-        "total_discount": request.total_discount,
-        "final_total_amount": request.final_total_amount,
         "status": request.status,
         "expired_at": request.expired_at,
     }
