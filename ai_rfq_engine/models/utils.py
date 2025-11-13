@@ -118,3 +118,24 @@ def _get_quote(request_uuid: str, quote_uuid: str) -> Dict[str, Any]:
         "notes": quote.notes,
         "status": quote.status,
     }
+
+
+def _validate_item_exists(endpoint_id: str, item_uuid: str) -> bool:
+    """Validate if an item exists in the database."""
+    from .item import get_item_count
+
+    return get_item_count(endpoint_id, item_uuid) > 0
+
+
+def _validate_provider_item_exists(endpoint_id: str, provider_item_uuid: str) -> bool:
+    """Validate if a provider item exists in the database."""
+    from .provider_item import get_provider_item_count
+
+    return get_provider_item_count(endpoint_id, provider_item_uuid) > 0
+
+
+def _validate_batch_exists(provider_item_uuid: str, batch_no: str) -> bool:
+    """Validate if a batch exists for a given provider item."""
+    from .provider_item_batches import get_provider_item_batch_count
+
+    return get_provider_item_batch_count(provider_item_uuid, batch_no) > 0

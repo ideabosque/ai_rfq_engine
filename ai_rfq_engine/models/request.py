@@ -17,6 +17,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -24,12 +26,16 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, convert_decimal_to_number
-from tenacity import retry, stop_after_attempt, wait_exponential
+from silvaengine_utility import Utility
 
 from ..types.request import RequestListType, RequestType
 from .file import resolve_file_list
 from .quote import resolve_quote_list
+from .utils import (
+    _validate_batch_exists,
+    _validate_item_exists,
+    _validate_provider_item_exists,
+)
 
 
 class EmailIndex(LocalSecondaryIndex):
@@ -181,6 +187,48 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
+def _validate_request_items(endpoint_id: str, items: list) -> None:
+    """Validate item_uuid, provider_item_uuid, and batch_no in request items."""
+    if not items:
+        return
+
+    for idx, item in enumerate(items):
+        # Validate item_uuid if provided
+        if "item_uuid" in item and item["item_uuid"]:
+            if not _validate_item_exists(endpoint_id, item["item_uuid"]):
+                raise ValueError(
+                    f"Item at index {idx}: item_uuid '{item['item_uuid']}' does not exist"
+                )
+
+        # Validate provider_items if provided (new format)
+        if "provider_items" in item and item["provider_items"]:
+            for provider_idx, provider_item in enumerate(item["provider_items"]):
+                # Validate provider_item_uuid in provider_items
+                if (
+                    "provider_item_uuid" in provider_item
+                    and provider_item["provider_item_uuid"]
+                ):
+                    if not _validate_provider_item_exists(
+                        endpoint_id, provider_item["provider_item_uuid"]
+                    ):
+                        raise ValueError(
+                            f"Item at index {idx}, provider_item at index {provider_idx}: "
+                            f"provider_item_uuid '{provider_item['provider_item_uuid']}' does not exist"
+                        )
+
+                    # Validate batch_no if provided
+                    if "batch_no" in provider_item and provider_item["batch_no"]:
+                        if not _validate_batch_exists(
+                            provider_item["provider_item_uuid"],
+                            provider_item["batch_no"],
+                        ):
+                            raise ValueError(
+                                f"Item at index {idx}, provider_item at index {provider_idx}: "
+                                f"batch_no '{provider_item['batch_no']}' does not exist for "
+                                f"provider_item_uuid '{provider_item['provider_item_uuid']}'"
+                            )
+
+
 @insert_update_decorator(
     keys={
         "hash_key": "endpoint_id",
@@ -191,8 +239,13 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     type_funct=get_request_type,
 )
 def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    endpoint_id = kwargs.get("endpoint_id")
+    endpoint_id = kwargs.get("endpoint_id") or info.context.get("endpoint_id")
     request_uuid = kwargs.get("request_uuid")
+
+    # Validate items if provided (runs for both insert and update operations)
+    if "items" in kwargs and kwargs["items"]:
+        _validate_request_items(endpoint_id, kwargs["items"])
+
     if kwargs.get("entity") is None:
         cols = {
             "items": [],
