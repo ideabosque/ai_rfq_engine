@@ -24,7 +24,6 @@ from silvaengine_dynamodb_base import (
 from silvaengine_utility import Utility
 
 from ..types.installment import InstallmentListType, InstallmentType
-from .quote import get_quote
 from .utils import _get_quote
 
 
@@ -106,9 +105,9 @@ def _calculate_installment_ratio(
         The calculated installment_ratio as a percentage, or None if calculation fails
     """
     try:
-        quote = get_quote(request_uuid, quote_uuid)
-        if quote.final_total_quote_amount and quote.final_total_quote_amount > 0:
-            return (float(installment_amount) / float(quote.final_total_quote_amount)) * 100
+        quote = _get_quote(request_uuid, quote_uuid)
+        if quote["final_total_quote_amount"] and quote["final_total_quote_amount"] > 0:
+            return (float(installment_amount) / float(quote["final_total_quote_amount"])) * 100
     except Exception as e:
         info.context.get("logger").warning(
             f"Failed to calculate installment_ratio: {str(e)}"

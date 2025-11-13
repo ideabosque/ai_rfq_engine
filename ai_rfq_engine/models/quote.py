@@ -24,7 +24,6 @@ from silvaengine_dynamodb_base import (
 from silvaengine_utility import Utility
 
 from ..types.quote import QuoteListType, QuoteType
-from .installment import resolve_installment_list
 from .utils import _get_request
 
 
@@ -422,6 +421,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
 )
 def delete_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     # Import here to avoid circular dependency
+    from .installment import resolve_installment_list
     from .quote_item import resolve_quote_item_list
 
     # Check if there are any quote items
