@@ -167,7 +167,12 @@ def pytest_collection_modifyitems(
     deselected: list[pytest.Item] = []
 
     for item in items:
-        name_match = not target_lower or target_lower in item.name.lower()
+        # Extract the test function name from the full test name (before the '[' if parameterized)
+        test_func_name = item.name.split("[")[0].lower()
+
+        # Use exact match for function name to avoid matching substrings
+        # e.g., "test_update_quote" won't match "test_update_quote_item"
+        name_match = not target_lower or test_func_name == target_lower
         marker_match = not markers or any(item.get_closest_marker(m) for m in markers)
 
         if name_match and marker_match:

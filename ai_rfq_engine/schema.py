@@ -210,6 +210,7 @@ class Query(ObjectType):
         max_quantity_less_then=Float(required=False),
         min_price=Float(required=False),
         max_price=Float(required=False),
+        status=String(required=False),
     )
 
     discount_rule = Field(
@@ -231,6 +232,7 @@ class Query(ObjectType):
         min_subtotal_less_than=Float(required=False),
         max_discount_percentage=Float(required=False),
         min_discount_percentage=Float(required=False),
+        status=String(required=False),
     )
 
     request = Field(

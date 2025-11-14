@@ -83,10 +83,10 @@ class ItemPriceTierModel(BaseModel):
     segment_uuid = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     quantity_greater_then = NumberAttribute()
-    quantity_less_then = NumberAttribute()
+    quantity_less_then = NumberAttribute(null=True)
     margin_per_uom = NumberAttribute(null=True)
     price_per_uom = NumberAttribute(null=True)
-    status = UnicodeAttribute(default="inreview")
+    status = UnicodeAttribute(default="in_review")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -217,6 +217,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     min_price = kwargs.get("min_price")
     updated_at_gt = kwargs.get("updated_at_gt")
     updated_at_lt = kwargs.get("updated_at_lt")
+    status = kwargs.get("status")
 
     args = []
     inquiry_funct = ItemPriceTierModel.scan
@@ -271,6 +272,8 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
         )
     if max_price and min_price:
         the_filters &= ItemPriceTierModel.price_per_uom.between(min_price, max_price)
+    if status:
+        the_filters &= ItemPriceTierModel.status == status
     if the_filters is not None:
         args.append(the_filters)
 

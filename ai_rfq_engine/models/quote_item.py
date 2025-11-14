@@ -76,7 +76,12 @@ def get_price_per_uom(
 
     # Find the first matching tier based on quantity
     for tier in price_tier_list.item_price_tier_list:
-        if tier.quantity_greater_then <= qty < tier.quantity_less_then:
+        # Match if qty >= lower_bound AND (no upper limit OR qty < upper limit)
+        is_match = tier.quantity_greater_then <= qty and (
+            tier.quantity_less_then is None or qty < tier.quantity_less_then
+        )
+
+        if is_match:
             # If tier has direct price_per_uom, use it
             if tier.price_per_uom is not None:
                 return tier.price_per_uom

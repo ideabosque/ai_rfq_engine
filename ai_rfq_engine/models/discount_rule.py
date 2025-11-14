@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -20,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.discount_rule import DiscountRuleListType, DiscountRuleType
 from .utils import _get_provider_item, _get_segment
@@ -81,9 +82,9 @@ class DiscountRuleModel(BaseModel):
     segment_uuid = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     subtotal_greater_than = NumberAttribute()
-    subtotal_less_than = NumberAttribute()
+    subtotal_less_than = NumberAttribute(null=True)
     max_discount_percentage = NumberAttribute()
-    status = UnicodeAttribute(default="inreview")
+    status = UnicodeAttribute(default="in_review")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -176,6 +177,7 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     min_discount_percentage = kwargs.get("min_discount_percentage")
     updated_at_gt = kwargs.get("updated_at_gt")
     updated_at_lt = kwargs.get("updated_at_lt")
+    status = kwargs.get("status")
 
     args = []
     inquiry_funct = DiscountRuleModel.scan
@@ -232,6 +234,8 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
         the_filters &= DiscountRuleModel.max_discount_percentage.between(
             min_discount_percentage, max_discount_percentage
         )
+    if status:
+        the_filters &= DiscountRuleModel.status == status
     if the_filters is not None:
         args.append(the_filters)
 
