@@ -17,6 +17,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -25,7 +27,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.provider_item import ProviderItemListType, ProviderItemType
 from .discount_rule import resolve_discount_rule_list
@@ -101,7 +102,7 @@ class ProviderItemModel(BaseModel):
     endpoint_id = UnicodeAttribute(hash_key=True)
     provider_item_uuid = UnicodeAttribute(range_key=True)
     item_uuid = UnicodeAttribute()
-    provider_corp_external_id = UnicodeAttribute(null=True)
+    provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
     provider_item_external_id = UnicodeAttribute(null=True)
     base_price_per_uom = NumberAttribute()
     item_spec = MapAttribute(null=True)

@@ -78,7 +78,7 @@ class QuoteModel(BaseModel):
 
     request_uuid = UnicodeAttribute(hash_key=True)
     quote_uuid = UnicodeAttribute(range_key=True)
-    provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXX")
+    provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
     sales_rep_email = UnicodeAttribute()
     endpoint_id = UnicodeAttribute()
     shipping_method = UnicodeAttribute(null=True)

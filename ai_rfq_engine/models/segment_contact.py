@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -20,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.segment_contact import SegmentContactListType, SegmentContactType
 from .utils import _get_segment
@@ -37,11 +38,11 @@ class ConsumerCorpExternalIdIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "consumer_corp_external_id-index"
 
-    segment_uuid = UnicodeAttribute(hash_key=True)
+    endpoint_id = UnicodeAttribute(hash_key=True)
     consumer_corp_external_id = UnicodeAttribute(range_key=True)
 
 
-class ContactUuidIndex(LocalSecondaryIndex):
+class SegmentUuidIndex(LocalSecondaryIndex):
     """
     This class represents a local secondary index
     """
@@ -50,10 +51,10 @@ class ContactUuidIndex(LocalSecondaryIndex):
         billing_mode = "PAY_PER_REQUEST"
         # All attributes are projected
         projection = AllProjection()
-        index_name = "contact_uuid-index"
+        index_name = "segment_uuid-index"
 
-    segment_uuid = UnicodeAttribute(hash_key=True)
-    contact_uuid = UnicodeAttribute(range_key=True)
+    endpoint_id = UnicodeAttribute(hash_key=True)
+    segment_uuid = UnicodeAttribute(range_key=True)
 
 
 class UpdateAtIndex(LocalSecondaryIndex):
@@ -67,7 +68,7 @@ class UpdateAtIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "updated_at-index"
 
-    segment_uuid = UnicodeAttribute(hash_key=True)
+    endpoint_id = UnicodeAttribute(hash_key=True)
     updated_at = UnicodeAttribute(range_key=True)
 
 
@@ -75,15 +76,15 @@ class SegmentContactModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-segment_contacts"
 
-    segment_uuid = UnicodeAttribute(hash_key=True)
+    endpoint_id = UnicodeAttribute(hash_key=True)
     email = UnicodeAttribute(range_key=True)
+    segment_uuid = UnicodeAttribute()
     contact_uuid = UnicodeAttribute(null=True)
-    consumer_corp_external_id = UnicodeAttribute(null=True)
-    endpoint_id = UnicodeAttribute()
+    consumer_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
-    contact_uuid_index = ContactUuidIndex()
+    segment_uuid_index = SegmentUuidIndex()
     consumer_corp_external_id_index = ConsumerCorpExternalIdIndex()
     updated_at_index = UpdateAtIndex()
 
@@ -102,12 +103,12 @@ def create_segment_contact_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-def get_segment_contact(segment_uuid: str, email: str) -> SegmentContactModel:
-    return SegmentContactModel.get(segment_uuid, email)
+def get_segment_contact(endpoint_id: str, email: str) -> SegmentContactModel:
+    return SegmentContactModel.get(endpoint_id, email)
 
 
-def get_segment_contact_count(segment_uuid: str, email: str) -> int:
-    return SegmentContactModel.count(segment_uuid, SegmentContactModel.email == email)
+def get_segment_contact_count(endpoint_id: str, email: str) -> int:
+    return SegmentContactModel.count(endpoint_id, SegmentContactModel.email == email)
 
 
 def get_segment_contact_type(
@@ -131,10 +132,28 @@ def get_segment_contact_type(
 def resolve_segment_contact(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> SegmentContactType:
-    return get_segment_contact_type(
-        info,
-        get_segment_contact(kwargs["segment_uuid"], kwargs["email"]),
-    )
+    endpoint_id = info.context["endpoint_id"]
+    segment_uuid = kwargs.get("segment_uuid")
+    email = kwargs["email"]
+
+    # Query using segment_uuid_index if segment_uuid is provided
+    if segment_uuid:
+        results = list(
+            SegmentContactModel.segment_uuid_index.query(
+                endpoint_id,
+                SegmentContactModel.segment_uuid == segment_uuid,
+                SegmentContactModel.email == email,
+            )
+        )
+        if not results:
+            raise Exception(
+                f"SegmentContact not found for segment_uuid={segment_uuid}, email={email}"
+            )
+        segment_contact = results[0]
+    else:
+        segment_contact = get_segment_contact(endpoint_id, email)
+
+    return get_segment_contact_type(info, segment_contact)
 
 
 @monitor_decorator
@@ -159,10 +178,14 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     args = []
     inquiry_funct = SegmentContactModel.scan
     count_funct = SegmentContactModel.count
-    if segment_uuid:
-        args = [segment_uuid, None]
-        inquiry_funct = SegmentContactModel.updated_at_index.query
-        count_funct = SegmentContactModel.updated_at_index.count
+
+    # Query by endpoint_id (hash key)
+    if endpoint_id:
+        args = [endpoint_id, None]
+        inquiry_funct = SegmentContactModel.query
+        count_funct = SegmentContactModel.count
+
+        # Use appropriate index based on query parameters
         if consumer_corp_external_id:
             count_funct = SegmentContactModel.consumer_corp_external_id_index.count
             args[1] = (
@@ -170,16 +193,16 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
                 == consumer_corp_external_id
             )
             inquiry_funct = SegmentContactModel.consumer_corp_external_id_index.query
-        elif contact_uuid:
-            count_funct = SegmentContactModel.contact_uuid_index.count
-            args[1] = SegmentContactModel.contact_uuid == contact_uuid
-            inquiry_funct = SegmentContactModel.contact_uuid_index.query
+        elif segment_uuid:
+            count_funct = SegmentContactModel.segment_uuid_index.count
+            args[1] = SegmentContactModel.segment_uuid == segment_uuid
+            inquiry_funct = SegmentContactModel.segment_uuid_index.query
 
     the_filters = None  # We can add filters for the query
     if email:
         the_filters &= SegmentContactModel.email == email
-    if endpoint_id:
-        the_filters &= SegmentContactModel.endpoint_id == endpoint_id
+    if contact_uuid:
+        the_filters &= SegmentContactModel.contact_uuid == contact_uuid
     if the_filters is not None:
         args.append(the_filters)
 
@@ -188,7 +211,7 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 
 @insert_update_decorator(
     keys={
-        "hash_key": "segment_uuid",
+        "hash_key": "endpoint_id",
         "range_key": "email",
     },
     range_key_required=True,
@@ -197,11 +220,11 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     type_funct=get_segment_contact_type,
 )
 def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    segment_uuid = kwargs.get("segment_uuid")
+    endpoint_id = kwargs.get("endpoint_id") or info.context.get("endpoint_id")
     email = kwargs.get("email")
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "segment_uuid": kwargs.get("segment_uuid"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
@@ -210,7 +233,7 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
             if key in kwargs:
                 cols[key] = kwargs[key]
         SegmentContactModel(
-            segment_uuid,
+            endpoint_id,
             email,
             **cols,
         ).save()
@@ -240,7 +263,7 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 
 @delete_decorator(
     keys={
-        "hash_key": "segment_uuid",
+        "hash_key": "endpoint_id",
         "range_key": "email",
     },
     model_funct=get_segment_contact,

@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -20,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.segment import SegmentListType, SegmentType
 from .segment_contact import resolve_segment_contact_list
@@ -62,7 +63,7 @@ class SegmentModel(BaseModel):
 
     endpoint_id = UnicodeAttribute(hash_key=True)
     segment_uuid = UnicodeAttribute(range_key=True)
-    provider_corp_external_id = UnicodeAttribute(null=True)
+    provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
     segment_name = UnicodeAttribute()
     segment_description = UnicodeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
