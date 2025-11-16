@@ -156,6 +156,7 @@ def get_item_price_tier_type(
                     {
                         "batch_no": provider_item_batch.batch_no,
                         "price_per_uom": provider_item_batch.price_per_uom,
+                        "expired_at": provider_item_batch.expired_at,
                         "slow_move_item": provider_item_batch.slow_move_item,
                         "in_stock": provider_item_batch.in_stock,
                     }
