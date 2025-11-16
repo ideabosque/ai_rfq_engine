@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,6 +20,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
 from .provider_item_batches import resolve_provider_item_batch_list
@@ -210,10 +209,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     provider_item_uuid = kwargs.get("provider_item_uuid")
     segment_uuid = kwargs.get("segment_uuid")
     endpoint_id = info.context["endpoint_id"]
-    max_quantity_greater_then = kwargs.get("max_quantity_greater_then")
-    min_quantity_greater_then = kwargs.get("min_quantity_greater_then")
-    max_quantity_less_then = kwargs.get("max_quantity_less_then")
-    min_quantity_less_then = kwargs.get("min_quantity_less_then")
+    quantity_value = kwargs.get("quantity_value")
     max_price = kwargs.get("max_price")
     min_price = kwargs.get("min_price")
     updated_at_gt = kwargs.get("updated_at_gt")
@@ -263,13 +259,15 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
         and args[1] != (ItemPriceTierModel.segment_uuid == segment_uuid)
     ):
         the_filters &= ItemPriceTierModel.segment_uuid == segment_uuid
-    if max_quantity_greater_then and min_quantity_greater_then:
-        the_filters &= ItemPriceTierModel.quantity_greater_then.between(
-            min_quantity_greater_then, max_quantity_greater_then
-        )
-    if max_quantity_less_then and min_quantity_less_then:
-        the_filters &= ItemPriceTierModel.quantity_less_then.between(
-            min_quantity_less_then, max_quantity_less_then
+
+    # Find the price tier that matches a specific quantity value
+    # A tier matches when: quantity_greater_then <= quantity_value < quantity_less_then
+    if quantity_value is not None:
+        the_filters &= ItemPriceTierModel.quantity_greater_then <= quantity_value
+        # Handle cases where quantity_less_then might be null (no upper limit)
+        the_filters &= (
+            ItemPriceTierModel.quantity_less_then.does_not_exist() |
+            (ItemPriceTierModel.quantity_less_then > quantity_value)
         )
     if max_price and min_price:
         the_filters &= ItemPriceTierModel.price_per_uom.between(min_price, max_price)

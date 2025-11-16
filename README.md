@@ -300,18 +300,23 @@ mutation {
 }
 
 # Add Quote Items
+# Note: price_per_uom is automatically calculated from item price tiers
+# based on qty, segment_uuid, and provider_item_uuid
 mutation {
   insertUpdateQuoteItem(
     quoteUuid: "quote_456"
     quoteItemUuid: "qi_789"
     providerItemUuid: "pi_123"
     itemUuid: "123456789"
-    pricePerUom: 25.50
+    segmentUuid: "seg_123"
     qty: 1000
+    requestUuid: "req_123"
     updatedBy: "sales@supplier.com"
   ) {
     quoteItem {
       quoteItemUuid
+      pricePerUom
+      qty
       subtotal
       finalSubtotal
     }
@@ -329,12 +334,35 @@ mutation {
     quantityGreaterThen: 100
     quantityLessThen: 500
     marginPerUom: 0.15
+    status: "active"
     updatedBy: "admin@company.com"
   ) {
     itemPriceTier {
       itemPriceTierUuid
       marginPerUom
+      status
     }
+  }
+}
+
+# Query Price Tiers with Quantity Filtering
+# The quantity_value parameter efficiently filters tiers at the database level
+query {
+  itemPriceTierList(
+    itemUuid: "123456789"
+    providerItemUuid: "pi_123"
+    segmentUuid: "seg_123"
+    quantityValue: 250.0
+    status: "active"
+  ) {
+    itemPriceTierList {
+      itemPriceTierUuid
+      quantityGreaterThen
+      quantityLessThen
+      marginPerUom
+      pricePerUom
+    }
+    total
   }
 }
 
@@ -345,12 +373,34 @@ mutation {
     discountRuleUuid: "discount_001"
     subtotalGreaterThan: 10000
     maxDiscountPercentage: 0.10
+    status: "active"
     updatedBy: "admin@company.com"
   ) {
     discountRule {
       discountRuleUuid
       maxDiscountPercentage
+      status
     }
+  }
+}
+
+# Query Discount Rules with Subtotal Filtering
+# The subtotal_value parameter efficiently filters rules at the database level
+query {
+  discountRuleList(
+    itemUuid: "123456789"
+    providerItemUuid: "pi_123"
+    segmentUuid: "seg_123"
+    subtotalValue: 12500.0
+    status: "active"
+  ) {
+    discountRuleList {
+      discountRuleUuid
+      subtotalGreaterThan
+      subtotalLessThan
+      maxDiscountPercentage
+    }
+    total
   }
 }
 ```
@@ -799,6 +849,23 @@ The API returns standard GraphQL errors with additional context:
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🔄 Changelog
+
+### Recent Updates - Performance Optimization
+
+#### Enhanced
+- **Price Tier Filtering**: Optimized item price tier queries to use database-level filtering with `quantityValue` parameter instead of application-level filtering. This significantly improves performance when querying price tiers for specific quantities.
+- **Discount Rule Filtering**: Enhanced discount rule queries to use database-level filtering with `subtotalValue` parameter for more efficient rule matching.
+- **Quote Item Creation**: Improved automatic price calculation in quote items to leverage the optimized tier filtering for better performance.
+
+#### Changed
+- **Item Price Tier Queries**: The `itemPriceTierList` query now supports `quantityValue` parameter that filters tiers at the database level, returning only tiers that match the specified quantity.
+- **Discount Rule Queries**: The `discountRuleList` query now supports `subtotalValue` parameter that filters rules at the database level, returning only rules that match the specified subtotal.
+- **Quote Item Mutations**: Quote item creation now automatically calculates `pricePerUom` from item price tiers based on quantity, segment, and provider item.
+
+#### Benefits
+- Reduced application memory usage by filtering at the database layer
+- Faster query response times for pricing lookups
+- More scalable pricing engine for high-volume quote generation
 
 ### Version 0.0.1 - Initial Release
 

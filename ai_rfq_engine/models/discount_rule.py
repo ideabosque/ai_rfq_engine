@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,6 +20,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.discount_rule import DiscountRuleListType, DiscountRuleType
 from .utils import _get_provider_item, _get_segment
@@ -169,10 +168,7 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     provider_item_uuid = kwargs.get("provider_item_uuid")
     segment_uuid = kwargs.get("segment_uuid")
     endpoint_id = info.context["endpoint_id"]
-    max_subtotal_greater_than = kwargs.get("max_subtotal_greater_than")
-    min_subtotal_greater_than = kwargs.get("min_subtotal_greater_than")
-    max_subtotal_less_than = kwargs.get("max_subtotal_less_than")
-    min_subtotal_less_than = kwargs.get("min_subtotal_less_than")
+    subtotal_value = kwargs.get("subtotal_value")
     max_discount_percentage = kwargs.get("max_discount_percentage")
     min_discount_percentage = kwargs.get("min_discount_percentage")
     updated_at_gt = kwargs.get("updated_at_gt")
@@ -222,13 +218,15 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
         and args[1] != (DiscountRuleModel.segment_uuid == segment_uuid)
     ):
         the_filters &= DiscountRuleModel.segment_uuid == segment_uuid
-    if max_subtotal_greater_than and min_subtotal_greater_than:
-        the_filters &= DiscountRuleModel.subtotal_greater_than.between(
-            min_subtotal_greater_than, max_subtotal_greater_than
-        )
-    if max_subtotal_less_than and min_subtotal_less_than:
-        the_filters &= DiscountRuleModel.subtotal_less_than.between(
-            min_subtotal_less_than, max_subtotal_less_than
+
+    # Find the discount tier that matches a specific subtotal value
+    # A tier matches when: subtotal_greater_than <= subtotal_value < subtotal_less_than
+    if subtotal_value is not None:
+        the_filters &= DiscountRuleModel.subtotal_greater_than <= subtotal_value
+        # Handle cases where subtotal_less_than might be null (no upper limit)
+        the_filters &= (
+            DiscountRuleModel.subtotal_less_than.does_not_exist() |
+            (DiscountRuleModel.subtotal_less_than > subtotal_value)
         )
     if max_discount_percentage and min_discount_percentage:
         the_filters &= DiscountRuleModel.max_discount_percentage.between(

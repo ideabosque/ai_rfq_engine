@@ -60,42 +60,38 @@ def get_price_per_uom(
     """
     from .item_price_tier import resolve_item_price_tier_list
 
-    # Build query parameters with required filters
+    # Build query parameters with required filters and quantity matching
     query_params = {
         "item_uuid": item_uuid,
         "segment_uuid": segment_uuid,
         "provider_item_uuid": provider_item_uuid,
+        "quantity_value": qty,  # Use new efficient tier matching
         "status": "active",
     }
 
-    # Retrieve price tiers
+    # Retrieve price tiers - now filtered by quantity_value at the database level
     price_tier_list = resolve_item_price_tier_list(info, **query_params)
 
     if price_tier_list.total == 0:
         return None
 
-    # Find the first matching tier based on quantity
-    for tier in price_tier_list.item_price_tier_list:
-        # Match if qty >= lower_bound AND (no upper limit OR qty < upper limit)
-        is_match = tier.quantity_greater_then <= qty and (
-            tier.quantity_less_then is None or qty < tier.quantity_less_then
-        )
+    # Get the first matching tier (database already filtered by quantity)
+    tier = price_tier_list.item_price_tier_list[0]
 
-        if is_match:
-            # If tier has direct price_per_uom, use it
-            if tier.price_per_uom is not None:
-                return tier.price_per_uom
+    # If tier has direct price_per_uom, use it
+    if tier.price_per_uom is not None:
+        return tier.price_per_uom
 
-            # If tier has margin_per_uom with batches, find the matching batch price
-            if hasattr(tier, "provider_item_batches") and tier.provider_item_batches:
-                # If batch_no is specified, find that specific batch
-                if batch_no:
-                    for batch in tier.provider_item_batches:
-                        if batch["batch_no"] == batch_no:
-                            return batch["price_per_uom"]
+    # If tier has margin_per_uom with batches, find the matching batch price
+    if hasattr(tier, "provider_item_batches") and tier.provider_item_batches:
+        # If batch_no is specified, find that specific batch
+        if batch_no:
+            for batch in tier.provider_item_batches:
+                if batch["batch_no"] == batch_no:
+                    return batch["price_per_uom"]
 
-                # Otherwise, return the first available batch price
-                return tier.provider_item_batches[0]["price_per_uom"]
+        # Otherwise, return the first available batch price
+        return tier.provider_item_batches[0]["price_per_uom"]
 
     return None
 

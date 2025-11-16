@@ -116,11 +116,13 @@ AI_RFQ_TEST_MARKERS=integration pytest ai_rfq_engine/tests/test_ai_rfq_engine.py
 
 ### Item Price Tier Test Data
 - **Purpose**: Test tiered pricing rules
-- **Key Fields**: itemPriceTierUuid, quantityGreaterThen, quantityLessThen, marginPerUom
+- **Key Fields**: itemPriceTierUuid, quantityGreaterThen, quantityLessThen, marginPerUom, pricePerUom, status
+- **Note**: The system now supports efficient database-level filtering using `quantityValue` parameter in queries, which automatically returns only the matching tier for a given quantity
 
 ### Discount Rule Test Data
 - **Purpose**: Test discount calculation rules
-- **Key Fields**: discountRuleUuid, subtotalGreaterThan, subtotalLessThan, maxDiscountPercentage
+- **Key Fields**: discountRuleUuid, subtotalGreaterThan, subtotalLessThan, maxDiscountPercentage, status
+- **Note**: The system now supports efficient database-level filtering using `subtotalValue` parameter in queries, which automatically returns only the matching rule for a given subtotal
 
 ### Request Test Data
 - **Purpose**: Test RFQ request creation and management
@@ -132,7 +134,8 @@ AI_RFQ_TEST_MARKERS=integration pytest ai_rfq_engine/tests/test_ai_rfq_engine.py
 
 ### Quote Item Test Data
 - **Purpose**: Test individual items within quotes
-- **Key Fields**: quoteItemUuid, quoteUuid, itemUuid, pricePerUom, qty, subtotal
+- **Key Fields**: quoteItemUuid, quoteUuid, itemUuid, providerItemUuid, segmentUuid, requestUuid, qty, pricePerUom (auto-calculated), subtotal (auto-calculated), finalSubtotal (auto-calculated)
+- **Note**: When creating quote items, `pricePerUom` is automatically calculated from item price tiers based on the quantity, segment, and provider item. The `subtotal` and `finalSubtotal` are also automatically calculated
 
 ### Installment Test Data
 - **Purpose**: Test payment installment schedules
