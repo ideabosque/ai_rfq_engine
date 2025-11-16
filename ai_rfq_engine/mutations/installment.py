@@ -20,6 +20,7 @@ class InsertUpdateInstallment(Mutation):
         request_uuid = String(required=False)
         priority = Int(required=False)
         salesorder_no = String(required=False)
+        payment_method = String(required=False)
         scheduled_date = DateTime(required=False)
         installment_amount = Float(required=False)
         status = String(required=False)

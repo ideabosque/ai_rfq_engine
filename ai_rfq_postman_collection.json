@@ -81,14 +81,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Simple ping query to test API connectivity"
           },
@@ -123,14 +117,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update an item"
           },
@@ -160,14 +148,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific item by UUID"
           },
@@ -197,14 +179,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List items with optional filters"
           },
@@ -234,14 +210,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete an item by UUID"
           },
@@ -276,14 +246,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update a segment"
           },
@@ -313,14 +277,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific segment by UUID"
           },
@@ -350,14 +308,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List segments with optional filters"
           },
@@ -387,14 +339,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete a segment by UUID"
           },
@@ -429,14 +375,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update a segment contact"
           },
@@ -466,14 +406,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific segment contact"
           },
@@ -503,14 +437,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List segment contacts with optional filters"
           },
@@ -540,14 +468,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete a segment contact"
           },
@@ -582,14 +504,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update a provider item"
           },
@@ -619,14 +535,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific provider item by UUID"
           },
@@ -656,14 +566,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List provider items with optional filters"
           },
@@ -693,14 +597,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete a provider item by UUID"
           },
@@ -735,14 +633,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update a provider item batch"
           },
@@ -772,14 +664,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific provider item batch"
           },
@@ -809,14 +695,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List provider item batches with optional filters"
           },
@@ -846,14 +726,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete a provider item batch"
           },
@@ -888,14 +762,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update an item price tier"
           },
@@ -925,14 +793,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific item price tier"
           },
@@ -962,14 +824,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List item price tiers with optional filters"
           },
@@ -999,14 +855,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete an item price tier"
           },
@@ -1041,14 +891,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update a discount rule"
           },
@@ -1078,14 +922,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific discount rule"
           },
@@ -1115,14 +953,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List discount rules with optional filters"
           },
@@ -1152,14 +984,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete a discount rule"
           },
@@ -1194,14 +1020,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update a request"
           },
@@ -1231,14 +1051,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific request by UUID"
           },
@@ -1268,14 +1082,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List requests with optional filters"
           },
@@ -1305,14 +1113,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete a request by UUID"
           },
@@ -1347,14 +1149,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update a quote"
           },
@@ -1384,14 +1180,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific quote"
           },
@@ -1421,14 +1211,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List quotes with optional filters"
           },
@@ -1458,14 +1242,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete a quote"
           },
@@ -1500,14 +1278,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update a quote item"
           },
@@ -1537,14 +1309,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific quote item"
           },
@@ -1574,14 +1340,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List quote items with optional filters"
           },
@@ -1611,14 +1371,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete a quote item"
           },
@@ -1647,20 +1401,14 @@
             "body": {
               "mode": "graphql",
               "graphql": {
-                "query": "mutation InsertUpdateInstallment($quoteUuid: String!, $installmentUuid: String, $requestUuid: String, $priority: Int, $salesorderNo: String, $scheduledDate: DateTime, $installmentAmount: Float, $status: String, $updatedBy: String!) {\n  insertUpdateInstallment(\n    quoteUuid: $quoteUuid, installmentUuid: $installmentUuid, requestUuid: $requestUuid, priority: $priority, salesorderNo: $salesorderNo, scheduledDate: $scheduledDate, installmentAmount: $installmentAmount, status: $status, updatedBy: $updatedBy\n  ) {\n    installment {\n      quote\n      installmentUuid\n      priority\n      salesorderNo\n      scheduledDate\n      installmentRatio\n      installmentAmount\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
-                "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"installmentUuid\": \"52848497367965515904\",\n  \"requestUuid\": \"65747032911835578496\",\n  \"priority\": 0,\n  \"salesorderNo\": \"SO-XXXX\",\n  \"scheduledDate\": \"2025-04-06T00:44:50.625413+0000\",\n  \"installmentAmount\": 100.23,\n  \"updatedBy\": \"Bibo W.\"\n}"
+                "query": "mutation InsertUpdateInstallment($quoteUuid: String!, $installmentUuid: String, $requestUuid: String, $priority: Int, $salesorderNo: String, $paymentMethod: String, $scheduledDate: DateTime, $installmentAmount: Float, $status: String, $updatedBy: String!) {\n  insertUpdateInstallment(\n    quoteUuid: $quoteUuid, installmentUuid: $installmentUuid, requestUuid: $requestUuid, priority: $priority, salesorderNo: $salesorderNo, paymentMethod: $paymentMethod, scheduledDate: $scheduledDate, installmentAmount: $installmentAmount, status: $status, updatedBy: $updatedBy\n  ) {\n    installment {\n      quote\n      installmentUuid\n      priority\n      salesorderNo\n      paymentMethod\n      scheduledDate\n      installmentRatio\n      installmentAmount\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"installmentUuid\": \"52848497367965515904\",\n  \"requestUuid\": \"65747032911835578496\",\n  \"priority\": 0,\n  \"salesorderNo\": \"SO-XXXX\",\n  \"paymentMethod\": \"credit_card\",\n  \"scheduledDate\": \"2025-04-06T00:44:50.625413+0000\",\n  \"installmentAmount\": 100.23,\n  \"updatedBy\": \"Bibo W.\"\n}"
               }
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update an installment"
           },
@@ -1684,20 +1432,14 @@
             "body": {
               "mode": "graphql",
               "graphql": {
-                "query": "query GetInstallment($quoteUuid: String!, $installmentUuid: String!) {\n  installment(quoteUuid: $quoteUuid, installmentUuid: $installmentUuid) {\n    quote\n    installmentUuid\n    endpointId\n    priority\n    salesorderNo\n    scheduledDate\n    installmentRatio\n    installmentAmount\n    status\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
+                "query": "query GetInstallment($quoteUuid: String!, $installmentUuid: String!) {\n  installment(quoteUuid: $quoteUuid, installmentUuid: $installmentUuid) {\n    quote\n    installmentUuid\n    endpointId\n    priority\n    salesorderNo\n    paymentMethod\n    scheduledDate\n    installmentRatio\n    installmentAmount\n    status\n    createdAt\n    updatedAt\n    updatedBy\n  }\n}",
                 "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"installmentUuid\": \"52848497367965515904\"\n}"
               }
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific installment"
           },
@@ -1721,20 +1463,14 @@
             "body": {
               "mode": "graphql",
               "graphql": {
-                "query": "query ListInstallments($quoteUuid: String, $limit: Int, $pageNumber: Int) {\n  installmentList(quoteUuid: $quoteUuid, limit: $limit, pageNumber: $pageNumber) {\n    installmentList {\n      quote\n      installmentUuid\n      endpointId\n      priority\n      salesorderNo\n      scheduledDate\n      installmentRatio\n      installmentAmount\n      status\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageSize\n    pageNumber\n    total\n  }\n}",
+                "query": "query ListInstallments($quoteUuid: String, $limit: Int, $pageNumber: Int) {\n  installmentList(quoteUuid: $quoteUuid, limit: $limit, pageNumber: $pageNumber) {\n    installmentList {\n      quote\n      installmentUuid\n      endpointId\n      priority\n      salesorderNo\n      paymentMethod\n      scheduledDate\n      installmentRatio\n      installmentAmount\n      status\n      createdAt\n      updatedAt\n      updatedBy\n    }\n    pageSize\n    pageNumber\n    total\n  }\n}",
                 "variables": "{\n  \"quoteUuid\": \"25537170259049463936\",\n  \"limit\": 10,\n  \"pageNumber\": 0\n}"
               }
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List installments with optional filters"
           },
@@ -1764,14 +1500,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete an installment"
           },
@@ -1806,14 +1536,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Create or update a file record"
           },
@@ -1843,14 +1567,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Get a specific file record"
           },
@@ -1880,14 +1598,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "List file records with optional filters"
           },
@@ -1917,14 +1629,8 @@
             },
             "url": {
               "raw": "{{api_url}}/{{area}}/{{endpoint_id}}/{{funct}}",
-              "host": [
-                "{{api_url}}"
-              ],
-              "path": [
-                "{{area}}",
-                "{{endpoint_id}}",
-                "{{funct}}"
-              ]
+              "host": ["{{api_url}}"],
+              "path": ["{{area}}", "{{endpoint_id}}", "{{funct}}"]
             },
             "description": "Delete a file record"
           },

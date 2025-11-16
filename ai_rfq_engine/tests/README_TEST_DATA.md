@@ -136,7 +136,8 @@ AI_RFQ_TEST_MARKERS=integration pytest ai_rfq_engine/tests/test_ai_rfq_engine.py
 
 ### Installment Test Data
 - **Purpose**: Test payment installment schedules
-- **Key Fields**: installmentUuid, quoteUuid, scheduledDate, installmentRatio, installmentAmount
+- **Key Fields**: installmentUuid, quoteUuid, scheduledDate, installmentAmount, paymentMethod
+- **Note**: The `installmentRatio` is automatically calculated based on `installmentAmount` and the quote's `finalTotalQuoteAmount`. It cannot be manually set via mutation.
 
 ### File Test Data
 - **Purpose**: Test file attachments to requests

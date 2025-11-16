@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,6 +20,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.installment import InstallmentListType, InstallmentType
 from .utils import _get_quote
@@ -52,10 +51,11 @@ class InstallmentModel(BaseModel):
     request_uuid = UnicodeAttribute()
     priority = NumberAttribute(default=0)
     salesorder_no = UnicodeAttribute(null=True)
+    payment_method = UnicodeAttribute()
     scheduled_date = UTCDateTimeAttribute(null=True)
     installment_ratio = NumberAttribute(default=0)
     installment_amount = NumberAttribute(default=0)
-    status = UnicodeAttribute(default="initial")
+    status = UnicodeAttribute(default="pending")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -107,7 +107,9 @@ def _calculate_installment_ratio(
     try:
         quote = _get_quote(request_uuid, quote_uuid)
         if quote["final_total_quote_amount"] and quote["final_total_quote_amount"] > 0:
-            return (float(installment_amount) / float(quote["final_total_quote_amount"])) * 100
+            return (
+                float(installment_amount) / float(quote["final_total_quote_amount"])
+            ) * 100
     except Exception as e:
         info.context.get("logger").warning(
             f"Failed to calculate installment_ratio: {str(e)}"
@@ -234,6 +236,7 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
         for key in [
             "priority",
             "salesorder_no",
+            "payment_method",
             "scheduled_date",
             "installment_amount",
             "status",
@@ -276,6 +279,7 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
         "request_uuid": InstallmentModel.request_uuid,
         "priority": InstallmentModel.priority,
         "salesorder_no": InstallmentModel.salesorder_no,
+        "payment_method": InstallmentModel.payment_method,
         "scheduled_date": InstallmentModel.scheduled_date,
         "installment_amount": InstallmentModel.installment_amount,
         "status": InstallmentModel.status,
