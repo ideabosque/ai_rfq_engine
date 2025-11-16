@@ -498,8 +498,8 @@
             "body": {
               "mode": "graphql",
               "graphql": {
-                "query": "mutation InsertUpdateProviderItem($providerItemUuid: String, $itemUuid: String!, $basePricePerUom: Float!, $itemSpec: JSON, $updatedBy: String!) {\n  insertUpdateProviderItem(\n    providerItemUuid: $providerItemUuid, itemUuid: $itemUuid, basePricePerUom: $basePricePerUom, itemSpec: $itemSpec, updatedBy: $updatedBy\n  ) {\n    providerItem {\n      item\n      providerItemUuid\n      basePricePerUom\n      itemSpec\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
-                "variables": "{\n  \"providerItemUuid\": \"06812599115120132224\",\n  \"itemUuid\": \"89151803645574004864\",\n  \"basePricePerUom\": 100.12,\n  \"itemSpec\": {},\n  \"updatedBy\": \"Bibo W.\"\n}"
+                "query": "mutation InsertUpdateProviderItem($providerItemUuid: String, $itemUuid: String, $providerCorpExternalId: String, $providerItemExternalId: String, $basePricePerUom: Float, $itemSpec: JSON, $updatedBy: String!) {\n  insertUpdateProviderItem(\n    providerItemUuid: $providerItemUuid, itemUuid: $itemUuid, providerCorpExternalId: $providerCorpExternalId, providerItemExternalId: $providerItemExternalId, basePricePerUom: $basePricePerUom, itemSpec: $itemSpec, updatedBy: $updatedBy\n  ) {\n    providerItem {\n      item\n      providerItemUuid\n      providerCorpExternalId\n      providerItemExternalId\n      basePricePerUom\n      itemSpec\n      createdAt\n      updatedAt\n      updatedBy\n    }\n  }\n}",
+                "variables": "{\n  \"providerItemUuid\": \"06812599115120132224\",\n  \"itemUuid\": \"89151803645574004864\",\n  \"providerCorpExternalId\": \"PROVIDER-001\",\n  \"providerItemExternalId\": \"PROV-ITEM-001\",\n  \"basePricePerUom\": 100.12,\n  \"itemSpec\": {},\n  \"updatedBy\": \"Bibo W.\"\n}"
               }
             },
             "url": {
