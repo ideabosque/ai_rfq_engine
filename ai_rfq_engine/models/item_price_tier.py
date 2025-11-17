@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -20,7 +22,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
 from .provider_item_batches import resolve_provider_item_batch_list
@@ -169,7 +170,7 @@ def get_item_price_tier_type(
             }
         )
 
-        if provider_item_batch_list.total > 0:
+        if len(provider_item_batches) > 0:
             item_price_tier["provider_item_batches"] = provider_item_batches
 
         item_price_tier.pop("endpoint_id")
@@ -205,6 +206,10 @@ def resolve_item_price_tier(
     type_funct=get_item_price_tier_type,
 )
 def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
+    """
+    Internal helper that builds the query for item price tiers.
+    Used by resolve_item_price_tier_list and private functions.
+    """
     item_uuid = kwargs.get("item_uuid")
     provider_item_uuid = kwargs.get("provider_item_uuid")
     segment_uuid = kwargs.get("segment_uuid")
@@ -215,6 +220,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     updated_at_gt = kwargs.get("updated_at_gt")
     updated_at_lt = kwargs.get("updated_at_lt")
     status = kwargs.get("status")
+    is_it_last_tier = kwargs.get("is_it_last_tier", False)
 
     args = []
     inquiry_funct = ItemPriceTierModel.scan
@@ -265,18 +271,123 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     if quantity_value is not None:
         the_filters &= ItemPriceTierModel.quantity_greater_then <= quantity_value
         # Handle cases where quantity_less_then might be null (no upper limit)
-        the_filters &= (
-            ItemPriceTierModel.quantity_less_then.does_not_exist() |
-            (ItemPriceTierModel.quantity_less_then > quantity_value)
+        the_filters &= ItemPriceTierModel.quantity_less_then.does_not_exist() | (
+            ItemPriceTierModel.quantity_less_then > quantity_value
         )
     if max_price and min_price:
         the_filters &= ItemPriceTierModel.price_per_uom.between(min_price, max_price)
     if status:
         the_filters &= ItemPriceTierModel.status == status
+
+    # Filter for tiers where quantity_less_then is None or doesn't exist
+    if is_it_last_tier:
+        the_filters &= ItemPriceTierModel.quantity_less_then.does_not_exist() | (
+            ItemPriceTierModel.quantity_less_then == None
+        )
+
     if the_filters is not None:
         args.append(the_filters)
 
     return inquiry_funct, count_funct, args
+
+
+def _get_previous_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
+    """
+    Retrieves and validates the previous tier for a new tier insertion.
+
+    Checks:
+    1. quantity_greater_then is provided and >= 0
+    2. provider_item_uuid and segment_uuid are provided
+    3. If a previous tier exists (quantity_less_then = None), the new tier's
+       quantity_greater_then must be greater than the previous tier's quantity_greater_then
+
+    Args:
+        info: GraphQL resolve info
+        kwargs: Dictionary containing:
+            - item_uuid: The item UUID
+            - quantity_greater_then: The new tier's lower bound
+            - provider_item_uuid: Provider item UUID
+            - segment_uuid: Segment UUID
+
+    Returns:
+        The previous tier if one exists and validation passes, None otherwise
+
+    Raises:
+        ValueError: If validation fails for any of the checks
+    """
+
+    item_uuid = kwargs.get("item_uuid")
+    quantity_greater_then = kwargs.get("quantity_greater_then")
+    provider_item_uuid = kwargs.get("provider_item_uuid")
+    segment_uuid = kwargs.get("segment_uuid")
+
+    # Validate required fields
+    if quantity_greater_then is None:
+        raise ValueError("quantity_greater_then is required for new price tier")
+
+    if quantity_greater_then < 0:
+        raise ValueError("quantity_greater_then must be >= 0")
+
+    if not provider_item_uuid:
+        raise ValueError("provider_item_uuid is required for new price tier")
+
+    if not segment_uuid:
+        raise ValueError("segment_uuid is required for new price tier")
+
+    # Use the same query logic as resolve_item_price_tier_list to find the current last tier
+    item_price_tier_list = resolve_item_price_tier_list(
+        info,
+        **{
+            "item_uuid": item_uuid,
+            "provider_item_uuid": provider_item_uuid,
+            "segment_uuid": segment_uuid,
+            "is_it_last_tier": True,
+        },
+    )
+
+    # Check if there's a previous tier and validate ordering
+    if item_price_tier_list.total == 0:
+        return None
+    else:
+        tier = item_price_tier_list.item_price_tier_list[0]
+        if quantity_greater_then > tier.quantity_greater_then:
+            return tier
+        raise ValueError(
+            f"New tier's quantity_greater_then ({quantity_greater_then}) must be greater than "
+            f"the previous tier's quantity_greater_then ({tier.quantity_greater_then})"
+        )
+
+
+def _update_previous_tier(
+    info: ResolveInfo,
+    item_uuid: str,
+    previous_tier: "ItemPriceTierType",
+    quantity_less_then: float,
+    updated_by: str,
+) -> None:
+    """
+    Updates the previous tier's quantity_less_then using insert_update_item_price_tier.
+
+    Args:
+        info: GraphQL resolve info
+        item_uuid: The item UUID
+        previous_tier: The previous tier object to update
+        quantity_less_then: The new upper bound for the previous tier
+        updated_by: User making the update
+    """
+    if previous_tier is None:
+        return
+
+    # Use insert_update_item_price_tier to update the previous tier
+    insert_update_item_price_tier(
+        info,
+        **{
+            "item_uuid": item_uuid,
+            "item_price_tier_uuid": previous_tier.item_price_tier_uuid,
+            "quantity_less_then": quantity_less_then,
+            "updated_by": updated_by,
+        },
+    )
 
 
 @insert_update_decorator(
@@ -292,28 +403,44 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     item_uuid = kwargs.get("item_uuid")
     item_price_tier_uuid = kwargs.get("item_price_tier_uuid")
     if kwargs.get("entity") is None:
+        # get the previous tier for validation, if any
+        previous_tier = _get_previous_tier(info, **kwargs)
+
         cols = {
             "endpoint_id": info.context.get("endpoint_id"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
+            "quantity_less_then": None,  # Always set to None for new tiers
         }
         for key in [
             "provider_item_uuid",
             "segment_uuid",
             "quantity_greater_then",
-            "quantity_less_then",
             "margin_per_uom",
             "price_per_uom",
             "status",
         ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
+
+        # Save the new tier first
         ItemPriceTierModel(
             item_uuid,
             item_price_tier_uuid,
             **cols,
         ).save()
+
+        # Update the previous tier's quantity_less_then if there is one
+        if previous_tier is not None:
+            _update_previous_tier(
+                info=info,
+                item_uuid=item_uuid,
+                previous_tier=previous_tier,
+                quantity_less_then=kwargs["quantity_greater_then"],
+                updated_by=kwargs["updated_by"],
+            )
+
         return
 
     item_price_tier = kwargs.get("entity")

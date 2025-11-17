@@ -904,7 +904,9 @@ def test_graphql_insert_update_item_price_tier_py(ai_rfq_engine, schema, test_da
         "insertUpdateItemPriceTier", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+    logger.info(
+        f"Test data: {Utility.json_dumps(test_data.pop("itemPriceTierUuid", None))}"
+    )
 
     result, error = _call_method(
         ai_rfq_engine,
@@ -1005,7 +1007,9 @@ def test_graphql_insert_update_discount_rule_py(ai_rfq_engine, schema, test_data
         "insertUpdateDiscountRule", "Mutation", schema
     )
     logger.info(f"Query: {query}")
-    logger.info(f"Test data: {Utility.json_dumps(test_data)}")
+    logger.info(
+        f"Test data: {Utility.json_dumps(test_data.pop("discountRuleUuid", None))}"
+    )
 
     result, error = _call_method(
         ai_rfq_engine,
