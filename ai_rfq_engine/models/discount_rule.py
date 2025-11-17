@@ -174,6 +174,7 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     updated_at_gt = kwargs.get("updated_at_gt")
     updated_at_lt = kwargs.get("updated_at_lt")
     status = kwargs.get("status")
+    is_it_last_rule = kwargs.get("is_it_last_rule", False)
 
     args = []
     inquiry_funct = DiscountRuleModel.scan
@@ -224,9 +225,8 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     if subtotal_value is not None:
         the_filters &= DiscountRuleModel.subtotal_greater_than <= subtotal_value
         # Handle cases where subtotal_less_than might be null (no upper limit)
-        the_filters &= (
-            DiscountRuleModel.subtotal_less_than.does_not_exist() |
-            (DiscountRuleModel.subtotal_less_than > subtotal_value)
+        the_filters &= DiscountRuleModel.subtotal_less_than.does_not_exist() | (
+            DiscountRuleModel.subtotal_less_than > subtotal_value
         )
     if max_discount_percentage and min_discount_percentage:
         the_filters &= DiscountRuleModel.max_discount_percentage.between(
@@ -234,10 +234,120 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
         )
     if status:
         the_filters &= DiscountRuleModel.status == status
+
+    # Filter for rules where subtotal_less_than is None or doesn't exist
+    if is_it_last_rule:
+        the_filters &= DiscountRuleModel.subtotal_less_than.does_not_exist() | (
+            DiscountRuleModel.subtotal_less_than == None
+        )
+
     if the_filters is not None:
         args.append(the_filters)
 
     return inquiry_funct, count_funct, args
+
+
+def _get_previous_rule(
+    info: ResolveInfo,
+    **kwargs: Dict[str, Any],
+) -> "DiscountRuleType":
+    """
+    Gets and validates the previous discount rule.
+
+    Checks:
+    1. subtotal_greater_than is provided and >= 0
+    2. provider_item_uuid and segment_uuid are provided
+    3. If a previous rule exists (subtotal_less_than = None), the new rule's
+       subtotal_greater_than must be greater than the previous rule's subtotal_greater_than
+       to maintain proper tier ordering
+
+    Args:
+        info (ResolveInfo): GraphQL resolve info containing context
+        **kwargs: Keyword arguments containing:
+            item_uuid (str): The item UUID
+            subtotal_greater_than (float): The new rule's lower bound
+            provider_item_uuid (str): Provider item UUID
+            segment_uuid (str): Segment UUID
+
+    Returns:
+        DiscountRuleType: The previous rule object if valid, None if no previous rule exists
+
+    Raises:
+        ValueError: If validation fails due to missing required fields or invalid tier ordering
+    """
+
+    item_uuid = kwargs.get("item_uuid")
+    subtotal_greater_than = kwargs.get("subtotal_greater_than")
+    provider_item_uuid = kwargs.get("provider_item_uuid")
+    segment_uuid = kwargs.get("segment_uuid")
+
+    # Validate required fields
+    if subtotal_greater_than is None:
+        raise ValueError("subtotal_greater_than is required for new discount rule")
+
+    if subtotal_greater_than <= 0:
+        raise ValueError("subtotal_greater_than must be greater than 0")
+
+    if not provider_item_uuid:
+        raise ValueError("provider_item_uuid is required for new discount rule")
+
+    if not segment_uuid:
+        raise ValueError("segment_uuid is required for new discount rule")
+
+    # Use resolve_discount_rule_list to find the current last rule
+    discount_rule_list = resolve_discount_rule_list(
+        info,
+        **{
+            "item_uuid": item_uuid,
+            "provider_item_uuid": provider_item_uuid,
+            "segment_uuid": segment_uuid,
+            "is_it_last_rule": True,
+        },
+    )
+
+    # Check if there's a previous rule and validate ordering
+    if discount_rule_list.total == 0:
+        return None
+    else:
+        rule = discount_rule_list.discount_rule_list[0]
+        if subtotal_greater_than > rule.subtotal_greater_than:
+            return rule
+        raise ValueError(
+            f"New rule's subtotal_greater_than ({subtotal_greater_than}) must be greater than "
+            f"the previous rule's subtotal_greater_than ({rule.subtotal_greater_than})"
+        )
+
+
+def _update_previous_rule(
+    info: ResolveInfo,
+    item_uuid: str,
+    previous_rule: "DiscountRuleType",
+    subtotal_less_than: float,
+    updated_by: str,
+) -> None:
+    """
+    Updates the previous rule's subtotal_less_than using insert_update_discount_rule.
+
+    Args:
+        info: GraphQL resolve info
+        item_uuid: The item UUID
+        previous_rule: The previous rule object to update
+        subtotal_less_than: The new upper bound for the previous rule
+        updated_by: User making the update
+    """
+    if previous_rule is None:
+        return
+
+    # Use insert_update_discount_rule to update the previous rule
+    insert_update_discount_rule(
+        info,
+        **{
+            "item_uuid": item_uuid,
+            "discount_rule_uuid": previous_rule.discount_rule_uuid,
+            "subtotal_less_than": subtotal_less_than,
+            "updated_by": updated_by,
+        },
+    )
 
 
 @insert_update_decorator(
@@ -253,27 +363,43 @@ def insert_update_discount_rule(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
     item_uuid = kwargs.get("item_uuid")
     discount_rule_uuid = kwargs.get("discount_rule_uuid")
     if kwargs.get("entity") is None:
+        # Get the previous rule for validation, if any
+        previous_rule = _get_previous_rule(info, **kwargs)
+
         cols = {
             "endpoint_id": info.context.get("endpoint_id"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
+            "subtotal_less_than": None,  # Always set to None for new rules
         }
         for key in [
             "provider_item_uuid",
             "segment_uuid",
             "subtotal_greater_than",
-            "subtotal_less_than",
             "max_discount_percentage",
             "status",
         ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
+
+        # Save the new rule first
         DiscountRuleModel(
             item_uuid,
             discount_rule_uuid,
             **cols,
         ).save()
+
+        # Update the previous rule's subtotal_less_than if there is one
+        if previous_rule is not None:
+            _update_previous_rule(
+                info=info,
+                item_uuid=item_uuid,
+                previous_rule=previous_rule,
+                subtotal_less_than=kwargs["subtotal_greater_than"],
+                updated_by=kwargs["updated_by"],
+            )
+
         return
 
     discount_rule = kwargs.get("entity")

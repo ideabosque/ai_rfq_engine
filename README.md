@@ -367,17 +367,23 @@ query {
 }
 
 # Create Discount Rule
+# Note: subtotalGreaterThan must be greater than 0 (cannot be 0)
+# The system automatically manages tiered discount rules
 mutation {
   insertUpdateDiscountRule(
     itemUuid: "123456789"
     discountRuleUuid: "discount_001"
-    subtotalGreaterThan: 10000
-    maxDiscountPercentage: 0.10
+    providerItemUuid: "pi_123"
+    segmentUuid: "seg_123"
+    subtotalGreaterThan: 1000.0
+    maxDiscountPercentage: 10.0
     status: "active"
     updatedBy: "admin@company.com"
   ) {
     discountRule {
       discountRuleUuid
+      subtotalGreaterThan
+      subtotalLessThan
       maxDiscountPercentage
       status
     }
