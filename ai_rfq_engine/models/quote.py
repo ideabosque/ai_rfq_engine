@@ -233,7 +233,13 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
     return QuoteType(**Utility.json_normalize(quote_dict))
 
 
-def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:
+def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType | None:
+    count = get_quote_count(
+        kwargs["request_uuid"], kwargs["quote_uuid"]
+    )
+    if count == 0:
+        return None
+
     return get_quote_type(
         info,
         get_quote(kwargs["request_uuid"], kwargs["quote_uuid"]),

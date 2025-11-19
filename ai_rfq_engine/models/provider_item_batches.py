@@ -142,7 +142,13 @@ def get_provider_item_batch_type(
 
 def resolve_provider_item_batch(
     info: ResolveInfo, **kwargs: Dict[str, Any]
-) -> ProviderItemBatchType:
+) -> ProviderItemBatchType | None:
+    count = get_provider_item_batch_count(
+        kwargs["provider_item_uuid"], kwargs["batch_no"]
+    )
+    if count == 0:
+        return None
+
     return get_provider_item_batch_type(
         info,
         get_provider_item_batch(kwargs["provider_item_uuid"], kwargs["batch_no"]),

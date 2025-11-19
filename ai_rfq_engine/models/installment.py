@@ -133,7 +133,13 @@ def get_installment_type(
     return InstallmentType(**Utility.json_normalize(installment))
 
 
-def resolve_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> InstallmentType:
+def resolve_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> InstallmentType | None:
+    count = get_installment_count(
+        kwargs["quote_uuid"], kwargs["installment_uuid"]
+    )
+    if count == 0:
+        return None
+
     return get_installment_type(
         info,
         get_installment(kwargs["quote_uuid"], kwargs["installment_uuid"]),

@@ -251,7 +251,13 @@ def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteI
     return QuoteItemType(**Utility.json_normalize(quote_item_dict))
 
 
-def resolve_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteItemType:
+def resolve_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteItemType | None:
+    count = get_quote_item_count(
+        kwargs["quote_uuid"], kwargs["quote_item_uuid"]
+    )
+    if count == 0:
+        return None
+
     return get_quote_item_type(
         info,
         get_quote_item(kwargs["quote_uuid"], kwargs["quote_item_uuid"]),

@@ -144,7 +144,11 @@ def get_discount_rule_type(
 
 def resolve_discount_rule(
     info: ResolveInfo, **kwargs: Dict[str, Any]
-) -> DiscountRuleType:
+) -> DiscountRuleType | None:
+    count = get_discount_rule_count(kwargs["item_uuid"], kwargs["discount_rule_uuid"])
+    if count == 0:
+        return None
+
     return get_discount_rule_type(
         info,
         get_discount_rule(kwargs["item_uuid"], kwargs["discount_rule_uuid"]),
@@ -250,7 +254,7 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
 def _get_previous_rule(
     info: ResolveInfo,
     **kwargs: Dict[str, Any],
-) -> "DiscountRuleType":
+) -> DiscountRuleType | None:
     """
     Gets and validates the previous discount rule.
 
@@ -277,7 +281,7 @@ def _get_previous_rule(
     """
 
     item_uuid = kwargs.get("item_uuid")
-    subtotal_greater_than = kwargs.get("subtotal_greater_than")
+    subtotal_greater_than = float(kwargs.get("subtotal_greater_than", 0))
     provider_item_uuid = kwargs.get("provider_item_uuid")
     segment_uuid = kwargs.get("segment_uuid")
 

@@ -106,7 +106,13 @@ def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
     return ItemType(**Utility.json_normalize(item))
 
 
-def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
+def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType | None:
+    count = get_item_count(
+        info.context["endpoint_id"], kwargs["item_uuid"]
+    )
+    if count == 0:
+        return None
+
     return get_item_type(
         info,
         get_item(info.context["endpoint_id"], kwargs["item_uuid"]),

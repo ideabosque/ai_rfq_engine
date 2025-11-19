@@ -105,7 +105,13 @@ def get_segment_type(info: ResolveInfo, segment: SegmentModel) -> SegmentType:
     return SegmentType(**Utility.json_normalize(segment))
 
 
-def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType:
+def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType | None:
+    count = get_segment_count(
+        info.context["endpoint_id"], kwargs["segment_uuid"]
+    )
+    if count == 0:
+        return None
+
     return get_segment_type(
         info,
         get_segment(info.context["endpoint_id"], kwargs["segment_uuid"]),

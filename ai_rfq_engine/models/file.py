@@ -107,7 +107,13 @@ def get_file_type(info: ResolveInfo, file: FileModel) -> FileType:
     return FileType(**Utility.json_normalize(file))
 
 
-def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType:
+def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType | None:
+    count = get_file_count(
+        kwargs["request_uuid"], kwargs["file_name"]
+    )
+    if count == 0:
+        return None
+
     return get_file_type(
         info,
         get_file(kwargs["request_uuid"], kwargs["file_name"]),

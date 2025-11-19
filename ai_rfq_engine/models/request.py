@@ -122,7 +122,13 @@ def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
     return RequestType(**Utility.json_normalize(request))
 
 
-def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:
+def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType | None:
+    count = get_request_count(
+        info.context["endpoint_id"], kwargs["request_uuid"]
+    )
+    if count == 0:
+        return None
+
     return get_request_type(
         info,
         get_request(info.context["endpoint_id"], kwargs["request_uuid"]),

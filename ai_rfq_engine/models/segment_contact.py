@@ -131,7 +131,7 @@ def get_segment_contact_type(
 
 def resolve_segment_contact(
     info: ResolveInfo, **kwargs: Dict[str, Any]
-) -> SegmentContactType:
+) -> SegmentContactType | None:
     endpoint_id = info.context["endpoint_id"]
     segment_uuid = kwargs.get("segment_uuid")
     email = kwargs["email"]
@@ -146,11 +146,12 @@ def resolve_segment_contact(
             )
         )
         if not results:
-            raise Exception(
-                f"SegmentContact not found for segment_uuid={segment_uuid}, email={email}"
-            )
+            return None
         segment_contact = results[0]
     else:
+        count = get_segment_contact_count(endpoint_id, email)
+        if count == 0:
+            return None
         segment_contact = get_segment_contact(endpoint_id, email)
 
     return get_segment_contact_type(info, segment_contact)

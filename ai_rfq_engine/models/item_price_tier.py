@@ -186,7 +186,13 @@ def get_item_price_tier_type(
 
 def resolve_item_price_tier(
     info: ResolveInfo, **kwargs: Dict[str, Any]
-) -> ItemPriceTierType:
+) -> ItemPriceTierType | None:
+    count = get_item_price_tier_count(
+        kwargs["item_uuid"], kwargs["item_price_tier_uuid"]
+    )
+    if count == 0:
+        return None
+
     return get_item_price_tier_type(
         info,
         get_item_price_tier(kwargs["item_uuid"], kwargs["item_price_tier_uuid"]),
