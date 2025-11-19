@@ -262,13 +262,13 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     if (
         provider_item_uuid
         and args[1] is not None
-        and args[1] != (ItemPriceTierModel.provider_item_uuid == provider_item_uuid)
+        and inquiry_funct != ItemPriceTierModel.provider_item_uuid_index.query
     ):
         the_filters &= ItemPriceTierModel.provider_item_uuid == provider_item_uuid
     if (
         segment_uuid
         and args[1] is not None
-        and args[1] != (ItemPriceTierModel.segment_uuid == segment_uuid)
+        and inquiry_funct != ItemPriceTierModel.segment_uuid_index.query
     ):
         the_filters &= ItemPriceTierModel.segment_uuid == segment_uuid
 
