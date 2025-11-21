@@ -241,9 +241,7 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
 
     # Filter for rules where subtotal_less_than is None or doesn't exist
     if is_it_last_rule:
-        the_filters &= (DiscountRuleModel.subtotal_less_than.does_not_exist()) | (
-            DiscountRuleModel.subtotal_less_than == None
-        )
+        the_filters &= DiscountRuleModel.subtotal_less_than.does_not_exist()
 
     if the_filters is not None:
         args.append(the_filters)

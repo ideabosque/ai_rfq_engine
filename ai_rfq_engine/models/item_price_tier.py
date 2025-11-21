@@ -286,9 +286,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 
     # Filter for tiers where quantity_less_then is None or doesn't exist
     if is_it_last_tier:
-        the_filters &= (ItemPriceTierModel.quantity_less_then.does_not_exist()) | (
-            ItemPriceTierModel.quantity_less_then == None
-        )
+        the_filters &= ItemPriceTierModel.quantity_less_then.does_not_exist()
 
     if the_filters is not None:
         args.append(the_filters)
