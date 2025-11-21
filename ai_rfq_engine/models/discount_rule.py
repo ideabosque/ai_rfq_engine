@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,6 +20,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.discount_rule import DiscountRuleListType, DiscountRuleType
 from .utils import _get_provider_item, _get_segment
@@ -230,7 +229,7 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     if subtotal_value is not None:
         the_filters &= DiscountRuleModel.subtotal_greater_than <= subtotal_value
         # Handle cases where subtotal_less_than might be null (no upper limit)
-        the_filters &= DiscountRuleModel.subtotal_less_than.does_not_exist() | (
+        the_filters &= (DiscountRuleModel.subtotal_less_than.does_not_exist()) | (
             DiscountRuleModel.subtotal_less_than > subtotal_value
         )
     if max_discount_percentage and min_discount_percentage:
@@ -242,7 +241,7 @@ def resolve_discount_rule_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
 
     # Filter for rules where subtotal_less_than is None or doesn't exist
     if is_it_last_rule:
-        the_filters &= DiscountRuleModel.subtotal_less_than.does_not_exist() | (
+        the_filters &= (DiscountRuleModel.subtotal_less_than.does_not_exist()) | (
             DiscountRuleModel.subtotal_less_than == None
         )
 

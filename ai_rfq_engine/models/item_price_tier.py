@@ -12,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,6 +20,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
 from .provider_item_batches import resolve_provider_item_batch_list
@@ -277,7 +276,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     if quantity_value is not None:
         the_filters &= ItemPriceTierModel.quantity_greater_then <= quantity_value
         # Handle cases where quantity_less_then might be null (no upper limit)
-        the_filters &= ItemPriceTierModel.quantity_less_then.does_not_exist() | (
+        the_filters &= (ItemPriceTierModel.quantity_less_then.does_not_exist()) | (
             ItemPriceTierModel.quantity_less_then > quantity_value
         )
     if max_price and min_price:
@@ -287,7 +286,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 
     # Filter for tiers where quantity_less_then is None or doesn't exist
     if is_it_last_tier:
-        the_filters &= ItemPriceTierModel.quantity_less_then.does_not_exist() | (
+        the_filters &= (ItemPriceTierModel.quantity_less_then.does_not_exist()) | (
             ItemPriceTierModel.quantity_less_then == None
         )
 
