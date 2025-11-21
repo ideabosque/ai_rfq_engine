@@ -200,7 +200,10 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
             inquiry_funct = SegmentContactModel.segment_uuid_index.query
 
     the_filters = None  # We can add filters for the query
-    if email:
+    if email and (
+        inquiry_funct == SegmentContactModel.consumer_corp_external_id_index.count
+        or inquiry_funct == SegmentContactModel.segment_uuid_index.query
+    ):
         the_filters &= SegmentContactModel.email == email
     if contact_uuid:
         the_filters &= SegmentContactModel.contact_uuid == contact_uuid
