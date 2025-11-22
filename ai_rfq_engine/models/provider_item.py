@@ -17,6 +17,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -25,7 +27,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..types.provider_item import ProviderItemListType, ProviderItemType
 from .discount_rule import resolve_discount_rule_list
@@ -232,14 +233,13 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     if (
         item_uuid
         and args[1] is not None
-        and args[1] != (ProviderItemModel.item_uuid == item_uuid)
+        and inquiry_funct != ProviderItemModel.item_uuid_index.query
     ):
         the_filters &= ProviderItemModel.item_uuid == item_uuid
     if (
         provider_corp_external_id
         and args[1] is not None
-        and args[1]
-        != (ProviderItemModel.provider_corp_external_id == provider_corp_external_id)
+        and inquiry_funct != ProviderItemModel.provider_corp_external_id_index.query
     ):
         the_filters &= (
             ProviderItemModel.provider_corp_external_id == provider_corp_external_id
@@ -247,8 +247,7 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     if (
         provider_item_external_id
         and args[1] is not None
-        and args[1]
-        != (ProviderItemModel.provider_item_external_id == provider_item_external_id)
+        and inquiry_funct != ProviderItemModel.provider_item_external_id_index.query
     ):
         the_filters &= (
             ProviderItemModel.provider_item_external_id == provider_item_external_id
