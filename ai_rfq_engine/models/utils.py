@@ -70,7 +70,11 @@ def _get_segment(endpoint_id: str, segment_uuid: str) -> Dict[str, Any]:
 
 
 def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, Any]:
-    from .provider_item import get_provider_item
+    from .provider_item import get_provider_item, get_provider_item_count
+
+    count = get_provider_item_count(endpoint_id, provider_item_uuid)
+    if count == 0:
+        return {}
 
     provider_item = get_provider_item(endpoint_id, provider_item_uuid)
 
@@ -86,7 +90,11 @@ def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, A
 
 
 def _get_request(endpoint_id: str, request_uuid: str) -> Dict[str, Any]:
-    from .request import get_request
+    from .request import get_request, get_request_count
+
+    count = get_request_count(endpoint_id, request_uuid)
+    if count == 0:
+        return {}
 
     request = get_request(endpoint_id, request_uuid)
 
@@ -105,7 +113,11 @@ def _get_request(endpoint_id: str, request_uuid: str) -> Dict[str, Any]:
 
 
 def _get_quote(request_uuid: str, quote_uuid: str) -> Dict[str, Any]:
-    from .quote import get_quote
+    from .quote import get_quote, get_quote_count
+
+    count = get_quote_count(request_uuid, quote_uuid)
+    if count == 0:
+        return {}
 
     quote = get_quote(request_uuid, quote_uuid)
 

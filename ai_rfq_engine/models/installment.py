@@ -91,7 +91,7 @@ def _calculate_installment_ratio(
     request_uuid: str,
     quote_uuid: str,
     installment_amount: float,
-) -> float:
+) -> float | None:
     """
     Calculate installment_ratio based on installment_amount and quote's final_total_quote_amount.
 
@@ -133,10 +133,10 @@ def get_installment_type(
     return InstallmentType(**Utility.json_normalize(installment))
 
 
-def resolve_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> InstallmentType | None:
-    count = get_installment_count(
-        kwargs["quote_uuid"], kwargs["installment_uuid"]
-    )
+def resolve_installment(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> InstallmentType | None:
+    count = get_installment_count(kwargs["quote_uuid"], kwargs["installment_uuid"])
     if count == 0:
         return None
 
