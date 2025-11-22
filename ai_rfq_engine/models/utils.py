@@ -52,7 +52,11 @@ def _get_item(endpoint_id: str, item_uuid: str) -> Dict[str, Any]:
 
 
 def _get_segment(endpoint_id: str, segment_uuid: str) -> Dict[str, Any]:
-    from .segment import get_segment
+    from .segment import get_segment, get_segment_count
+
+    count = get_segment_count(endpoint_id, segment_uuid)
+    if count == 0:
+        return {}
 
     segment = get_segment(endpoint_id, segment_uuid)
 
