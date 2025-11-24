@@ -1,28 +1,64 @@
 import json
+import logging
 import os
 import random
+import sys
 import uuid
 from datetime import datetime, timedelta
 
 import pendulum
-import requests
 from dotenv import load_dotenv
-try:
-    from faker import Faker
-    fake = Faker()
-except ModuleNotFoundError:
-    print("The 'faker' package is not installed. Please install it by running 'pip install faker'")
-    exit(1)
 
-# Load .env from current directory (tests folder)
+# Load .env from current directory (tests folder) before setting up paths
 env_path = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv(env_path)
 
+# Ensure local packages are importable (mirrors conftest.py setup)
+BASE_DIR = os.getenv("base_dir") or os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..")
+)
+sys.path.insert(0, BASE_DIR)
+sys.path.insert(0, os.path.join(BASE_DIR, "silvaengine_utility"))
+sys.path.insert(1, os.path.join(BASE_DIR, "silvaengine_dynamodb_base"))
+sys.path.insert(2, os.path.join(BASE_DIR, "ai_rfq_engine"))
+
+from silvaengine_utility import Utility  # noqa: E402
+
+from ai_rfq_engine import AIRFQEngine  # noqa: E402
+
+try:
+    from faker import Faker
+
+    fake = Faker()
+except ModuleNotFoundError:
+    print(
+        "The 'faker' package is not installed. Please install it by running 'pip install faker'"
+    )
+    exit(1)
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("load_sample_data")
+
 # --- CONFIGURATION ---
 endpoint_id = os.getenv("endpoint_id")
-API_URL = os.getenv("API_URL")
-API_KEY = os.getenv("API_KEY")
 UPDATED_BY = "data_loader_script"
+TEST_DATA_FILE = os.path.join(os.path.dirname(__file__), "test_data.json")
+
+SETTING = {
+    "region_name": os.getenv("region_name"),
+    "aws_access_key_id": os.getenv("aws_access_key_id"),
+    "aws_secret_access_key": os.getenv("aws_secret_access_key"),
+    "functs_on_local": {
+        "ai_rfq_graphql": {
+            "module_name": "ai_rfq_engine",
+            "class_name": "AIRFQEngine",
+        },
+    },
+    "endpoint_id": endpoint_id,
+    "execute_mode": os.getenv("execute_mode", "local"),
+}
 
 NUM_SEGMENTS = 3
 NUM_CONTACTS_PER_SEGMENT = 5
@@ -34,26 +70,70 @@ NUM_QUOTE_ITEMS_PER_QUOTE = 3
 NUM_INSTALLMENTS_PER_QUOTE = 2
 NUM_FILES_PER_REQUEST = 1
 
-# --- INITIALIZATION ---
-headers = {"x-api-key": API_KEY, "Content-Type": "application/json"}
+
+def create_engine():
+    """Instantiate AIRFQEngine using environment-driven settings."""
+    try:
+        engine = AIRFQEngine(logger, **SETTING)
+        setattr(engine, "__is_real__", True)
+        return engine
+    except Exception as exc:
+        logger.error(f"Failed to initialize AIRFQEngine: {exc}", exc_info=True)
+        raise
 
 
-def run_graphql_mutation(query, variables):
-    """A helper function to execute a GraphQL mutation."""
-    payload = json.dumps({"query": query, "variables": variables})
-    response = requests.post(
-        API_URL.format(endpoint_id=endpoint_id), headers=headers, data=payload
-    )
-    response.raise_for_status()
-    result = response.json()
-    if "errors" in result:
-        print("GraphQL Error:", json.dumps(result["errors"], indent=2))
+def run_graphql_mutation(engine, query, variables):
+    """Execute a GraphQL mutation through the local engine."""
+    try:
+        response = engine.ai_rfq_graphql(
+            query=query,
+            variables=variables,
+            endpoint_id=endpoint_id,
+        )
+        parsed = (
+            Utility.json_loads(response)
+            if isinstance(response, (str, bytes))
+            else response
+        )
+    except Exception as exc:
+        print(f"GraphQL execution failed: {exc}")
         return None
+
+    if parsed.get("errors"):
+        print("GraphQL Error:", json.dumps(parsed["errors"], indent=2))
+        return None
+
+    data = parsed.get("data")
+    if not data:
+        print("GraphQL Error: No data returned.")
+        return None
+
     print(f"  -> Success: {query.strip().splitlines()[0]} ...")
-    return result["data"]
+    return data
 
 
-def generate_and_load_data():
+def persist_test_data(test_data_updates):
+    """Override test_data.json with newly generated data."""
+    # For each entity type, randomly select one entry for get/list test data
+    final_data = {}
+
+    for key, records in test_data_updates.items():
+        if not records:
+            continue
+
+        # For main test data, include all records
+        if not key.endswith("_get_test_data") and not key.endswith("_list_test_data"):
+            final_data[key] = records
+        # For get/list test data, randomly pick one entry
+        else:
+            final_data[key] = [random.choice(records)]
+
+    with open(TEST_DATA_FILE, "w") as f:
+        json.dump(final_data, f, indent=2)
+    print(f"\nTest data written to: {TEST_DATA_FILE}")
+
+
+def generate_and_load_data(engine):
     """Main function to generate and load all data."""
 
     # --- DATA STORAGE ---
@@ -61,6 +141,29 @@ def generate_and_load_data():
     segment_map = {}
     item_map = {}
     provider_item_map = {}
+    test_data_updates = {
+        "segment_test_data": [],
+        "segment_get_test_data": [],
+        "segment_list_test_data": [],
+        "segment_contact_test_data": [],
+        "segment_contact_get_test_data": [],
+        "segment_contact_list_test_data": [],
+        "item_test_data": [],
+        "item_get_test_data": [],
+        "item_list_test_data": [],
+        "provider_item_test_data": [],
+        "provider_item_get_test_data": [],
+        "provider_item_list_test_data": [],
+        "provider_item_batch_test_data": [],
+        "provider_item_batch_get_test_data": [],
+        "provider_item_batch_list_test_data": [],
+        "item_price_tier_test_data": [],
+        "item_price_tier_get_test_data": [],
+        "item_price_tier_list_test_data": [],
+        "discount_rule_test_data": [],
+        "discount_rule_get_test_data": [],
+        "discount_rule_list_test_data": [],
+    }
 
     # 1. Segments
     print("--- Loading Segments ---")
@@ -88,11 +191,23 @@ def generate_and_load_data():
             "desc": segment_data["description"],
             "by": UPDATED_BY,
         }
-        result = run_graphql_mutation(mutation, variables)
+        result = run_graphql_mutation(engine, mutation, variables)
         if result:
             api_uuid = result["insertUpdateSegment"]["segment"]["segmentUuid"]
             segment_map[segment_data["local_id"]] = api_uuid
             print(f"  -> Success. API UUID: {api_uuid}")
+            test_data_updates["segment_test_data"].append(
+                {
+                    "segmentUuid": api_uuid,
+                    "segmentName": segment_data["name"],
+                    "segmentDescription": segment_data["description"],
+                    "updatedBy": UPDATED_BY,
+                }
+            )
+            test_data_updates["segment_get_test_data"].append({"segmentUuid": api_uuid})
+            test_data_updates["segment_list_test_data"].append(
+                {"limit": 10, "offset": 0}
+            )
 
     # 2. Segment Contacts
     print("\n--- Loading Segment Contacts ---")
@@ -113,9 +228,27 @@ def generate_and_load_data():
                 "cid": f"CUST-{random.randint(1000, 9999)}",
                 "by": UPDATED_BY,
             }
-            result = run_graphql_mutation(mutation, variables)
+            result = run_graphql_mutation(engine, mutation, variables)
             if result:
                 print(f"  -> Success.")
+                contact_uuid = result["insertUpdateSegmentContact"]["segmentContact"][
+                    "contactUuid"
+                ]
+                test_data_updates["segment_contact_test_data"].append(
+                    {
+                        "segmentUuid": api_uuid,
+                        "email": email,
+                        "contactUuid": contact_uuid,
+                        "consumerCorpExternalId": variables["cid"],
+                        "updatedBy": UPDATED_BY,
+                    }
+                )
+                test_data_updates["segment_contact_get_test_data"].append(
+                    {"segmentUuid": api_uuid, "email": email}
+                )
+                test_data_updates["segment_contact_list_test_data"].append(
+                    {"segmentUuid": api_uuid, "limit": 10, "offset": 0}
+                )
 
     # 3. Items & Provider Items
     print("\n--- Loading Items & Provider Items ---")
@@ -146,11 +279,23 @@ def generate_and_load_data():
             "uom": item_data["uom"],
             "by": UPDATED_BY,
         }
-        item_result = run_graphql_mutation(mutation, variables)
+        item_result = run_graphql_mutation(engine, mutation, variables)
         if item_result:
             item_api_uuid = item_result["insertUpdateItem"]["item"]["itemUuid"]
             item_map[item_data["local_id"]] = item_api_uuid
             print(f"  -> Item Success. API UUID: {item_api_uuid}")
+            test_data_updates["item_test_data"].append(
+                {
+                    "itemUuid": item_api_uuid,
+                    "itemType": variables["type"],
+                    "itemName": item_data["name"],
+                    "itemDescription": item_data["description"],
+                    "uom": item_data["uom"],
+                    "updatedBy": UPDATED_BY,
+                }
+            )
+            test_data_updates["item_get_test_data"].append({"itemUuid": item_api_uuid})
+            test_data_updates["item_list_test_data"].append({"limit": 10, "offset": 0})
 
             print(f"  -> Creating corresponding Provider Item...")
             prov_mutation = """
@@ -166,13 +311,28 @@ def generate_and_load_data():
                 "price": round(random.uniform(10.0, 500.0), 2),
                 "by": UPDATED_BY,
             }
-            prov_result = run_graphql_mutation(prov_mutation, prov_variables)
+            prov_result = run_graphql_mutation(engine, prov_mutation, prov_variables)
             if prov_result:
                 prov_api_uuid = prov_result["insertUpdateProviderItem"]["providerItem"][
                     "providerItemUuid"
                 ]
                 provider_item_map[item_data["local_id"]] = prov_api_uuid
                 print(f"    -> Provider Item Success. API UUID: {prov_api_uuid}")
+                test_data_updates["provider_item_test_data"].append(
+                    {
+                        "providerItemUuid": prov_api_uuid,
+                        "itemUuid": item_api_uuid,
+                        "providerCorpExternalId": prov_variables["provId"],
+                        "basePricePerUom": prov_variables["price"],
+                        "updatedBy": UPDATED_BY,
+                    }
+                )
+                test_data_updates["provider_item_get_test_data"].append(
+                    {"providerItemUuid": prov_api_uuid}
+                )
+                test_data_updates["provider_item_list_test_data"].append(
+                    {"itemUuid": item_api_uuid, "limit": 10, "offset": 0}
+                )
 
     # 4. Provider Item Batches
     print(
@@ -187,12 +347,8 @@ def generate_and_load_data():
                     f"Creating Batch: {batch_no} for Provider Item {provider_item_api_uuid}..."
                 )
                 now = pendulum.now("UTC")
-                produced = (
-                    now - timedelta(days=random.randint(10, 100))
-                ).isoformat()
-                expires = (
-                    now + timedelta(days=random.randint(90, 730))
-                ).isoformat()
+                produced = (now - timedelta(days=random.randint(10, 100))).isoformat()
+                expires = (now + timedelta(days=random.randint(90, 730))).isoformat()
                 mutation = """
                 mutation InsertUpdateProviderItemBatch($pid: String!, $iid: String!, $bno: String!, $exp: DateTime, $prod: DateTime, $cost: Float, $addCost: Float, $freightCost: Float, $stock: Boolean, $by: String!) {
                     insertUpdateProviderItemBatch(providerItemUuid: $pid, itemUuid: $iid, batchNo: $bno, expiredAt: $exp, producedAt: $prod, costPerUom: $cost, additionalCostPerUom: $addCost, freightCostPerUom: $freightCost, inStock: $stock, updatedBy: $by) {
@@ -212,141 +368,37 @@ def generate_and_load_data():
                     "stock": True,
                     "by": UPDATED_BY,
                 }
-                result = run_graphql_mutation(mutation, variables)
+                result = run_graphql_mutation(engine, mutation, variables)
                 if result:
                     print(f"  -> Success.")
+                    test_data_updates["provider_item_batch_test_data"].append(
+                        {
+                            "providerItemUuid": variables["pid"],
+                            "batchNo": batch_no,
+                            "itemUuid": variables["iid"],
+                            "expiredAt": expires,
+                            "producedAt": produced,
+                            "costPerUom": variables["cost"],
+                            "freightCostPerUom": variables["freightCost"],
+                            "additionalCostPerUom": variables["addCost"],
+                            "inStock": True,
+                            "updatedBy": UPDATED_BY,
+                        }
+                    )
+                    test_data_updates["provider_item_batch_get_test_data"].append(
+                        {"providerItemUuid": variables["pid"], "batchNo": batch_no}
+                    )
+                    test_data_updates["provider_item_batch_list_test_data"].append(
+                        {"providerItemUuid": variables["pid"], "limit": 10, "offset": 0}
+                    )
 
-
-    # 6. Quotes
-    # print("\n--- Loading Quotes ---")
-    # for local_req_id, req_api_uuid in request_map.items():
-    #     for _ in range(NUM_QUOTES_PER_REQUEST):
-    #         local_quote_id = str(uuid.uuid4())
-    #         provider_corp_id = f"SUPPLIER-{random.randint(100, 999)}"
-    #         sales_rep_email = fake.email()
-    #         shipping_method = random.choice(["AIR", "SEA", "LAND"])
-    #         shipping_amount = round(random.uniform(50.0, 500.0), 2)
-
-    #         print(f"Creating Quote: {local_quote_id} for Request {req_api_uuid}...")
-    #         mutation = """
-    #         mutation InsertUpdateQuote($reqId: String!, $quoteId: String!, $provCorpId: String, $salesEmail: String, $shipMethod: String, $shipAmount: Float, $by: String!) {
-    #             insertUpdateQuote(requestUuid: $reqId, quoteUuid: $quoteId, providerCorpExternalId: $provCorpId, salesRepEmail: $salesEmail, shippingMethod: $shipMethod, shippingAmount: $shipAmount, updatedBy: $by) {
-    #                 quote { quoteUuid }
-    #             }
-    #         }
-    #         """
-    #         variables = {
-    #             "reqId": req_api_uuid,
-    #             "quoteId": local_quote_id,
-    #             "provCorpId": provider_corp_id,
-    #             "salesEmail": sales_rep_email,
-    #             "shipMethod": shipping_method,
-    #             "shipAmount": shipping_amount,
-    #             "by": UPDATED_BY,
-    #         }
-    #         result = run_graphql_mutation(mutation, variables)
-    #         if result:
-    #             api_uuid = result["insertUpdateQuote"]["quote"]["quoteUuid"]
-    #             # Store a tuple (request_uuid, quote_uuid) for easier lookup in quote items
-    #             quote_map[local_quote_id] = (req_api_uuid, api_uuid)
-    #             print(f"  -> Quote Success. API UUID: {api_uuid}")
-
-    # 7. Quote Items
-    # print("\n--- Loading Quote Items ---")
-    # if not item_map or not provider_item_map or not segment_map:
-    #     print("Not enough data to create Quote Items. Skipping.")
-    # else:
-    #     for local_quote_id, (req_api_uuid, quote_api_uuid) in quote_map.items():
-    #         for _ in range(NUM_QUOTE_ITEMS_PER_QUOTE):
-    #             local_quote_item_id = str(uuid.uuid4())
-
-    #             # Select a random item, provider item, and segment
-    #             random_item_local_id = random.choice(list(item_map.keys()))
-    #             item_api_uuid = item_map[random_item_local_id]
-    #             provider_item_api_uuid = provider_item_map.get(
-    #                 random_item_local_id
-    #             )  # ensure it exists
-    #             if not provider_item_api_uuid:
-    #                 continue  # Skip if no provider item for this item
-
-    #             # Use the same segment for which price tiers and discounts were created
-    #             segment_api_uuid = first_segment_api_uuid
-
-    #             qty = random.randint(10, 1000)
-
-    #             print(
-    #                 f"Creating Quote Item {local_quote_item_id} for Quote {quote_api_uuid}..."
-    #             )
-    #             mutation = """
-    #             mutation InsertUpdateQuoteItem($quoteId: String!, $quoteItemId: String!, $provItemId: String!, $itemId: String!, $segId: String!, $qty: Float!, $reqId: String!, $by: String!) {
-    #                 insertUpdateQuoteItem(quoteUuid: $quoteId, quoteItemUuid: $quoteItemId, providerItemUuid: $provItemId, itemUuid: $itemId, segmentUuid: $segId, qty: $qty, requestUuid: $reqId, updatedBy: $by) {
-    #                     quoteItem { quoteItemUuid pricePerUom subtotal finalSubtotal }
-    #                 }
-    #             }
-    #             """
-    #             variables = {
-    #                 "quoteId": quote_api_uuid,
-    #                 "quoteItemId": local_quote_item_id,
-    #                 "provItemId": provider_item_api_uuid,
-    #                 "itemId": item_api_uuid,
-    #                 "segId": segment_api_uuid,
-    #                 "qty": float(qty),
-    #                 "reqId": req_api_uuid,
-    #                 "by": UPDATED_BY,
-    #             }
-    #             result = run_graphql_mutation(mutation, variables)
-    #             if result:
-    #                 api_uuid = result["insertUpdateQuoteItem"]["quoteItem"][
-    #                     "quoteItemUuid"
-    #                 ]
-    #                 quote_item_map[local_quote_item_id] = api_uuid
-    #                 print(f"  -> Quote Item Success. API UUID: {api_uuid}")
-
-    # 8. Installments
-    # print("\n--- Loading Installments ---")
-    # for local_quote_id, (req_api_uuid, quote_api_uuid) in quote_map.items():
-    #     for i in range(NUM_INSTALLMENTS_PER_QUOTE):
-    #         local_installment_id = str(uuid.uuid4())
-    #         scheduled_date = (pendulum.now("UTC").add(weeks=i + 1)).isoformat()
-    #         payment_method = random.choice(
-    #             ["bank_transfer", "credit_card", "net_terms"]
-    #         )
-    #         installment_amount = round(random.uniform(100.0, 5000.0), 2)
-
-    #         print(
-    #             f"Creating Installment {local_installment_id} for Quote {quote_api_uuid}..."
-    #         )
-    #         mutation = """
-    #         mutation InsertUpdateInstallment($quoteId: String!, $instId: String!, $priority: Int!, $scheduledDate: DateTime!, $instAmount: Float!, $payMethod: String!, $by: String!) {
-    #             insertUpdateInstallment(quoteUuid: $quoteId, installmentUuid: $instId, priority: $priority, scheduledDate: $scheduledDate, installmentAmount: $instAmount, paymentMethod: $payMethod, updatedBy: $by) {
-    #                 installment { installmentUuid installmentRatio }
-    #             }
-    #         }
-    #         """
-    #         variables = {
-    #             "quoteId": quote_api_uuid,
-    #             "instId": local_installment_id,
-    #             "priority": i + 1,
-    #             "scheduledDate": scheduled_date,
-    #             "instAmount": installment_amount,
-    #             "payMethod": payment_method,
-    #             "by": UPDATED_BY,
-    #         }
-    #         result = run_graphql_mutation(mutation, variables)
-    #         if result:
-    #             api_uuid = result["insertUpdateInstallment"]["installment"][
-    #                 "installmentUuid"
-    #             ]
-    #             installment_map[local_installment_id] = api_uuid
-    #             print(f"  -> Installment Success. API UUID: {api_uuid}")
-
-
-    # 10. Item Price Tiers & Discount Rules
+    # 5. Item Price Tiers & Discount Rules
     print(
         "\n--- Loading Item Price Tiers & Discount Rules ---\n"
     )  # Added newline for better formatting
     if not segment_map:
         print("No segments created, skipping price tiers and discount rules.")
+        persist_test_data(test_data_updates)
         return
 
     # Use the first created segment for all price tiers and discount rules
@@ -397,9 +449,32 @@ def generate_and_load_data():
                     "stat": "active",
                     "by": UPDATED_BY,
                 }
-                tier_result = run_graphql_mutation(tier_mutation, tier_variables)
+                tier_result = run_graphql_mutation(
+                    engine, tier_mutation, tier_variables
+                )
                 if tier_result:
                     print(f"  -> Success.")
+                    tier_uuid = tier_result["insertUpdateItemPriceTier"][
+                        "itemPriceTier"
+                    ]["itemPriceTierUuid"]
+                    test_data_updates["item_price_tier_test_data"].append(
+                        {
+                            "itemUuid": item_api_uuid,
+                            "itemPriceTierUuid": tier_uuid,
+                            "providerItemUuid": provider_item_api_uuid,
+                            "segmentUuid": segment_api_uuid,
+                            "quantityGreaterThen": tier_config["qty"],
+                            "marginPerUom": tier_config["margin"],
+                            "status": "active",
+                            "updatedBy": UPDATED_BY,
+                        }
+                    )
+                    test_data_updates["item_price_tier_get_test_data"].append(
+                        {"itemUuid": item_api_uuid, "itemPriceTierUuid": tier_uuid}
+                    )
+                    test_data_updates["item_price_tier_list_test_data"].append(
+                        {"itemUuid": item_api_uuid, "limit": 10, "offset": 0}
+                    )
 
             # Create multiple Discount Rules with increasing subtotal thresholds
             discount_configs = [
@@ -444,11 +519,41 @@ def generate_and_load_data():
                     "stat": "active",
                     "by": UPDATED_BY,
                 }
-                rule_result = run_graphql_mutation(rule_mutation, rule_variables)
+                rule_result = run_graphql_mutation(
+                    engine, rule_mutation, rule_variables
+                )
                 if rule_result:
                     print(f"  -> Success.")
+                    discount_rule_uuid = rule_result["insertUpdateDiscountRule"][
+                        "discountRule"
+                    ]["discountRuleUuid"]
+                    test_data_updates["discount_rule_test_data"].append(
+                        {
+                            "itemUuid": item_api_uuid,
+                            "discountRuleUuid": discount_rule_uuid,
+                            "providerItemUuid": provider_item_api_uuid,
+                            "segmentUuid": segment_api_uuid,
+                            "subtotalGreaterThan": discount_config["subtotal"],
+                            "maxDiscountPercentage": discount_config["discount"],
+                            "status": "active",
+                            "updatedBy": UPDATED_BY,
+                        }
+                    )
+                    test_data_updates["discount_rule_get_test_data"].append(
+                        {
+                            "itemUuid": item_api_uuid,
+                            "discountRuleUuid": discount_rule_uuid,
+                        }
+                    )
+                    test_data_updates["discount_rule_list_test_data"].append(
+                        {"itemUuid": item_api_uuid, "limit": 10, "offset": 0}
+                    )
+
+    # Persist generated data for tests
+    persist_test_data(test_data_updates)
 
 
 if __name__ == "__main__":
-    generate_and_load_data()
+    engine_instance = create_engine()
+    generate_and_load_data(engine_instance)
     print("\n--- Data Loading Complete ---")
