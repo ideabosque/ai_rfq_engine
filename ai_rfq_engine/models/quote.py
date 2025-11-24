@@ -79,7 +79,7 @@ class QuoteModel(BaseModel):
     request_uuid = UnicodeAttribute(hash_key=True)
     quote_uuid = UnicodeAttribute(range_key=True)
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
-    sales_rep_email = UnicodeAttribute()
+    sales_rep_email = UnicodeAttribute(null=True)
     endpoint_id = UnicodeAttribute()
     shipping_method = UnicodeAttribute(null=True)
     shipping_amount = NumberAttribute(default=0)
@@ -234,9 +234,7 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
 
 
 def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType | None:
-    count = get_quote_count(
-        kwargs["request_uuid"], kwargs["quote_uuid"]
-    )
+    count = get_quote_count(kwargs["request_uuid"], kwargs["quote_uuid"])
     if count == 0:
         return None
 
