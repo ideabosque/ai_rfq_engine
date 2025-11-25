@@ -4,6 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict
@@ -19,11 +20,11 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
+from silvaengine_utility import Utility, method_cache
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..handlers.config import Config
 from ..types.file import FileListType, FileType
-from .utils import _get_request
 
 
 class EmailIndex(LocalSecondaryIndex):
@@ -71,6 +72,43 @@ class FileModel(BaseModel):
     updated_at_index = UpdateAtIndex()
 
 
+def purge_cache():
+    def actual_decorator(original_function):
+        @functools.wraps(original_function)
+        def wrapper_function(*args, **kwargs):
+            try:
+                # Use cascading cache purging for files
+                from ..models.cache import purge_entity_cascading_cache
+
+                context_keys = None
+                entity_keys = {}
+                if kwargs.get("request_uuid"):
+                    entity_keys["request_uuid"] = kwargs.get("request_uuid")
+                if kwargs.get("file_uuid"):
+                    entity_keys["file_uuid"] = kwargs.get("file_uuid")
+
+                result = purge_entity_cascading_cache(
+                    args[0].context.get("logger"),
+                    entity_type="file",
+                    context_keys=context_keys,
+                    entity_keys=entity_keys if entity_keys else None,
+                    cascade_depth=3,
+                )
+
+                ## Original function.
+                result = original_function(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                log = traceback.format_exc()
+                args[0].context.get("logger").error(log)
+                raise e
+
+        return wrapper_function
+
+    return actual_decorator
+
+
 def create_file_table(logger: logging.Logger) -> bool:
     """Create the File table if it doesn't exist."""
     if not FileModel.exists():
@@ -84,6 +122,9 @@ def create_file_table(logger: logging.Logger) -> bool:
     reraise=True,
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "file")
 )
 def get_file(request_uuid: str, file_name: str) -> FileModel:
     return FileModel.get(request_uuid, file_name)
@@ -110,9 +151,7 @@ def get_file_type(info: ResolveInfo, file: FileModel) -> FileType:
 
 
 def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType | None:
-    count = get_file_count(
-        kwargs["request_uuid"], kwargs["file_name"]
-    )
+    count = get_file_count(kwargs["request_uuid"], kwargs["file_name"])
     if count == 0:
         return None
 
@@ -156,6 +195,7 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
+@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "request_uuid",
@@ -207,6 +247,7 @@ def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     return
 
 
+@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "request_uuid",

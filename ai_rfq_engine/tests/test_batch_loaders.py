@@ -10,7 +10,6 @@ import os
 from unittest.mock import MagicMock, patch
 
 import pytest
-from promise import Promise
 
 # Add parent directory to path to allow imports when running directly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -70,7 +69,8 @@ def test_item_loader_batches_requests():
     from ai_rfq_engine.models.batch_loaders import ItemLoader
 
     context = {"logger": MagicMock()}
-    loader = ItemLoader(logger=context["logger"])
+    # Disable cache for testing
+    loader = ItemLoader(logger=context["logger"], cache_enabled=False)
 
     i1 = _mock_model("endpoint-1", "item_uuid", "item-1", item_name="Item 1")
     i2 = _mock_model("endpoint-1", "item_uuid", "item-2", item_name="Item 2")
@@ -118,7 +118,7 @@ def test_provider_item_loader_batches_requests():
     from ai_rfq_engine.models.batch_loaders import ProviderItemLoader
 
     context = {"logger": MagicMock()}
-    loader = ProviderItemLoader(logger=context["logger"])
+    loader = ProviderItemLoader(logger=context["logger"], cache_enabled=False)
 
     p1 = _mock_model(
         "endpoint-1", "provider_item_uuid", "pi-1", base_price_per_uom="10.00"
@@ -152,7 +152,7 @@ def test_segment_loader_batches_requests():
     from ai_rfq_engine.models.batch_loaders import SegmentLoader
 
     context = {"logger": MagicMock()}
-    loader = SegmentLoader(logger=context["logger"])
+    loader = SegmentLoader(logger=context["logger"], cache_enabled=False)
 
     s1 = _mock_model("endpoint-1", "segment_uuid", "seg-1", segment_name="Segment 1")
     s2 = _mock_model("endpoint-1", "segment_uuid", "seg-2", segment_name="Segment 2")
@@ -180,7 +180,7 @@ def test_request_loader_batches_requests():
     from ai_rfq_engine.models.batch_loaders import RequestLoader
 
     context = {"logger": MagicMock()}
-    loader = RequestLoader(logger=context["logger"])
+    loader = RequestLoader(logger=context["logger"], cache_enabled=False)
 
     r1 = _mock_model("endpoint-1", "request_uuid", "req-1", request_title="RFQ 1")
     r2 = _mock_model("endpoint-1", "request_uuid", "req-2", request_title="RFQ 2")
@@ -208,7 +208,7 @@ def test_quote_loader_batches_requests():
     from ai_rfq_engine.models.batch_loaders import QuoteLoader
 
     context = {"logger": MagicMock()}
-    loader = QuoteLoader(logger=context["logger"])
+    loader = QuoteLoader(logger=context["logger"], cache_enabled=False)
 
     q1 = _mock_model(
         "req-1", "quote_uuid", "quote-1", total_quote_amount="1000.00"
@@ -245,7 +245,7 @@ def test_loader_deduplicates_keys():
     from ai_rfq_engine.models.batch_loaders import ItemLoader
 
     context = {"logger": MagicMock()}
-    loader = ItemLoader(logger=context["logger"])
+    loader = ItemLoader(logger=context["logger"], cache_enabled=False)
 
     i1 = _mock_model("endpoint-1", "item_uuid", "item-1", item_name="Item 1")
 
@@ -270,7 +270,7 @@ def test_loader_handles_missing_items():
     from ai_rfq_engine.models.batch_loaders import ItemLoader
 
     context = {"logger": MagicMock()}
-    loader = ItemLoader(logger=context["logger"])
+    loader = ItemLoader(logger=context["logger"], cache_enabled=False)
 
     i1 = _mock_model("endpoint-1", "item_uuid", "item-1", item_name="Item 1")
     # item-2 is missing (not returned by batch_get)
