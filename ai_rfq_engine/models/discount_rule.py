@@ -119,27 +119,19 @@ def get_discount_rule_count(item_uuid: str, discount_rule_uuid: str) -> int:
 def get_discount_rule_type(
     info: ResolveInfo, discount_rule: DiscountRuleModel
 ) -> DiscountRuleType:
+    """
+    Nested resolver approach: return minimal discount_rule data.
+    - Do NOT embed 'provider_item' or 'segment'.
+    Those are resolved lazily by DiscountRuleType resolvers.
+    """
     try:
-        provider_item = _get_provider_item(
-            info.context["endpoint_id"], discount_rule.provider_item_uuid
-        )
-        segment = _get_segment(info.context["endpoint_id"], discount_rule.segment_uuid)
-        discount_rule: Dict = discount_rule.__dict__["attribute_values"]
-        discount_rule.update(
-            {
-                "provider_item": provider_item,
-                "segment": segment,
-            }
-        )
-        discount_rule.pop("endpoint_id")
-        discount_rule.pop("provider_item_uuid")
-        discount_rule.pop("segment_uuid")
-        discount_rule.pop("item_uuid")
-    except Exception as e:
+        rule_dict = discount_rule.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return DiscountRuleType(**Utility.json_normalize(discount_rule))
+        raise
+
+    return DiscountRuleType(**Utility.json_normalize(rule_dict))
 
 
 def resolve_discount_rule(

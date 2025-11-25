@@ -4,19 +4,51 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from graphene import DateTime, List, ObjectType, String
+from graphene import DateTime, Field, List, ObjectType, String
+
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON
+
+from ..models.utils import _get_segment
+from .segment import SegmentType
 
 
 class SegmentContactType(ObjectType):
-    segment = JSON()
+    endpoint_id = String()
     email = String()
     contact_uuid = String()
     consumer_corp_external_id = String()
-    created_at = DateTime()
+
+    # Nested resolver: strongly-typed nested relationship
+    segment_uuid = String()  # keep raw id
+    segment = Field(lambda: SegmentType)
+
     updated_by = String()
+    created_at = DateTime()
     updated_at = DateTime()
+
+    # ------- Nested resolvers -------
+
+    def resolve_segment(parent, info):
+        """
+        Resolve nested Segment for this segment_contact.
+        """
+        # Case 2: already embedded
+        existing = getattr(parent, "segment", None)
+        if isinstance(existing, dict):
+            return SegmentType(**existing)
+        if isinstance(existing, SegmentType):
+            return existing
+
+        # Case 1: need to fetch by endpoint_id + segment_uuid
+        endpoint_id = getattr(parent, "endpoint_id", None)
+        segment_uuid = getattr(parent, "segment_uuid", None)
+        if not endpoint_id or not segment_uuid:
+            return None
+
+        segment_dict = _get_segment(endpoint_id, segment_uuid)
+        if not segment_dict:
+            return None
+        return SegmentType(**segment_dict)
 
 
 class SegmentContactListType(ListObjectType):

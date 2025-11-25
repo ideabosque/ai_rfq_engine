@@ -94,17 +94,19 @@ def get_file_count(request_uuid: str, file_name: str) -> int:
 
 
 def get_file_type(info: ResolveInfo, file: FileModel) -> FileType:
+    """
+    Nested resolver approach: return minimal file data.
+    - Do NOT embed 'request'.
+    'request' is resolved lazily by FileType.resolve_request.
+    """
     try:
-        request = _get_request(info.context["endpoint_id"], file.request_uuid)
-        file: Dict = file.__dict__["attribute_values"]
-        file["request"] = request
-        file.pop("endpoint_id")
-        file.pop("request_uuid")
-    except Exception as e:
+        file_dict = file.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return FileType(**Utility.json_normalize(file))
+        raise
+
+    return FileType(**Utility.json_normalize(file_dict))
 
 
 def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType | None:

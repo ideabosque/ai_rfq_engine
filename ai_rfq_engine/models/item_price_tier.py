@@ -123,64 +123,19 @@ def get_item_price_tier_count(item_uuid: str, item_price_tier_uuid: str) -> int:
 def get_item_price_tier_type(
     info: ResolveInfo, item_price_tier: ItemPriceTierModel
 ) -> ItemPriceTierType:
+    """
+    Nested resolver approach: return minimal item_price_tier data.
+    - Do NOT embed 'provider_item', 'segment', or 'provider_item_batches'.
+    Those are resolved lazily by ItemPriceTierType resolvers.
+    """
     try:
-        provider_item = _get_provider_item(
-            info.context["endpoint_id"], item_price_tier.provider_item_uuid
-        )
-        segment = _get_segment(
-            info.context["endpoint_id"], item_price_tier.segment_uuid
-        )
-
-        provider_item_batches = []
-        if item_price_tier.margin_per_uom is not None:
-            provider_item_batch_list = resolve_provider_item_batch_list(
-                info,
-                **{
-                    "item_uuid": item_price_tier.item_uuid,
-                    "provider_item_uuid": item_price_tier.provider_item_uuid,
-                    "in_stock": True,
-                    "expired_at_gt": pendulum.now("UTC"),
-                },
-            )
-            for (
-                provider_item_batch
-            ) in provider_item_batch_list.provider_item_batch_list:
-                margin_per_uom = float(item_price_tier.margin_per_uom)
-                if provider_item_batch.slow_move_item:
-                    margin_per_uom = 0.0
-                provider_item_batch.price_per_uom = float(
-                    provider_item_batch.guardrail_price_per_uom
-                ) * (1 + margin_per_uom / 100)
-                provider_item_batches.append(
-                    {
-                        "batch_no": provider_item_batch.batch_no,
-                        "price_per_uom": provider_item_batch.price_per_uom,
-                        "expired_at": provider_item_batch.expired_at,
-                        "slow_move_item": provider_item_batch.slow_move_item,
-                        "in_stock": provider_item_batch.in_stock,
-                    }
-                )
-
-        item_price_tier: Dict = item_price_tier.__dict__["attribute_values"]
-        item_price_tier.update(
-            {
-                "provider_item": provider_item,
-                "segment": segment,
-            }
-        )
-
-        if len(provider_item_batches) > 0:
-            item_price_tier["provider_item_batches"] = provider_item_batches
-
-        item_price_tier.pop("endpoint_id")
-        item_price_tier.pop("provider_item_uuid")
-        item_price_tier.pop("segment_uuid")
-        item_price_tier.pop("item_uuid")
-    except Exception as e:
+        tier_dict = item_price_tier.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return ItemPriceTierType(**Utility.json_normalize(item_price_tier))
+        raise
+
+    return ItemPriceTierType(**Utility.json_normalize(tier_dict))
 
 
 def resolve_item_price_tier(

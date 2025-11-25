@@ -142,17 +142,19 @@ def get_provider_item_count(endpoint_id: str, provider_item_uuid: str) -> int:
 def get_provider_item_type(
     info: ResolveInfo, provider_item: ProviderItemModel
 ) -> ProviderItemType:
+    """
+    Nested resolver approach: return minimal provider_item data.
+    - Do NOT embed 'item' here anymore.
+    'item' is resolved lazily by ProviderItemType.resolve_item.
+    """
     try:
-        item = _get_item(info.context["endpoint_id"], provider_item.item_uuid)
-        provider_item: Dict = provider_item.__dict__["attribute_values"]
-        provider_item["item"] = item
-        provider_item.pop("endpoint_id")
-        provider_item.pop("item_uuid")
-    except Exception as e:
+        pi_dict = provider_item.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return ProviderItemType(**Utility.json_normalize(provider_item))
+        raise
+
+    return ProviderItemType(**Utility.json_normalize(pi_dict))
 
 
 def resolve_provider_item(

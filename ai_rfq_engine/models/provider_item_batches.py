@@ -118,26 +118,22 @@ def get_provider_item_batch_count(provider_item_uuid: str, batch_no: str) -> int
 def get_provider_item_batch_type(
     info: ResolveInfo, provider_item_batch: ProviderItemBatchModel
 ) -> ProviderItemBatchType:
+    """
+    Nested resolver approach: return minimal batch data.
+    - Do NOT embed 'item' or 'provider_item'.
+    Those are resolved lazily by ProviderItemBatchType resolvers.
+    """
     try:
-        item = _get_item(info.context["endpoint_id"], provider_item_batch.item_uuid)
-        provider_item = _get_provider_item(
-            info.context["endpoint_id"], provider_item_batch.provider_item_uuid
-        )
-        provider_item_batch: Dict = provider_item_batch.__dict__["attribute_values"]
-        provider_item_batch.update(
-            {
-                "item": item,
-                "provider_item": provider_item,
-            }
-        )
-        provider_item_batch.pop("endpoint_id")
-        provider_item_batch.pop("item_uuid")
-        provider_item_batch.pop("provider_item_uuid")
-    except Exception as e:
+        batch_dict = provider_item_batch.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return ProviderItemBatchType(**Utility.json_normalize(provider_item_batch))
+        raise
+
+    batch_dict.pop("endpoint_id", None)
+    valid_fields = ProviderItemBatchType._meta.fields.keys()
+    filtered_batch_dict = {k: v for k, v in batch_dict.items() if k in valid_fields}
+    return ProviderItemBatchType(**Utility.json_normalize(filtered_batch_dict))
 
 
 def resolve_provider_item_batch(

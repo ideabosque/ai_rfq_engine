@@ -188,14 +188,19 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -
 
 
 def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
+    """
+    Nested resolver approach: return minimal quote data.
+    - Do NOT embed 'request'.
+    'request' is resolved lazily by QuoteType.resolve_request.
+    - 'quote_items' ARE still embedded for now (List(JSON)).
+    """
     try:
         # Import here to avoid circular dependency
         from .quote_item import resolve_quote_item_list
 
-        request = _get_request(info.context["endpoint_id"], quote.request_uuid)
         quote_dict: Dict = quote.__dict__["attribute_values"]
 
-        # Get quote items for this quote
+        # Get quote items for this quote (still eager for now)
         quote_item_list = resolve_quote_item_list(
             info, **{"quote_uuid": quote.quote_uuid}
         )
@@ -222,7 +227,6 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
             for item in quote_item_list.quote_item_list
         ]
 
-        quote_dict["request"] = request
         quote_dict["quote_items"] = quote_items
         quote_dict.pop("endpoint_id")
         quote_dict.pop("request_uuid")

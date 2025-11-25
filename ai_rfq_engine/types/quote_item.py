@@ -4,7 +4,8 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from graphene import Boolean, DateTime, Float, List, ObjectType, String
+from graphene import Boolean, DateTime, List, ObjectType, String
+
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
@@ -14,19 +15,21 @@ class QuoteItemType(ObjectType):
     quote_item_uuid = String()
     provider_item_uuid = String()
     item_uuid = String()
+    segment_uuid = String()
     batch_no = String()
-    request_uuid = String()
-    endpoint_id = String()
-    request_data = JSON()
+    qty = String()
+    price_per_uom = String()
+    subtotal = String()
+    subtotal_discount = String()
+    final_subtotal = String()
+    guardrail_price_per_uom = String()
     slow_move_item = Boolean()
-    guardrail_price_per_uom = Float()
-    price_per_uom = Float()
-    qty = Float()
-    subtotal = Float()
-    subtotal_discount = Float()
-    final_subtotal = Float()
-    created_at = DateTime()
+
+    # Keep as JSON (MapAttribute)
+    request_data = JSON()
+
     updated_by = String()
+    created_at = DateTime()
     updated_at = DateTime()
 
 

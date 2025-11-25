@@ -114,19 +114,19 @@ def get_segment_contact_count(endpoint_id: str, email: str) -> int:
 def get_segment_contact_type(
     info: ResolveInfo, segment_contact: SegmentContactModel
 ) -> SegmentContactType:
+    """
+    Nested resolver approach: return minimal segment_contact data.
+    - Do NOT embed 'segment'.
+    'segment' is resolved lazily by SegmentContactType.resolve_segment.
+    """
     try:
-        segment = _get_segment(
-            info.context["endpoint_id"], segment_contact.segment_uuid
-        )
-        segment_contact: Dict = segment_contact.__dict__["attribute_values"]
-        segment_contact["segment"] = segment
-        segment_contact.pop("endpoint_id")
-        segment_contact.pop("segment_uuid")
-    except Exception as e:
+        sc_dict = segment_contact.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return SegmentContactType(**Utility.json_normalize(segment_contact))
+        raise
+
+    return SegmentContactType(**Utility.json_normalize(sc_dict))
 
 
 def resolve_segment_contact(

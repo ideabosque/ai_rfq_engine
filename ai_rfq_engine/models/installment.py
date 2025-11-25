@@ -120,17 +120,19 @@ def _calculate_installment_ratio(
 def get_installment_type(
     info: ResolveInfo, installment: InstallmentModel
 ) -> InstallmentType:
+    """
+    Nested resolver approach: return minimal installment data.
+    - Do NOT embed 'quote'.
+    'quote' is resolved lazily by InstallmentType.resolve_quote.
+    """
     try:
-        quote = _get_quote(installment.request_uuid, installment.quote_uuid)
-        installment: Dict = installment.__dict__["attribute_values"]
-        installment["quote"] = quote
-        installment.pop("request_uuid")
-        installment.pop("quote_uuid")
-    except Exception as e:
+        inst_dict = installment.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return InstallmentType(**Utility.json_normalize(installment))
+        raise
+
+    return InstallmentType(**Utility.json_normalize(inst_dict))
 
 
 def resolve_installment(
