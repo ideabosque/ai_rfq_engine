@@ -8,7 +8,7 @@ from graphene import DateTime, Field, List, ObjectType, String
 
 from silvaengine_dynamodb_base import ListObjectType
 
-from ..models.utils import _get_segment
+from ..models.batch_loaders import get_loaders
 from .segment import SegmentType
 
 
@@ -29,9 +29,7 @@ class SegmentContactType(ObjectType):
     # ------- Nested resolvers -------
 
     def resolve_segment(parent, info):
-        """
-        Resolve nested Segment for this segment_contact.
-        """
+        """Resolve nested Segment for this segment_contact using DataLoader."""
         # Case 2: already embedded
         existing = getattr(parent, "segment", None)
         if isinstance(existing, dict):
@@ -39,16 +37,16 @@ class SegmentContactType(ObjectType):
         if isinstance(existing, SegmentType):
             return existing
 
-        # Case 1: need to fetch by endpoint_id + segment_uuid
+        # Case 1: need to fetch using DataLoader
         endpoint_id = getattr(parent, "endpoint_id", None)
         segment_uuid = getattr(parent, "segment_uuid", None)
         if not endpoint_id or not segment_uuid:
             return None
 
-        segment_dict = _get_segment(endpoint_id, segment_uuid)
-        if not segment_dict:
-            return None
-        return SegmentType(**segment_dict)
+        loaders = get_loaders(info.context)
+        return loaders.segment_loader.load((endpoint_id, segment_uuid)).then(
+            lambda segment_dict: SegmentType(**segment_dict) if segment_dict else None
+        )
 
 
 class SegmentContactListType(ListObjectType):

@@ -300,6 +300,13 @@ def test_request_loaders_container():
     # Verify all loaders are initialized
     assert hasattr(loaders, "item_loader")
     assert hasattr(loaders, "provider_item_loader")
+    assert hasattr(loaders, "provider_items_by_item_loader")
+    assert hasattr(loaders, "provider_item_batch_list_loader")
+    assert hasattr(loaders, "item_price_tier_by_provider_item_loader")
+    assert hasattr(loaders, "item_price_tier_by_item_loader")
+    assert hasattr(loaders, "quote_item_list_loader")
+    assert hasattr(loaders, "installment_list_loader")
+    assert hasattr(loaders, "discount_rule_by_item_loader")
     assert hasattr(loaders, "segment_loader")
     assert hasattr(loaders, "request_loader")
     assert hasattr(loaders, "quote_loader")
@@ -308,6 +315,13 @@ def test_request_loaders_container():
     from ai_rfq_engine.models.batch_loaders import (
         ItemLoader,
         ProviderItemLoader,
+        ProviderItemsByItemLoader,
+        ProviderItemBatchListLoader,
+        ItemPriceTierByProviderItemLoader,
+        ItemPriceTierByItemLoader,
+        QuoteItemListLoader,
+        InstallmentListLoader,
+        DiscountRuleByItemLoader,
         SegmentLoader,
         RequestLoader,
         QuoteLoader,
@@ -315,9 +329,261 @@ def test_request_loaders_container():
 
     assert isinstance(loaders.item_loader, ItemLoader)
     assert isinstance(loaders.provider_item_loader, ProviderItemLoader)
+    assert isinstance(loaders.provider_items_by_item_loader, ProviderItemsByItemLoader)
+    assert isinstance(loaders.provider_item_batch_list_loader, ProviderItemBatchListLoader)
+    assert isinstance(
+        loaders.item_price_tier_by_provider_item_loader, ItemPriceTierByProviderItemLoader
+    )
+    assert isinstance(loaders.item_price_tier_by_item_loader, ItemPriceTierByItemLoader)
+    assert isinstance(loaders.quote_item_list_loader, QuoteItemListLoader)
+    assert isinstance(loaders.installment_list_loader, InstallmentListLoader)
+    assert isinstance(loaders.discount_rule_by_item_loader, DiscountRuleByItemLoader)
     assert isinstance(loaders.segment_loader, SegmentLoader)
     assert isinstance(loaders.request_loader, RequestLoader)
     assert isinstance(loaders.quote_loader, QuoteLoader)
+
+
+@pytest.mark.unit
+def test_provider_item_batch_list_loader_fetches_batches():
+    """Test ProviderItemBatchListLoader loads batches keyed by provider_item_uuid."""
+    from ai_rfq_engine.models.batch_loaders import ProviderItemBatchListLoader
+
+    context = {"logger": MagicMock()}
+    loader = ProviderItemBatchListLoader(logger=context["logger"], cache_enabled=False)
+
+    b1 = _mock_model(
+        "endpoint-1",
+        "batch_no",
+        "batch-1",
+        provider_item_uuid="pi-1",
+        item_uuid="item-1",
+    )
+    b2 = _mock_model(
+        "endpoint-1",
+        "batch_no",
+        "batch-2",
+        provider_item_uuid="pi-1",
+        item_uuid="item-2",
+    )
+
+    with patch(
+        "ai_rfq_engine.models.provider_item_batches.ProviderItemBatchModel.query"
+    ) as mock_query:
+        mock_query.return_value = [b1, b2]
+
+        result_promise = loader.batch_load_fn(["pi-1"])
+        results = result_promise.get()
+
+    mock_query.assert_called_once_with("pi-1")
+    assert len(results[0]) == 2
+    assert results[0][0]["batch_no"] == "batch-1"
+    assert results[0][1]["item_uuid"] == "item-2"
+
+
+@pytest.mark.unit
+def test_item_price_tier_by_provider_item_loader_fetches_tiers():
+    """Test ItemPriceTierByProviderItemLoader loads tiers keyed by (item_uuid, provider_item_uuid)."""
+    from ai_rfq_engine.models.batch_loaders import ItemPriceTierByProviderItemLoader
+
+    context = {"logger": MagicMock()}
+    loader = ItemPriceTierByProviderItemLoader(
+        logger=context["logger"], cache_enabled=False
+    )
+
+    t1 = _mock_model(
+        "endpoint-1",
+        "item_price_tier_uuid",
+        "tier-1",
+        item_uuid="item-1",
+        provider_item_uuid="pi-1",
+        margin_per_uom="0.1",
+    )
+    t2 = _mock_model(
+        "endpoint-1",
+        "item_price_tier_uuid",
+        "tier-2",
+        item_uuid="item-1",
+        provider_item_uuid="pi-1",
+        price_per_uom="12.50",
+    )
+
+    with patch(
+        "ai_rfq_engine.models.item_price_tier.ItemPriceTierModel.provider_item_uuid_index.query"
+    ) as mock_query:
+        mock_query.return_value = [t1, t2]
+
+        result_promise = loader.batch_load_fn([("item-1", "pi-1")])
+        results = result_promise.get()
+
+    mock_query.assert_called_once()
+    assert len(results[0]) == 2
+    assert results[0][0]["item_price_tier_uuid"] == "tier-1"
+    assert results[0][1]["price_per_uom"] == "12.50"
+
+
+@pytest.mark.unit
+def test_item_price_tier_by_item_loader_fetches_tiers():
+    """Test ItemPriceTierByItemLoader loads tiers keyed by item_uuid."""
+    from ai_rfq_engine.models.batch_loaders import ItemPriceTierByItemLoader
+
+    context = {"logger": MagicMock()}
+    loader = ItemPriceTierByItemLoader(logger=context["logger"], cache_enabled=False)
+
+    t1 = _mock_model(
+        "endpoint-1",
+        "item_price_tier_uuid",
+        "tier-1",
+        item_uuid="item-1",
+        price_per_uom="10.00",
+    )
+    t2 = _mock_model(
+        "endpoint-1",
+        "item_price_tier_uuid",
+        "tier-2",
+        item_uuid="item-1",
+        price_per_uom="15.00",
+    )
+
+    with patch("ai_rfq_engine.models.item_price_tier.ItemPriceTierModel.query") as mock_query:
+        mock_query.return_value = [t1, t2]
+
+        result_promise = loader.batch_load_fn(["item-1"])
+        results = result_promise.get()
+
+    mock_query.assert_called_once_with("item-1")
+    assert len(results[0]) == 2
+    assert results[0][0]["item_price_tier_uuid"] == "tier-1"
+    assert results[0][1]["price_per_uom"] == "15.00"
+
+
+@pytest.mark.unit
+def test_quote_item_list_loader_fetches_items():
+    """Test QuoteItemListLoader loads quote items keyed by quote_uuid."""
+    from ai_rfq_engine.models.batch_loaders import QuoteItemListLoader
+
+    context = {"logger": MagicMock()}
+    loader = QuoteItemListLoader(logger=context["logger"], cache_enabled=False)
+
+    qi1 = _mock_model(
+        "endpoint-1",
+        "quote_item_uuid",
+        "qi-1",
+        quote_uuid="quote-1",
+        item_uuid="item-1",
+    )
+    qi2 = _mock_model(
+        "endpoint-1",
+        "quote_item_uuid",
+        "qi-2",
+        quote_uuid="quote-1",
+        item_uuid="item-2",
+    )
+
+    with patch("ai_rfq_engine.models.quote_item.QuoteItemModel.query") as mock_query:
+        mock_query.return_value = [qi1, qi2]
+
+        result_promise = loader.batch_load_fn(["quote-1"])
+        results = result_promise.get()
+
+    mock_query.assert_called_once_with("quote-1")
+    assert len(results[0]) == 2
+    assert results[0][0]["quote_item_uuid"] == "qi-1"
+    assert results[0][1]["item_uuid"] == "item-2"
+
+
+@pytest.mark.unit
+def test_provider_items_by_item_loader_fetches_items():
+    """Test ProviderItemsByItemLoader loads provider items keyed by (endpoint_id, item_uuid)."""
+    from ai_rfq_engine.models.batch_loaders import ProviderItemsByItemLoader
+
+    context = {"logger": MagicMock()}
+    loader = ProviderItemsByItemLoader(logger=context["logger"], cache_enabled=False)
+
+    pi1 = _mock_model(
+        "endpoint-1",
+        "provider_item_uuid",
+        "pi-1",
+        item_uuid="item-1",
+        base_price_per_uom="10.00",
+    )
+    pi2 = _mock_model(
+        "endpoint-1",
+        "provider_item_uuid",
+        "pi-2",
+        item_uuid="item-1",
+        base_price_per_uom="12.00",
+    )
+
+    with patch(
+        "ai_rfq_engine.models.provider_item.ProviderItemModel.item_uuid_index.query"
+    ) as mock_query:
+        mock_query.return_value = [pi1, pi2]
+
+        result_promise = loader.batch_load_fn([("endpoint-1", "item-1")])
+        results = result_promise.get()
+
+    mock_query.assert_called_once()
+    assert len(results[0]) == 2
+    assert results[0][0]["provider_item_uuid"] == "pi-1"
+    assert results[0][1]["base_price_per_uom"] == "12.00"
+
+
+@pytest.mark.unit
+def test_installment_list_loader_fetches_installments():
+    """Test InstallmentListLoader loads installments keyed by quote_uuid."""
+    from ai_rfq_engine.models.batch_loaders import InstallmentListLoader
+
+    context = {"logger": MagicMock()}
+    loader = InstallmentListLoader(logger=context["logger"], cache_enabled=False)
+
+    inst1 = _mock_model(
+        "endpoint-1",
+        "installment_uuid",
+        "inst-1",
+        quote_uuid="quote-1",
+        status="pending",
+    )
+    inst2 = _mock_model(
+        "endpoint-1",
+        "installment_uuid",
+        "inst-2",
+        quote_uuid="quote-1",
+        status="paid",
+    )
+
+    with patch("ai_rfq_engine.models.installment.InstallmentModel.query") as mock_query:
+        mock_query.return_value = [inst1, inst2]
+
+        result_promise = loader.batch_load_fn(["quote-1"])
+        results = result_promise.get()
+
+    mock_query.assert_called_once_with("quote-1")
+    assert len(results[0]) == 2
+    assert results[0][0]["installment_uuid"] == "inst-1"
+    assert results[0][1]["status"] == "paid"
+
+
+@pytest.mark.unit
+def test_discount_rule_by_item_loader_fetches_rules():
+    """Test DiscountRuleByItemLoader loads discount rules keyed by item_uuid."""
+    from ai_rfq_engine.models.batch_loaders import DiscountRuleByItemLoader
+
+    context = {"logger": MagicMock()}
+    loader = DiscountRuleByItemLoader(logger=context["logger"], cache_enabled=False)
+
+    r1 = _mock_model("endpoint-1", "discount_rule_uuid", "dr-1", item_uuid="item-1", rule="A")
+    r2 = _mock_model("endpoint-1", "discount_rule_uuid", "dr-2", item_uuid="item-1", rule="B")
+
+    with patch("ai_rfq_engine.models.discount_rule.DiscountRuleModel.query") as mock_query:
+        mock_query.return_value = [r1, r2]
+
+        result_promise = loader.batch_load_fn(["item-1"])
+        results = result_promise.get()
+
+    mock_query.assert_called_once_with("item-1")
+    assert len(results[0]) == 2
+    assert results[0][0]["discount_rule_uuid"] == "dr-1"
+    assert results[0][1]["rule"] == "B"
 
 
 # ============================================================================

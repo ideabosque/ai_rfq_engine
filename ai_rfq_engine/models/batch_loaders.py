@@ -12,11 +12,18 @@ from silvaengine_utility import Utility
 from silvaengine_utility.cache import HybridCacheEngine
 
 from ..handlers.config import Config
+from .discount_rule import DiscountRuleModel
+from .file import FileModel
+from .installment import InstallmentModel
 from .item import ItemModel
+from .item_price_tier import ItemPriceTierModel
 from .provider_item import ProviderItemModel
+from .provider_item_batches import ProviderItemBatchModel
 from .quote import QuoteModel
+from .quote_item import QuoteItemModel
 from .request import RequestModel
 from .segment import SegmentModel
+from .segment_contact import SegmentContactModel
 
 # Type aliases for readability
 Key = Tuple[str, str]
@@ -145,6 +152,326 @@ class ProviderItemLoader(_SafeDataLoader):
                     self.logger.exception(exc)
 
         return Promise.resolve([key_map.get(key) for key in keys])
+
+
+class ProviderItemsByItemLoader(_SafeDataLoader):
+    """Batch loader returning provider items keyed by (endpoint_id, item_uuid)."""
+
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
+        super(ProviderItemsByItemLoader, self).__init__(
+            logger=logger, cache_enabled=cache_enabled, **kwargs
+        )
+        if self.cache_enabled:
+            self.cache = HybridCacheEngine(
+                Config.get_cache_name("models", "provider_item")
+            )
+
+    def batch_load_fn(self, keys: List[Key]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[Key, List[Dict[str, Any]]] = {}
+        uncached_keys: List[Key] = []
+
+        # Check cache first if enabled
+        if self.cache_enabled:
+            for key in unique_keys:
+                cache_key = f"{key[0]}:{key[1]}:list"  # endpoint_id:item_uuid:list
+                cached_items = self.cache.get(cache_key)
+                if cached_items is not None:
+                    key_map[key] = cached_items
+                else:
+                    uncached_keys.append(key)
+        else:
+            uncached_keys = unique_keys
+
+        for endpoint_id, item_uuid in uncached_keys:
+            try:
+                provider_items = ProviderItemModel.item_uuid_index.query(
+                    endpoint_id, ProviderItemModel.item_uuid == item_uuid
+                )
+                normalized = [_normalize_model(pi) for pi in provider_items]
+                key_map[(endpoint_id, item_uuid)] = normalized
+
+                if self.cache_enabled:
+                    cache_key = f"{endpoint_id}:{item_uuid}:list"
+                    self.cache.set(cache_key, normalized, ttl=Config.get_cache_ttl())
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[(endpoint_id, item_uuid)] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
+
+
+class ProviderItemBatchListLoader(_SafeDataLoader):
+    """Batch loader returning batches for a provider item keyed by provider_item_uuid."""
+
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
+        super(ProviderItemBatchListLoader, self).__init__(
+            logger=logger, cache_enabled=cache_enabled, **kwargs
+        )
+        if self.cache_enabled:
+            self.cache = HybridCacheEngine(
+                Config.get_cache_name("models", "provider_item_batch")
+            )
+
+    def batch_load_fn(self, keys: List[str]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[str, List[Dict[str, Any]]] = {}
+        uncached_keys = []
+
+        # Check cache first if enabled
+        if self.cache_enabled:
+            for key in unique_keys:
+                cached_batches = self.cache.get(key)
+                if cached_batches is not None:
+                    key_map[key] = cached_batches
+                else:
+                    uncached_keys.append(key)
+        else:
+            uncached_keys = unique_keys
+
+        # Batch fetch uncached batches
+        for provider_item_uuid in uncached_keys:
+            try:
+                batches = ProviderItemBatchModel.query(provider_item_uuid)
+                normalized = [_normalize_model(batch) for batch in batches]
+                key_map[provider_item_uuid] = normalized
+
+                if self.cache_enabled:
+                    self.cache.set(
+                        provider_item_uuid, normalized, ttl=Config.get_cache_ttl()
+                    )
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[provider_item_uuid] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
+
+
+class QuoteItemListLoader(_SafeDataLoader):
+    """Batch loader returning quote items keyed by quote_uuid."""
+
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
+        super(QuoteItemListLoader, self).__init__(
+            logger=logger, cache_enabled=cache_enabled, **kwargs
+        )
+        if self.cache_enabled:
+            self.cache = HybridCacheEngine(
+                Config.get_cache_name("models", "quote_item")
+            )
+
+    def batch_load_fn(self, keys: List[str]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[str, List[Dict[str, Any]]] = {}
+        uncached_keys: List[str] = []
+
+        # Check cache first if enabled
+        if self.cache_enabled:
+            for key in unique_keys:
+                cached_items = self.cache.get(key)
+                if cached_items is not None:
+                    key_map[key] = cached_items
+                else:
+                    uncached_keys.append(key)
+        else:
+            uncached_keys = unique_keys
+
+        for quote_uuid in uncached_keys:
+            try:
+                items = QuoteItemModel.query(quote_uuid)
+                normalized = [_normalize_model(item) for item in items]
+                key_map[quote_uuid] = normalized
+
+                if self.cache_enabled:
+                    self.cache.set(quote_uuid, normalized, ttl=Config.get_cache_ttl())
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[quote_uuid] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
+
+
+class InstallmentListLoader(_SafeDataLoader):
+    """Batch loader returning installments keyed by quote_uuid."""
+
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
+        super(InstallmentListLoader, self).__init__(
+            logger=logger, cache_enabled=cache_enabled, **kwargs
+        )
+        if self.cache_enabled:
+            self.cache = HybridCacheEngine(
+                Config.get_cache_name("models", "installment")
+            )
+
+    def batch_load_fn(self, keys: List[str]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[str, List[Dict[str, Any]]] = {}
+        uncached_keys: List[str] = []
+
+        # Check cache first if enabled
+        if self.cache_enabled:
+            for key in unique_keys:
+                cached_installments = self.cache.get(key)
+                if cached_installments is not None:
+                    key_map[key] = cached_installments
+                else:
+                    uncached_keys.append(key)
+        else:
+            uncached_keys = unique_keys
+
+        for quote_uuid in uncached_keys:
+            try:
+                installments = InstallmentModel.query(quote_uuid)
+                normalized = [_normalize_model(inst) for inst in installments]
+                key_map[quote_uuid] = normalized
+
+                if self.cache_enabled:
+                    self.cache.set(quote_uuid, normalized, ttl=Config.get_cache_ttl())
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[quote_uuid] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
+
+
+class DiscountRuleByItemLoader(_SafeDataLoader):
+    """Batch loader returning discount rules keyed by item_uuid."""
+
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
+        super(DiscountRuleByItemLoader, self).__init__(
+            logger=logger, cache_enabled=cache_enabled, **kwargs
+        )
+        if self.cache_enabled:
+            self.cache = HybridCacheEngine(
+                Config.get_cache_name("models", "discount_rule")
+            )
+
+    def batch_load_fn(self, keys: List[str]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[str, List[Dict[str, Any]]] = {}
+        uncached_keys: List[str] = []
+
+        if self.cache_enabled:
+            for key in unique_keys:
+                cached_rules = self.cache.get(key)
+                if cached_rules is not None:
+                    key_map[key] = cached_rules
+                else:
+                    uncached_keys.append(key)
+        else:
+            uncached_keys = unique_keys
+
+        for item_uuid in uncached_keys:
+            try:
+                rules = DiscountRuleModel.query(item_uuid)
+                normalized = [_normalize_model(rule) for rule in rules]
+                key_map[item_uuid] = normalized
+
+                if self.cache_enabled:
+                    self.cache.set(item_uuid, normalized, ttl=Config.get_cache_ttl())
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[item_uuid] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
+
+
+class ItemPriceTierByProviderItemLoader(_SafeDataLoader):
+    """
+    Batch loader returning price tiers keyed by (item_uuid, provider_item_uuid).
+    """
+
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
+        super(ItemPriceTierByProviderItemLoader, self).__init__(
+            logger=logger, cache_enabled=cache_enabled, **kwargs
+        )
+        if self.cache_enabled:
+            self.cache = HybridCacheEngine(
+                Config.get_cache_name("models", "item_price_tier")
+            )
+
+    def batch_load_fn(self, keys: List[Key]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[Key, List[Dict[str, Any]]] = {}
+        uncached_keys: List[Key] = []
+
+        # Check cache first if enabled
+        if self.cache_enabled:
+            for key in unique_keys:
+                cache_key = f"{key[0]}:{key[1]}"  # item_uuid:provider_item_uuid
+                cached_tiers = self.cache.get(cache_key)
+                if cached_tiers is not None:
+                    key_map[key] = cached_tiers
+                else:
+                    uncached_keys.append(key)
+        else:
+            uncached_keys = unique_keys
+
+        # Batch fetch uncached tiers
+        for item_uuid, provider_item_uuid in uncached_keys:
+            try:
+                tiers = ItemPriceTierModel.provider_item_uuid_index.query(
+                    item_uuid, ItemPriceTierModel.provider_item_uuid == provider_item_uuid
+                )
+                normalized = [_normalize_model(tier) for tier in tiers]
+                key_map[(item_uuid, provider_item_uuid)] = normalized
+
+                if self.cache_enabled:
+                    cache_key = f"{item_uuid}:{provider_item_uuid}"
+                    self.cache.set(cache_key, normalized, ttl=Config.get_cache_ttl())
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[(item_uuid, provider_item_uuid)] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
+
+
+class ItemPriceTierByItemLoader(_SafeDataLoader):
+    """Batch loader returning price tiers keyed by item_uuid."""
+
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
+        super(ItemPriceTierByItemLoader, self).__init__(
+            logger=logger, cache_enabled=cache_enabled, **kwargs
+        )
+        if self.cache_enabled:
+            self.cache = HybridCacheEngine(
+                Config.get_cache_name("models", "item_price_tier")
+            )
+
+    def batch_load_fn(self, keys: List[str]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[str, List[Dict[str, Any]]] = {}
+        uncached_keys: List[str] = []
+
+        if self.cache_enabled:
+            for key in unique_keys:
+                cached = self.cache.get(key)
+                if cached is not None:
+                    key_map[key] = cached
+                else:
+                    uncached_keys.append(key)
+        else:
+            uncached_keys = unique_keys
+
+        for item_uuid in uncached_keys:
+            try:
+                tiers = ItemPriceTierModel.query(item_uuid)
+                normalized = [_normalize_model(tier) for tier in tiers]
+                key_map[item_uuid] = normalized
+
+                if self.cache_enabled:
+                    self.cache.set(item_uuid, normalized, ttl=Config.get_cache_ttl())
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[item_uuid] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
 
 
 class SegmentLoader(_SafeDataLoader):
@@ -294,6 +621,67 @@ class QuoteLoader(_SafeDataLoader):
         return Promise.resolve([key_map.get(key) for key in keys])
 
 
+class QuotesByRequestLoader(_SafeDataLoader):
+    """Batch loader returning all quotes for a request keyed by request_uuid."""
+
+    def batch_load_fn(self, keys: List[str]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[str, List[Dict[str, Any]]] = {}
+
+        for request_uuid in unique_keys:
+            try:
+                quotes = QuoteModel.query(request_uuid)
+                key_map[request_uuid] = [_normalize_model(q) for q in quotes]
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[request_uuid] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
+
+
+class FilesByRequestLoader(_SafeDataLoader):
+    """Batch loader returning all files for a request keyed by request_uuid."""
+
+    def batch_load_fn(self, keys: List[str]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[str, List[Dict[str, Any]]] = {}
+
+        for request_uuid in unique_keys:
+            try:
+                files = FileModel.query(request_uuid)
+                key_map[request_uuid] = [_normalize_model(f) for f in files]
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[request_uuid] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
+
+
+class SegmentContactBySegmentLoader(_SafeDataLoader):
+    """Batch loader returning contacts for a segment keyed by (endpoint_id, segment_uuid)."""
+
+    def batch_load_fn(self, keys: List[Key]) -> Promise:
+        unique_keys = list(dict.fromkeys(keys))
+        key_map: Dict[Key, List[Dict[str, Any]]] = {}
+
+        for endpoint_id, segment_uuid in unique_keys:
+            try:
+                contacts = SegmentContactModel.segment_uuid_index.query(
+                    endpoint_id, SegmentContactModel.segment_uuid == segment_uuid
+                )
+                key_map[(endpoint_id, segment_uuid)] = [
+                    _normalize_model(contact) for contact in contacts
+                ]
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[(endpoint_id, segment_uuid)] = []
+
+        return Promise.resolve([key_map.get(key, []) for key in keys])
+
+
 class RequestLoaders:
     """Container for all DataLoaders scoped to a single GraphQL request."""
 
@@ -305,9 +693,41 @@ class RequestLoaders:
         self.provider_item_loader = ProviderItemLoader(
             logger=logger, cache_enabled=cache_enabled
         )
+        self.provider_items_by_item_loader = ProviderItemsByItemLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
+        self.provider_item_batch_list_loader = ProviderItemBatchListLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
+        self.item_price_tier_by_provider_item_loader = (
+            ItemPriceTierByProviderItemLoader(
+                logger=logger, cache_enabled=cache_enabled
+            )
+        )
+        self.item_price_tier_by_item_loader = ItemPriceTierByItemLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
+        self.quote_item_list_loader = QuoteItemListLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
+        self.installment_list_loader = InstallmentListLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
+        self.discount_rule_by_item_loader = DiscountRuleByItemLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
         self.segment_loader = SegmentLoader(logger=logger, cache_enabled=cache_enabled)
         self.request_loader = RequestLoader(logger=logger, cache_enabled=cache_enabled)
         self.quote_loader = QuoteLoader(logger=logger, cache_enabled=cache_enabled)
+        self.quotes_by_request_loader = QuotesByRequestLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
+        self.files_by_request_loader = FilesByRequestLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
+        self.segment_contact_by_segment_loader = SegmentContactBySegmentLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
 
     def invalidate_cache(self, entity_type: str, entity_keys: Dict[str, str]):
         """Invalidate specific cache entries when entities are modified."""
@@ -324,6 +744,16 @@ class RequestLoaders:
             )
             if hasattr(self.provider_item_loader, "cache"):
                 self.provider_item_loader.cache.delete(cache_key)
+            # Also clear provider_items_by_item_loader using item_uuid list cache if provided
+            if (
+                hasattr(self, "provider_items_by_item_loader")
+                and hasattr(self.provider_items_by_item_loader, "cache")
+                and "item_uuid" in entity_keys
+            ):
+                list_cache_key = (
+                    f"{entity_keys.get('endpoint_id')}:{entity_keys['item_uuid']}:list"
+                )
+                self.provider_items_by_item_loader.cache.delete(list_cache_key)
         elif entity_type == "segment" and "segment_uuid" in entity_keys:
             cache_key = (
                 f"{entity_keys.get('endpoint_id')}:{entity_keys['segment_uuid']}"
@@ -340,6 +770,42 @@ class RequestLoaders:
             cache_key = f"{entity_keys.get('request_uuid')}:{entity_keys['quote_uuid']}"
             if hasattr(self.quote_loader, "cache"):
                 self.quote_loader.cache.delete(cache_key)
+            if hasattr(self, "quote_item_list_loader") and hasattr(
+                self.quote_item_list_loader, "cache"
+            ):
+                self.quote_item_list_loader.cache.delete(entity_keys["quote_uuid"])
+            if hasattr(self, "installment_list_loader") and hasattr(
+                self.installment_list_loader, "cache"
+            ):
+                self.installment_list_loader.cache.delete(entity_keys["quote_uuid"])
+        elif entity_type == "provider_item_batch" and "provider_item_uuid" in entity_keys:
+            cache_key = entity_keys["provider_item_uuid"]
+            if hasattr(self, "provider_item_batch_list_loader") and hasattr(
+                self.provider_item_batch_list_loader, "cache"
+            ):
+                self.provider_item_batch_list_loader.cache.delete(cache_key)
+        elif (
+            entity_type == "item_price_tier"
+            and "item_uuid" in entity_keys
+            and "provider_item_uuid" in entity_keys
+        ):
+            cache_key = f"{entity_keys['item_uuid']}:{entity_keys['provider_item_uuid']}"
+            if hasattr(self, "item_price_tier_by_provider_item_loader") and hasattr(
+                self.item_price_tier_by_provider_item_loader, "cache"
+            ):
+                self.item_price_tier_by_provider_item_loader.cache.delete(cache_key)
+            if hasattr(self, "item_price_tier_by_item_loader") and hasattr(
+                self.item_price_tier_by_item_loader, "cache"
+            ):
+                self.item_price_tier_by_item_loader.cache.delete(
+                    entity_keys["item_uuid"]
+                )
+        elif entity_type == "discount_rule" and "item_uuid" in entity_keys:
+            cache_key = entity_keys["item_uuid"]
+            if hasattr(self, "discount_rule_by_item_loader") and hasattr(
+                self.discount_rule_by_item_loader, "cache"
+            ):
+                self.discount_rule_by_item_loader.cache.delete(cache_key)
 
 
 def get_loaders(context: Dict[str, Any]) -> RequestLoaders:

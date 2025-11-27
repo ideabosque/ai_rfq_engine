@@ -5,11 +5,10 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Field, List, ObjectType, String
+from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
-from silvaengine_dynamodb_base import ListObjectType
-
-from ..models.utils import _get_request
+from ..models.batch_loaders import get_loaders
 from .request import RequestType
 
 
@@ -32,8 +31,9 @@ class QuoteType(ObjectType):
     # Nested resolvers: strongly-typed nested relationship
     request = Field(lambda: RequestType)
 
-    # Keep as JSON for now (will migrate in Phase 2.5)
-    quote_items = List(JSON)
+    # Nested resolvers: strongly-typed nested relationships
+    quote_items = List(lambda: "ai_rfq_engine.types.quote_item.QuoteItemType")
+    installments = List(lambda: "ai_rfq_engine.types.installment.InstallmentType")
 
     updated_by = String()
     created_at = DateTime()
@@ -42,7 +42,7 @@ class QuoteType(ObjectType):
     # ------- Nested resolvers -------
 
     def resolve_request(parent, info):
-        """Resolve nested Request for this quote."""
+        """Resolve nested Request for this quote using DataLoader."""
         # Case 2: already embedded
         existing = getattr(parent, "request", None)
         if isinstance(existing, dict):
@@ -50,16 +50,68 @@ class QuoteType(ObjectType):
         if isinstance(existing, RequestType):
             return existing
 
-        # Case 1: need to fetch
+        # Case 1: need to fetch using DataLoader
         endpoint_id = info.context.get("endpoint_id")
         request_uuid = getattr(parent, "request_uuid", None)
         if not endpoint_id or not request_uuid:
             return None
 
-        request_dict = _get_request(endpoint_id, request_uuid)
-        if not request_dict:
-            return None
-        return RequestType(**request_dict)
+        loaders = get_loaders(info.context)
+        return loaders.request_loader.load((endpoint_id, request_uuid)).then(
+            lambda request_dict: RequestType(**request_dict) if request_dict else None
+        )
+
+    def resolve_quote_items(parent, info):
+        """Resolve nested QuoteItems for this quote."""
+        # Check if already embedded
+        existing = getattr(parent, "quote_items", None)
+        if isinstance(existing, list) and existing:
+            from .quote_item import QuoteItemType
+
+            return [
+                QuoteItemType(**qi) if isinstance(qi, dict) else qi for qi in existing
+            ]
+
+        # Fetch quote items for this quote
+        quote_uuid = getattr(parent, "quote_uuid", None)
+        if not quote_uuid:
+            return []
+
+        from .quote_item import QuoteItemType
+
+        loaders = get_loaders(info.context)
+        return loaders.quote_item_list_loader.load(quote_uuid).then(
+            lambda q_items: [
+                QuoteItemType(**qi) if isinstance(qi, dict) else qi for qi in q_items
+            ]
+        )
+
+    def resolve_installments(parent, info):
+        """Resolve nested Installments for this quote."""
+        # Check if already embedded
+        existing = getattr(parent, "installments", None)
+        if isinstance(existing, list) and existing:
+            from .installment import InstallmentType
+
+            return [
+                InstallmentType(**inst) if isinstance(inst, dict) else inst
+                for inst in existing
+            ]
+
+        # Fetch installments for this quote
+        quote_uuid = getattr(parent, "quote_uuid", None)
+        if not quote_uuid:
+            return []
+
+        from .installment import InstallmentType
+
+        loaders = get_loaders(info.context)
+        return loaders.installment_list_loader.load(quote_uuid).then(
+            lambda insts: [
+                InstallmentType(**inst) if isinstance(inst, dict) else inst
+                for inst in insts
+            ]
+        )
 
 
 class QuoteListType(ListObjectType):

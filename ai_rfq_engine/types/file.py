@@ -8,7 +8,7 @@ from graphene import DateTime, Field, List, ObjectType, String
 
 from silvaengine_dynamodb_base import ListObjectType
 
-from ..models.utils import _get_request
+from ..models.batch_loaders import get_loaders
 from .request import RequestType
 
 
@@ -30,9 +30,7 @@ class FileType(ObjectType):
     # ------- Nested resolvers -------
 
     def resolve_request(parent, info):
-        """
-        Resolve nested Request for this file.
-        """
+        """Resolve nested Request for this file using DataLoader."""
         # Case 2: already embedded
         existing = getattr(parent, "request", None)
         if isinstance(existing, dict):
@@ -40,16 +38,16 @@ class FileType(ObjectType):
         if isinstance(existing, RequestType):
             return existing
 
-        # Case 1: need to fetch
+        # Case 1: need to fetch using DataLoader
         endpoint_id = info.context.get("endpoint_id")
         request_uuid = getattr(parent, "request_uuid", None)
         if not endpoint_id or not request_uuid:
             return None
 
-        request_dict = _get_request(endpoint_id, request_uuid)
-        if not request_dict:
-            return None
-        return RequestType(**request_dict)
+        loaders = get_loaders(info.context)
+        return loaders.request_loader.load((endpoint_id, request_uuid)).then(
+            lambda request_dict: RequestType(**request_dict) if request_dict else None
+        )
 
 
 class FileListType(ListObjectType):

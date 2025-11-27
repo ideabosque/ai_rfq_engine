@@ -8,7 +8,7 @@ from graphene import DateTime, Field, List, ObjectType, String
 
 from silvaengine_dynamodb_base import ListObjectType
 
-from ..models.utils import _get_provider_item, _get_segment
+from ..models.batch_loaders import get_loaders
 from .provider_item import ProviderItemType
 from .segment import SegmentType
 
@@ -35,7 +35,7 @@ class DiscountRuleType(ObjectType):
     # ------- Nested resolvers -------
 
     def resolve_provider_item(parent, info):
-        """Resolve nested ProviderItem for this rule."""
+        """Resolve nested ProviderItem for this rule using DataLoader."""
         # Case 2: already embedded
         existing = getattr(parent, "provider_item", None)
         if isinstance(existing, dict):
@@ -43,19 +43,19 @@ class DiscountRuleType(ObjectType):
         if isinstance(existing, ProviderItemType):
             return existing
 
-        # Case 1: need to fetch
+        # Case 1: need to fetch using DataLoader
         endpoint_id = getattr(parent, "endpoint_id", None)
         provider_item_uuid = getattr(parent, "provider_item_uuid", None)
         if not endpoint_id or not provider_item_uuid:
             return None
 
-        pi_dict = _get_provider_item(endpoint_id, provider_item_uuid)
-        if not pi_dict:
-            return None
-        return ProviderItemType(**pi_dict)
+        loaders = get_loaders(info.context)
+        return loaders.provider_item_loader.load((endpoint_id, provider_item_uuid)).then(
+            lambda pi_dict: ProviderItemType(**pi_dict) if pi_dict else None
+        )
 
     def resolve_segment(parent, info):
-        """Resolve nested Segment for this rule."""
+        """Resolve nested Segment for this rule using DataLoader."""
         # Case 2: already embedded
         existing = getattr(parent, "segment", None)
         if isinstance(existing, dict):
@@ -63,16 +63,16 @@ class DiscountRuleType(ObjectType):
         if isinstance(existing, SegmentType):
             return existing
 
-        # Case 1: need to fetch
+        # Case 1: need to fetch using DataLoader
         endpoint_id = getattr(parent, "endpoint_id", None)
         segment_uuid = getattr(parent, "segment_uuid", None)
         if not endpoint_id or not segment_uuid:
             return None
 
-        segment_dict = _get_segment(endpoint_id, segment_uuid)
-        if not segment_dict:
-            return None
-        return SegmentType(**segment_dict)
+        loaders = get_loaders(info.context)
+        return loaders.segment_loader.load((endpoint_id, segment_uuid)).then(
+            lambda segment_dict: SegmentType(**segment_dict) if segment_dict else None
+        )
 
 
 class DiscountRuleListType(ListObjectType):

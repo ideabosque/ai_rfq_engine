@@ -8,7 +8,7 @@ from graphene import DateTime, Field, Int, List, ObjectType, String
 
 from silvaengine_dynamodb_base import ListObjectType
 
-from ..models.utils import _get_quote
+from ..models.batch_loaders import get_loaders
 from .quote import QuoteType
 
 
@@ -33,7 +33,7 @@ class InstallmentType(ObjectType):
     # ------- Nested resolvers -------
 
     def resolve_quote(parent, info):
-        """Resolve nested Quote for this installment."""
+        """Resolve nested Quote for this installment using DataLoader."""
         # Case 2: already embedded
         existing = getattr(parent, "quote", None)
         if isinstance(existing, dict):
@@ -41,16 +41,16 @@ class InstallmentType(ObjectType):
         if isinstance(existing, QuoteType):
             return existing
 
-        # Case 1: need to fetch
+        # Case 1: need to fetch using DataLoader
         request_uuid = getattr(parent, "request_uuid", None)
         quote_uuid = getattr(parent, "quote_uuid", None)
         if not request_uuid or not quote_uuid:
             return None
 
-        quote_dict = _get_quote(request_uuid, quote_uuid)
-        if not quote_dict:
-            return None
-        return QuoteType(**quote_dict)
+        loaders = get_loaders(info.context)
+        return loaders.quote_loader.load((request_uuid, quote_uuid)).then(
+            lambda quote_dict: QuoteType(**quote_dict) if quote_dict else None
+        )
 
 
 class InstallmentListType(ListObjectType):
