@@ -6,8 +6,22 @@ __author__ = "bibow"
 
 from graphene import DateTime, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
+from silvaengine_utility import JSON, Utility
 
 from ..models.batch_loaders import get_loaders
+
+
+def _normalize_to_json(item):
+    """Convert various object shapes to a JSON-serializable dict/primitive."""
+    if isinstance(item, dict):
+        return Utility.json_normalize(item)
+    if hasattr(item, "attribute_values"):
+        return Utility.json_normalize(item.attribute_values)
+    if hasattr(item, "__dict__"):
+        return Utility.json_normalize(
+            {k: v for k, v in vars(item).items() if not k.startswith("_")}
+        )
+    return item
 
 
 class SegmentType(ObjectType):
@@ -21,19 +35,16 @@ class SegmentType(ObjectType):
     updated_at = DateTime()
 
     # Nested resolvers: strongly-typed nested relationships
-    contacts = List("ai_rfq_engine.types.segment_contact.SegmentContactType")
+    contacts = List(JSON)
 
     # ------- Nested resolvers -------
 
     def resolve_contacts(parent, info):
         """Resolve nested SegmentContacts for this segment."""
-        from ..models.segment_contact import SegmentContactModel
-        from .segment_contact import SegmentContactType
-
         # Check if already embedded
         existing = getattr(parent, "contacts", None)
         if isinstance(existing, list) and existing:
-            return [SegmentContactType(**contact) if isinstance(contact, dict) else contact for contact in existing]
+            return [_normalize_to_json(contact) for contact in existing]
 
         # Fetch contacts for this segment
         endpoint_id = getattr(parent, "endpoint_id", None)
@@ -46,7 +57,7 @@ class SegmentType(ObjectType):
             (endpoint_id, segment_uuid)
         ).then(
             lambda contacts: [
-                SegmentContactType(**contact) for contact in (contacts or [])
+                _normalize_to_json(contact) for contact in (contacts or [])
             ]
         )
 
