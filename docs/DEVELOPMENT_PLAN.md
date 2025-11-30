@@ -372,20 +372,20 @@ graph TD
 #### 2.1 Nested Resolver Architecture (🟡 **IN PROGRESS**)
 - [x] GraphQL types updated to use strongly-typed `Field()` instead of `JSON()` for relationships (Partial)
 - [x] Model type converters simplified to return minimal, flat data structures
-- [ ] Field resolvers implemented for all nested relationships
-    - [ ] `QuoteType.resolve_request` (Currently uses eager helper)
-    - [ ] `QuoteType.quote_items` (Currently `List(JSON)`)
-- **Status**: 🟡 Migration in progress (Quote entity pending)
+- [x] Field resolvers implemented for all nested relationships
+    - [x] `QuoteType.resolve_request` (Using DataLoader)
+    - [x] `QuoteType.quote_items` (Using DataLoader)
+- **Status**: 🟡 Core migration complete; Strict type definition refinement pending.
 
-#### 2.2 Batch Loading Optimization (🟡 **IN PROGRESS**)
+#### 2.2 Batch Loading Optimization (✅ **COMPLETED**)
 - [x] `models/batch_loaders/` package created (refactored from single module)
 - [x] Implemented modular loaders with HybridCacheEngine integration
 - [x] `RequestLoaders` container for request-scoped loader lifecycle
 - [x] `get_loaders()` utility for dependency injection via GraphQL context
-- [ ] All resolvers updated to use batch loaders
-    - [ ] `QuoteType` resolvers pending update
+- [x] All resolvers updated to use batch loaders
+    - [x] `QuoteType` resolvers updated
 - [x] **HybridCacheEngine integration**: All batch loaders support cross-request caching
-- **Status**: 🟡 Core infrastructure ready, pending full adoption
+- **Status**: ✅ Batch loading fully integrated across core entities
 
 ### ✅ Completed Features
 
