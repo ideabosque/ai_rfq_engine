@@ -10,18 +10,8 @@ from silvaengine_utility import JSON, Utility
 
 from ..models.batch_loaders import get_loaders
 
-
-def _normalize_to_json(item):
-    """Convert various object shapes to a JSON-serializable dict/primitive."""
-    if isinstance(item, dict):
-        return Utility.json_normalize(item)
-    if hasattr(item, "attribute_values"):
-        return Utility.json_normalize(item.attribute_values)
-    if hasattr(item, "__dict__"):
-        return Utility.json_normalize(
-            {k: v for k, v in vars(item).items() if not k.startswith("_")}
-        )
-    return item
+# Use the shared normalization helper instead of a local copy.
+from ..utils.normalization import normalize_to_json
 
 
 class RequestType(ObjectType):
@@ -51,7 +41,7 @@ class RequestType(ObjectType):
         # Check if already embedded
         existing = getattr(parent, "quotes", None)
         if isinstance(existing, list) and existing:
-            return [RequestType._normalize_to_json(q) for q in existing]
+            return [normalize_to_json(q) for q in existing]
 
         # Fetch quotes for this request
         request_uuid = getattr(parent, "request_uuid", None)
@@ -60,7 +50,7 @@ class RequestType(ObjectType):
 
         loaders = get_loaders(info.context)
         return loaders.quotes_by_request_loader.load(request_uuid).then(
-            lambda quotes: [_normalize_to_json(quote) for quote in (quotes or [])]
+            lambda quotes: [normalize_to_json(quote) for quote in (quotes or [])]
         )
 
     def resolve_files(parent, info):
@@ -68,7 +58,7 @@ class RequestType(ObjectType):
         # Check if already embedded
         existing = getattr(parent, "files", None)
         if isinstance(existing, list) and existing:
-            return [_normalize_to_json(f) for f in existing]
+            return [normalize_to_json(f) for f in existing]
 
         # Fetch files for this request
         request_uuid = getattr(parent, "request_uuid", None)
@@ -77,7 +67,7 @@ class RequestType(ObjectType):
 
         loaders = get_loaders(info.context)
         return loaders.files_by_request_loader.load(request_uuid).then(
-            lambda files: [_normalize_to_json(file) for file in (files or [])]
+            lambda files: [normalize_to_json(file) for file in (files or [])]
         )
 
 

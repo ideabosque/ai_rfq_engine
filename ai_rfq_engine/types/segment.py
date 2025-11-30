@@ -10,18 +10,8 @@ from silvaengine_utility import JSON, Utility
 
 from ..models.batch_loaders import get_loaders
 
-
-def _normalize_to_json(item):
-    """Convert various object shapes to a JSON-serializable dict/primitive."""
-    if isinstance(item, dict):
-        return Utility.json_normalize(item)
-    if hasattr(item, "attribute_values"):
-        return Utility.json_normalize(item.attribute_values)
-    if hasattr(item, "__dict__"):
-        return Utility.json_normalize(
-            {k: v for k, v in vars(item).items() if not k.startswith("_")}
-        )
-    return item
+# Use the shared normalization helper instead of a local copy.
+from ..utils.normalization import normalize_to_json
 
 
 class SegmentType(ObjectType):
@@ -44,7 +34,7 @@ class SegmentType(ObjectType):
         # Check if already embedded
         existing = getattr(parent, "contacts", None)
         if isinstance(existing, list) and existing:
-            return [_normalize_to_json(contact) for contact in existing]
+            return [normalize_to_json(contact) for contact in existing]
 
         # Fetch contacts for this segment
         endpoint_id = getattr(parent, "endpoint_id", None)
@@ -57,7 +47,7 @@ class SegmentType(ObjectType):
             (endpoint_id, segment_uuid)
         ).then(
             lambda contacts: [
-                _normalize_to_json(contact) for contact in (contacts or [])
+                normalize_to_json(contact) for contact in (contacts or [])
             ]
         )
 

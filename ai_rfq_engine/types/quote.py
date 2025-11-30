@@ -7,23 +7,10 @@ __author__ = "bibow"
 from graphene import DateTime, Field, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
-from silvaengine_utility import Utility
 
 from ..models.batch_loaders import get_loaders
+from ..utils.normalization import normalize_to_json
 from .request import RequestType
-
-
-def _normalize_to_json(item):
-    """Convert various object shapes to a JSON-serializable dict/primitive."""
-    if isinstance(item, dict):
-        return Utility.json_normalize(item)
-    if hasattr(item, "attribute_values"):
-        return Utility.json_normalize(item.attribute_values)
-    if hasattr(item, "__dict__"):
-        return Utility.json_normalize(
-            {k: v for k, v in vars(item).items() if not k.startswith("_")}
-        )
-    return item
 
 
 class QuoteType(ObjectType):
@@ -80,7 +67,7 @@ class QuoteType(ObjectType):
         # Check if already embedded
         existing = getattr(parent, "quote_items", None)
         if isinstance(existing, list):
-            return [_normalize_to_json(qi) for qi in existing]
+            return [normalize_to_json(qi) for qi in existing]
 
         # Fetch quote items for this quote
         quote_uuid = getattr(parent, "quote_uuid", None)
@@ -89,7 +76,7 @@ class QuoteType(ObjectType):
 
         loaders = get_loaders(info.context)
         return loaders.quote_item_list_loader.load(quote_uuid).then(
-            lambda q_items: [_normalize_to_json(qi) for qi in (q_items or [])]
+            lambda q_items: [normalize_to_json(qi) for qi in (q_items or [])]
         )
 
     def resolve_installments(parent, info):
@@ -97,7 +84,7 @@ class QuoteType(ObjectType):
         # Check if already embedded
         existing = getattr(parent, "installments", None)
         if isinstance(existing, list):
-            return [_normalize_to_json(inst) for inst in existing]
+            return [normalize_to_json(inst) for inst in existing]
 
         # Fetch installments for this quote
         quote_uuid = getattr(parent, "quote_uuid", None)
@@ -106,7 +93,7 @@ class QuoteType(ObjectType):
 
         loaders = get_loaders(info.context)
         return loaders.installment_list_loader.load(quote_uuid).then(
-            lambda insts: [_normalize_to_json(inst) for inst in (insts or [])]
+            lambda insts: [normalize_to_json(inst) for inst in (insts or [])]
         )
 
 
