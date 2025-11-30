@@ -40,6 +40,7 @@ ai_rfq_engine/
 ├── ai_rfq_engine/           # Main package
 │   ├── handlers/            # Configuration and handlers
 │   ├── models/              # Data models and business logic
+│   │   └── batch_loaders/   # DataLoader implementations
 │   ├── mutations/           # GraphQL mutations
 │   ├── queries/             # GraphQL queries
 │   ├── types/               # GraphQL type definitions
