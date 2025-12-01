@@ -5,12 +5,12 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Field, List, ObjectType, String
-
 from silvaengine_dynamodb_base import ListObjectType
+from silvaengine_utility import JSON
 
 from ..models.batch_loaders import get_loaders
+from ..utils.normalization import normalize_to_json
 from .provider_item import ProviderItemType
-from .provider_item_batches import ProviderItemBatchType
 from .segment import SegmentType
 
 
@@ -29,7 +29,7 @@ class ItemPriceTierType(ObjectType):
     # Nested resolvers: strongly-typed nested relationships
     provider_item = Field(lambda: ProviderItemType)
     segment = Field(lambda: SegmentType)
-    provider_item_batches = List(lambda: ProviderItemBatchType)
+    provider_item_batches = List(JSON)
 
     updated_by = String()
     created_at = DateTime()
@@ -53,9 +53,9 @@ class ItemPriceTierType(ObjectType):
             return None
 
         loaders = get_loaders(info.context)
-        return loaders.provider_item_loader.load((endpoint_id, provider_item_uuid)).then(
-            lambda pi_dict: ProviderItemType(**pi_dict) if pi_dict else None
-        )
+        return loaders.provider_item_loader.load(
+            (endpoint_id, provider_item_uuid)
+        ).then(lambda pi_dict: ProviderItemType(**pi_dict) if pi_dict else None)
 
     def resolve_segment(parent, info):
         """Resolve nested Segment for this price tier using DataLoader."""
@@ -84,41 +84,39 @@ class ItemPriceTierType(ObjectType):
         """
         # Case 2: already embedded (from get_item_price_tier_type)
         existing = getattr(parent, "provider_item_batches", None)
-        if isinstance(existing, list) and len(existing) > 0:
-            # Convert dicts to types if needed
-            if isinstance(existing[0], dict):
-                return [ProviderItemBatchType(**batch) for batch in existing]
-            return existing
+        if isinstance(existing, list):
+            return [normalize_to_json(batch_dict) for batch_dict in existing]
 
         # Case 1: need to fetch (only if margin_per_uom is set)
         margin_per_uom = getattr(parent, "margin_per_uom", None)
         if not margin_per_uom:
             return []
 
-        # Fetch batches from database
-        from ..models.provider_item_batches import ProviderItemBatchModel
-
         provider_item_uuid = getattr(parent, "provider_item_uuid", None)
         if not provider_item_uuid:
             return []
 
+        loaders = get_loaders(info.context)
+
         try:
-            batches = ProviderItemBatchModel.query(provider_item_uuid)
+            margin = float(margin_per_uom)
+        except Exception:
+            return []
+
+        def build_batches(batches):
             result = []
-            for batch in batches:
-                batch_dict = batch.__dict__["attribute_values"]
-                # Calculate price_per_uom for this batch
-                total_cost = float(batch_dict.get("total_cost_per_uom", 0))
-                margin = float(margin_per_uom)
+            for batch in batches or []:
+                batch_dict = dict(batch)
+                total_cost = float(batch_dict.get("total_cost_per_uom", 0) or 0)
                 price_per_uom = total_cost * (1 + margin)
                 batch_dict["price_per_uom"] = str(price_per_uom)
                 batch_dict.pop("endpoint_id", None)
-                valid_fields = ProviderItemBatchType._meta.fields.keys()
-                filtered_batch_dict = {k: v for k, v in batch_dict.items() if k in valid_fields}
-                result.append(ProviderItemBatchType(**filtered_batch_dict))
+                result.append(normalize_to_json(batch_dict))
             return result
-        except Exception:
-            return []
+
+        return loaders.provider_item_batch_list_loader.load(provider_item_uuid).then(
+            build_batches
+        )
 
 
 class ItemPriceTierListType(ListObjectType):

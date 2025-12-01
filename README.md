@@ -40,6 +40,7 @@ ai_rfq_engine/
 ├── ai_rfq_engine/           # Main package
 │   ├── handlers/            # Configuration and handlers
 │   ├── models/              # Data models and business logic
+│   │   └── batch_loaders/   # DataLoader implementations
 │   ├── mutations/           # GraphQL mutations
 │   ├── queries/             # GraphQL queries
 │   ├── types/               # GraphQL type definitions
@@ -836,3 +837,19 @@ export EXECUTE_MODE=local_for_all
 # Run tests to verify setup
 pytest ai_rfq_engine/tests/ -v
 ```
+
+### API Testing
+
+To facilitate testing and exploration of the API, a comprehensive Postman collection is included in the project.
+
+#### Using the Postman Collection
+
+1. **Locate the Collection**: The collection file is located at `ai_rfq_engine/ai_rfq_postman_collection.json`.
+2. **Import into Postman**:
+   - Open Postman.
+   - Click "Import" in the top left.
+   - Drag and drop the `ai_rfq_postman_collection.json` file or select it from the file dialog.
+3. **Explore the API**:
+   - The collection includes pre-configured GraphQL queries and mutations for all supported operations.
+   - It covers CRUD operations for Items, Segments, Providers, Quotes, Requests, and more.
+   - Use it to verify nested relationships and batch loading behavior.
