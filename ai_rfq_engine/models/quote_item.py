@@ -241,6 +241,15 @@ def get_quote_item(quote_uuid: str, quote_item_uuid: str) -> QuoteItemModel:
     return QuoteItemModel.get(quote_uuid, quote_item_uuid)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_quote_item(quote_uuid: str, quote_item_uuid: str) -> QuoteItemModel:
+    return QuoteItemModel.get(quote_uuid, quote_item_uuid)
+
+
 def get_quote_item_count(quote_uuid: str, quote_item_uuid: str) -> int:
     return QuoteItemModel.count(
         quote_uuid, QuoteItemModel.quote_item_uuid == quote_item_uuid
@@ -417,7 +426,7 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         "hash_key": "quote_uuid",
         "range_key": "quote_item_uuid",
     },
-    model_funct=get_quote_item,
+    model_funct=_get_quote_item,
     count_funct=get_quote_item_count,
     type_funct=get_quote_item_type,
 )

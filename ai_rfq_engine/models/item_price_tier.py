@@ -157,6 +157,17 @@ def get_item_price_tier(
     return ItemPriceTierModel.get(item_uuid, item_price_tier_uuid)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_item_price_tier(
+    item_uuid: str, item_price_tier_uuid: str
+) -> ItemPriceTierModel:
+    return ItemPriceTierModel.get(item_uuid, item_price_tier_uuid)
+
+
 def get_item_price_tier_count(item_uuid: str, item_price_tier_uuid: str) -> int:
     return ItemPriceTierModel.count(
         item_uuid, ItemPriceTierModel.item_price_tier_uuid == item_price_tier_uuid
@@ -397,7 +408,7 @@ def _update_previous_tier(
         "hash_key": "item_uuid",
         "range_key": "item_price_tier_uuid",
     },
-    model_funct=get_item_price_tier,
+    model_funct=_get_item_price_tier,
     count_funct=get_item_price_tier_count,
     type_funct=get_item_price_tier_type,
 )

@@ -130,6 +130,15 @@ def get_file(request_uuid: str, file_name: str) -> FileModel:
     return FileModel.get(request_uuid, file_name)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_file(request_uuid: str, file_name: str) -> FileModel:
+    return FileModel.get(request_uuid, file_name)
+
+
 def get_file_count(request_uuid: str, file_name: str) -> int:
     return FileModel.count(request_uuid, FileModel.file_name == file_name)
 
@@ -202,7 +211,7 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         "range_key": "file_name",
     },
     range_key_required=True,
-    model_funct=get_file,
+    model_funct=_get_file,
     count_funct=get_file_count,
     type_funct=get_file_type,
 )

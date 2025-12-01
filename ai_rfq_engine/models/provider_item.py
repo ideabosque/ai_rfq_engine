@@ -174,6 +174,15 @@ def get_provider_item(endpoint_id: str, provider_item_uuid: str) -> ProviderItem
     return ProviderItemModel.get(endpoint_id, provider_item_uuid)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> ProviderItemModel:
+    return ProviderItemModel.get(endpoint_id, provider_item_uuid)
+
+
 def get_provider_item_count(endpoint_id: str, provider_item_uuid: str) -> int:
     return ProviderItemModel.count(
         endpoint_id, ProviderItemModel.provider_item_uuid == provider_item_uuid
@@ -311,7 +320,7 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
         "hash_key": "endpoint_id",
         "range_key": "provider_item_uuid",
     },
-    model_funct=get_provider_item,
+    model_funct=_get_provider_item,
     count_funct=get_provider_item_count,
     type_funct=get_provider_item_type,
 )

@@ -148,6 +148,15 @@ def get_segment_contact(endpoint_id: str, email: str) -> SegmentContactModel:
     return SegmentContactModel.get(endpoint_id, email)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_segment_contact(endpoint_id: str, email: str) -> SegmentContactModel:
+    return SegmentContactModel.get(endpoint_id, email)
+
+
 def get_segment_contact_count(endpoint_id: str, email: str) -> int:
     return SegmentContactModel.count(endpoint_id, SegmentContactModel.email == email)
 
@@ -261,7 +270,7 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
         "range_key": "email",
     },
     range_key_required=True,
-    model_funct=get_segment_contact,
+    model_funct=_get_segment_contact,
     count_funct=get_segment_contact_count,
     type_funct=get_segment_contact_type,
 )

@@ -152,6 +152,15 @@ def get_discount_rule(item_uuid: str, discount_rule_uuid: str) -> DiscountRuleMo
     return DiscountRuleModel.get(item_uuid, discount_rule_uuid)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_discount_rule(item_uuid: str, discount_rule_uuid: str) -> DiscountRuleModel:
+    return DiscountRuleModel.get(item_uuid, discount_rule_uuid)
+
+
 def get_discount_rule_count(item_uuid: str, discount_rule_uuid: str) -> int:
     return DiscountRuleModel.count(
         item_uuid, DiscountRuleModel.discount_rule_uuid == discount_rule_uuid
@@ -392,7 +401,7 @@ def _update_previous_rule(
         "hash_key": "item_uuid",
         "range_key": "discount_rule_uuid",
     },
-    model_funct=get_discount_rule,
+    model_funct=_get_discount_rule,
     count_funct=get_discount_rule_count,
     type_funct=get_discount_rule_type,
 )

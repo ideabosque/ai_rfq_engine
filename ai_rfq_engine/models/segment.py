@@ -135,6 +135,15 @@ def get_segment(endpoint_id: str, segment_uuid: str) -> SegmentModel:
     return SegmentModel.get(endpoint_id, segment_uuid)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_segment(endpoint_id: str, segment_uuid: str) -> SegmentModel:
+    return SegmentModel.get(endpoint_id, segment_uuid)
+
+
 def get_segment_count(endpoint_id: str, segment_uuid: str) -> int:
     return SegmentModel.count(endpoint_id, SegmentModel.segment_uuid == segment_uuid)
 
@@ -208,7 +217,7 @@ def resolve_segment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         "hash_key": "endpoint_id",
         "range_key": "segment_uuid",
     },
-    model_funct=get_segment,
+    model_funct=_get_segment,
     count_funct=get_segment_count,
     type_funct=get_segment_type,
 )

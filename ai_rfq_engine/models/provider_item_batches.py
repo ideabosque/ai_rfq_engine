@@ -151,6 +151,17 @@ def get_provider_item_batch(
     return ProviderItemBatchModel.get(provider_item_uuid, batch_no)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_provider_item_batch(
+    provider_item_uuid: str, batch_no: str
+) -> ProviderItemBatchModel:
+    return ProviderItemBatchModel.get(provider_item_uuid, batch_no)
+
+
 def get_provider_item_batch_count(provider_item_uuid: str, batch_no: str) -> int:
     return ProviderItemBatchModel.count(
         provider_item_uuid, ProviderItemBatchModel.batch_no == batch_no
@@ -289,7 +300,7 @@ def resolve_provider_item_batch_list(
         "range_key": "batch_no",
     },
     range_key_required=True,
-    model_funct=get_provider_item_batch,
+    model_funct=_get_provider_item_batch,
     count_funct=get_provider_item_batch_count,
     type_funct=get_provider_item_batch_type,
 )

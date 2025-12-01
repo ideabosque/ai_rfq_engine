@@ -123,6 +123,15 @@ def get_installment(quote_uuid: str, installment_uuid: str) -> InstallmentModel:
     return InstallmentModel.get(quote_uuid, installment_uuid)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_installment(quote_uuid: str, installment_uuid: str) -> InstallmentModel:
+    return InstallmentModel.get(quote_uuid, installment_uuid)
+
+
 def get_installment_count(quote_uuid: str, installment_uuid: str) -> int:
     return InstallmentModel.count(
         quote_uuid, InstallmentModel.installment_uuid == installment_uuid
@@ -270,7 +279,7 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
         "hash_key": "quote_uuid",
         "range_key": "installment_uuid",
     },
-    model_funct=get_installment,
+    model_funct=_get_installment,
     count_funct=get_installment_count,
     type_funct=get_installment_type,
 )

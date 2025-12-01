@@ -137,6 +137,15 @@ def get_item(endpoint_id: str, item_uuid: str) -> ItemModel:
     return ItemModel.get(endpoint_id, item_uuid)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_item(endpoint_id: str, item_uuid: str) -> ItemModel:
+    return ItemModel.get(endpoint_id, item_uuid)
+
+
 def get_item_count(endpoint_id: str, item_uuid: str) -> int:
     return ItemModel.count(endpoint_id, ItemModel.item_uuid == item_uuid)
 
@@ -206,7 +215,7 @@ def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         "hash_key": "endpoint_id",
         "range_key": "item_uuid",
     },
-    model_funct=get_item,
+    model_funct=_get_item,
     count_funct=get_item_count,
     type_funct=get_item_type,
 )

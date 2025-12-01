@@ -154,6 +154,15 @@ def get_quote(request_uuid: str, quote_uuid: str) -> QuoteModel:
     return QuoteModel.get(request_uuid, quote_uuid)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_quote(request_uuid: str, quote_uuid: str) -> QuoteModel:
+    return QuoteModel.get(request_uuid, quote_uuid)
+
+
 def get_quote_count(request_uuid: str, quote_uuid: str) -> int:
     return QuoteModel.count(request_uuid, QuoteModel.quote_uuid == quote_uuid)
 
@@ -388,7 +397,7 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         "hash_key": "request_uuid",
         "range_key": "quote_uuid",
     },
-    model_funct=get_quote,
+    model_funct=_get_quote,
     count_funct=get_quote_count,
     type_funct=get_quote_type,
 )

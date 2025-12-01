@@ -149,6 +149,15 @@ def get_request(endpoint_id: str, request_uuid: str) -> RequestModel:
     return RequestModel.get(endpoint_id, request_uuid)
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_request(endpoint_id: str, request_uuid: str) -> RequestModel:
+    return RequestModel.get(endpoint_id, request_uuid)
+
+
 def get_request_count(endpoint_id: str, request_uuid: str) -> int:
     return RequestModel.count(endpoint_id, RequestModel.request_uuid == request_uuid)
 
@@ -280,7 +289,7 @@ def _validate_request_items(endpoint_id: str, items: list) -> None:
         "hash_key": "endpoint_id",
         "range_key": "request_uuid",
     },
-    model_funct=get_request,
+    model_funct=_get_request,
     count_funct=get_request_count,
     type_funct=get_request_type,
 )

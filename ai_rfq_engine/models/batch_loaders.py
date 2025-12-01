@@ -63,6 +63,27 @@ class ItemLoader(_SafeDataLoader):
         )
         if self.cache_enabled:
             self.cache = HybridCacheEngine(Config.get_cache_name("models", "item"))
+            cache_meta = Config.get_cache_entity_config().get("item")
+            self.cache_func_prefix = ""
+            if cache_meta:
+                self.cache_func_prefix = ".".join([cache_meta.get("module"), cache_meta.get("getter")])
+    def generate_cache_key(self, key: Key) -> str:
+        key_data = ":".join([str(key), str({})])
+        return self.cache._generate_key(
+            self.cache_func_prefix,
+            key_data
+        )
+
+    def _get_cache_data(self, key: Key) -> Dict[str, Any]:
+        cache_key = self.generate_cache_key(key)
+        cache_data = self.cache.get(cache_key)
+        if cache_data is not None and not isinstance(cache_data, dict):  # pragma: no cover - defensive
+            cache_data = _normalize_model(cache_data)
+        return cache_data
+
+    def _set_cache_data(self, key: Key, data: Any) -> None:
+        cache_key = self.generate_cache_key(key)
+        self.cache.set(cache_key, data, ttl=Config.get_cache_ttl())
 
     def batch_load_fn(self, keys: List[Key]) -> Promise:
         unique_keys = list(dict.fromkeys(keys))
@@ -72,8 +93,9 @@ class ItemLoader(_SafeDataLoader):
         # Check cache first if enabled
         if self.cache_enabled:
             for key in unique_keys:
-                cache_key = f"{key[0]}:{key[1]}"  # endpoint_id:item_uuid
-                cached_item = self.cache.get(cache_key)
+                # cache_key = f"{key[0]}:{key[1]}"  # endpoint_id:item_uuid
+                # cached_item = self.cache.get(cache_key)
+                cached_item = self._get_cache_data(key)
                 if cached_item:
                     key_map[key] = cached_item
                 else:
@@ -85,17 +107,18 @@ class ItemLoader(_SafeDataLoader):
         if uncached_keys:
             try:
                 for item in ItemModel.batch_get(uncached_keys):
-                    normalized = _normalize_model(item)
                     key = (item.endpoint_id, item.item_uuid)
-                    key_map[key] = normalized
 
                     # Cache the result if enabled
                     if self.cache_enabled:
-                        cache_key = f"{key[0]}:{key[1]}"
-                        self.cache.set(
-                            cache_key, normalized, ttl=Config.get_cache_ttl()
-                        )
-
+                        self._set_cache_data(key, item)
+                        # cache_key = f"{key[0]}:{key[1]}"
+                        # self.cache.set(
+                        #     cache_key, normalized, ttl=Config.get_cache_ttl()
+                        # )
+                    
+                    normalized = _normalize_model(item)
+                    key_map[key] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
@@ -114,6 +137,23 @@ class ProviderItemLoader(_SafeDataLoader):
             self.cache = HybridCacheEngine(
                 Config.get_cache_name("models", "provider_item")
             )
+            cache_meta = Config.get_cache_entity_config().get("provider_item")
+            self.cache_func_prefix = ""
+            if cache_meta:
+                self.cache_func_prefix = ".".join([cache_meta.get("module"), cache_meta.get("getter")])
+    def generate_cache_key(self, key: Key) -> str:
+        key_data = ":".join([str(key), str({})])
+        return self.cache._generate_key(
+            self.cache_func_prefix,
+            key_data
+        )
+
+    def _get_cache_data(self, key: Key) -> Dict[str, Any]:
+        cache_key = self.generate_cache_key(key)
+        cache_data = self.cache.get(cache_key)
+        if cache_data is not None and not isinstance(cache_data, dict):  # pragma: no cover - defensive
+            cache_data = _normalize_model(cache_data)
+        return cache_data
 
     def batch_load_fn(self, keys: List[Key]) -> Promise:
         unique_keys = list(dict.fromkeys(keys))
@@ -123,8 +163,9 @@ class ProviderItemLoader(_SafeDataLoader):
         # Check cache first if enabled
         if self.cache_enabled:
             for key in unique_keys:
-                cache_key = f"{key[0]}:{key[1]}"  # endpoint_id:provider_item_uuid
-                cached_item = self.cache.get(cache_key)
+                # cache_key = f"{key[0]}:{key[1]}"  # endpoint_id:provider_item_uuid
+                # cached_item = self.cache.get(cache_key)
+                cached_item = self._get_cache_data(key)
                 if cached_item:
                     key_map[key] = cached_item
                 else:
@@ -136,17 +177,18 @@ class ProviderItemLoader(_SafeDataLoader):
         if uncached_keys:
             try:
                 for pi in ProviderItemModel.batch_get(uncached_keys):
-                    normalized = _normalize_model(pi)
                     key = (pi.endpoint_id, pi.provider_item_uuid)
-                    key_map[key] = normalized
 
                     # Cache the result if enabled
                     if self.cache_enabled:
-                        cache_key = f"{key[0]}:{key[1]}"
-                        self.cache.set(
-                            cache_key, normalized, ttl=Config.get_cache_ttl()
-                        )
+                        # cache_key = f"{key[0]}:{key[1]}"
+                        # self.cache.set(
+                        #     cache_key, normalized, ttl=Config.get_cache_ttl()
+                        # )
+                        self._set_cache_data(key, pi)
 
+                    normalized = _normalize_model(pi)
+                    key_map[key] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
