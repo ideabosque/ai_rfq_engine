@@ -119,6 +119,26 @@ def purge_cache():
                     cascade_depth=3,
                 )
 
+                if kwargs.get("item_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="item_price_tier",
+                        context_keys=context_keys,
+                        entity_keys={"item_uuid": kwargs.get("item_uuid")},
+                        cascade_depth=3,
+                        custom_getter="get_item_price_tiers_by_item"
+                    )
+
+                if kwargs.get("item_uuid") and kwargs.get("item_price_tier_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="item_price_tier",
+                        context_keys=context_keys,
+                        entity_keys={"item_uuid": kwargs.get("item_uuid"), "item_price_tier_uuid": kwargs.get("item_price_tier_uuid")},
+                        cascade_depth=3,
+                        custom_getter="get_item_price_tiers_by_provider_item"
+                    )
+                   
                 ## Original function.
                 result = original_function(*args, **kwargs)
 
@@ -494,3 +514,36 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 def delete_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "item_price_tier"),
+)
+def get_item_price_tiers_by_item(
+    item_uuid: str
+) -> Any:
+    return ItemPriceTierModel.query(item_uuid)
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "item_price_tier"),
+)
+def get_item_price_tiers_by_provider_item(
+    item_uuid: str, provider_item_uuid: str
+) -> Any:
+    item_price_tiers = []
+    for item_price_tier in ItemPriceTierModel.provider_item_uuid_index.query(
+        item_uuid, ItemPriceTierModel.provider_item_uuid == provider_item_uuid
+    ):
+        item_price_tiers.append(item_price_tier)
+    return item_price_tiers

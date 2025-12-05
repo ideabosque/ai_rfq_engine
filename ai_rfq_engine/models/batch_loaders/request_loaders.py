@@ -77,13 +77,11 @@ class RequestLoaders:
             return
 
         if entity_type == "item" and "item_uuid" in entity_keys:
-            cache_key = f"{entity_keys.get('endpoint_id')}:{entity_keys['item_uuid']}"
+            cache_key = self.item_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['item_uuid']))
             if hasattr(self.item_loader, "cache"):
                 self.item_loader.cache.delete(cache_key)
         elif entity_type == "provider_item" and "provider_item_uuid" in entity_keys:
-            cache_key = (
-                f"{entity_keys.get('endpoint_id')}:{entity_keys['provider_item_uuid']}"
-            )
+            cache_key = self.provider_item_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['provider_item_uuid']))
             if hasattr(self.provider_item_loader, "cache"):
                 self.provider_item_loader.cache.delete(cache_key)
             if (
@@ -91,36 +89,32 @@ class RequestLoaders:
                 and hasattr(self.provider_items_by_item_loader, "cache")
                 and "item_uuid" in entity_keys
             ):
-                list_cache_key = (
-                    f"{entity_keys.get('endpoint_id')}:{entity_keys['item_uuid']}:list"
-                )
+                list_cache_key = self.provider_items_by_item_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['item_uuid']))
                 self.provider_items_by_item_loader.cache.delete(list_cache_key)
         elif entity_type == "segment" and "segment_uuid" in entity_keys:
-            cache_key = (
-                f"{entity_keys.get('endpoint_id')}:{entity_keys['segment_uuid']}"
-            )
+            cache_key = self.segment_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['segment_uuid']))
             if hasattr(self.segment_loader, "cache"):
                 self.segment_loader.cache.delete(cache_key)
         elif entity_type == "request" and "request_uuid" in entity_keys:
-            cache_key = (
-                f"{entity_keys.get('endpoint_id')}:{entity_keys['request_uuid']}"
-            )
+            cache_key = self.request_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['request_uuid']))
             if hasattr(self.request_loader, "cache"):
                 self.request_loader.cache.delete(cache_key)
         elif entity_type == "quote" and "quote_uuid" in entity_keys:
-            cache_key = f"{entity_keys.get('request_uuid')}:{entity_keys['quote_uuid']}"
+            cache_key = self.quote_loader.generate_cache_key((entity_keys.get('request_uuid'),entity_keys['quote_uuid']))
             if hasattr(self.quote_loader, "cache"):
                 self.quote_loader.cache.delete(cache_key)
             if hasattr(self, "quote_item_list_loader") and hasattr(
                 self.quote_item_list_loader, "cache"
             ):
-                self.quote_item_list_loader.cache.delete(entity_keys["quote_uuid"])
+                cache_key = self.quote_item_list_loader.generate_cache_key((entity_keys.get('quote_uuid')))
+                self.quote_item_list_loader.cache.delete(cache_key)
             if hasattr(self, "installment_list_loader") and hasattr(
                 self.installment_list_loader, "cache"
             ):
-                self.installment_list_loader.cache.delete(entity_keys["quote_uuid"])
+                cache_key = self.installment_list_loader.generate_cache_key((entity_keys.get('quote_uuid')))
+                self.installment_list_loader.cache.delete(cache_key)
         elif entity_type == "provider_item_batch" and "provider_item_uuid" in entity_keys:
-            cache_key = entity_keys["provider_item_uuid"]
+            cache_key = self.provider_item_batch_list_loader.generate_cache_key((entity_keys.get('provider_item_uuid')))
             if hasattr(self, "provider_item_batch_list_loader") and hasattr(
                 self.provider_item_batch_list_loader, "cache"
             ):
@@ -130,7 +124,7 @@ class RequestLoaders:
             and "item_uuid" in entity_keys
             and "provider_item_uuid" in entity_keys
         ):
-            cache_key = f"{entity_keys['item_uuid']}:{entity_keys['provider_item_uuid']}"
+            cache_key = self.item_price_tier_by_provider_item_loader.generate_cache_key((entity_keys.get('item_uuid'), entity_keys['provider_item_uuid']))
             if hasattr(self, "item_price_tier_by_provider_item_loader") and hasattr(
                 self.item_price_tier_by_provider_item_loader, "cache"
             ):
@@ -138,11 +132,12 @@ class RequestLoaders:
             if hasattr(self, "item_price_tier_by_item_loader") and hasattr(
                 self.item_price_tier_by_item_loader, "cache"
             ):
+                cache_key = self.item_price_tier_by_item_loader.generate_cache_key((entity_keys.get('item_uuid')))
                 self.item_price_tier_by_item_loader.cache.delete(
-                    entity_keys["item_uuid"]
+                    cache_key
                 )
         elif entity_type == "discount_rule" and "item_uuid" in entity_keys:
-            cache_key = entity_keys["item_uuid"]
+            cache_key = self.discount_rule_by_item_loader.generate_cache_key((entity_keys.get('item_uuid')))
             if hasattr(self, "discount_rule_by_item_loader") and hasattr(
                 self.discount_rule_by_item_loader, "cache"
             ):

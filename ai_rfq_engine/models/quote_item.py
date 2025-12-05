@@ -206,6 +206,16 @@ def purge_cache():
                     cascade_depth=3,
                 )
 
+                if kwargs.get("quote_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="provider_item",
+                        context_keys=context_keys,
+                        entity_keys={"quote_uuid": kwargs.get("quote_uuid")},
+                        cascade_depth=3,
+                        custom_getter="get_quote_items_by_quote",
+                    )
+
                 ## Original function.
                 result = original_function(*args, **kwargs)
 
@@ -582,3 +592,17 @@ def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     update_quote_totals(info, request_uuid, quote_uuid)
 
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "quote_item")
+)
+def get_quote_items_by_quote(quote_uuid: str) -> Any:
+    quote_items = []
+    for quote_item in QuoteItemModel.query(quote_uuid):
+        quote_items.append(quote_item)
+    return quote_items

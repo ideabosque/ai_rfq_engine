@@ -113,6 +113,16 @@ def purge_cache():
                     cascade_depth=3,
                 )
 
+                if kwargs.get("provider_item_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="provider_item_batch",
+                        context_keys=context_keys,
+                        entity_keys={"provider_item_uuid": kwargs.get("provider_item_uuid")},
+                        cascade_depth=3,
+                        custom_getter="get_provider_item_batches_by_provider_item"
+                    )
+
                 ## Original function.
                 result = original_function(*args, **kwargs)
 
@@ -409,3 +419,20 @@ def insert_update_provider_item_batch(
 def delete_provider_item_batch(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "provider_item_batch"),
+)
+def get_provider_item_batches_by_provider_item(
+    provider_item_uuid: str
+) -> Any:
+    provider_item_batches = []
+    for provider_item_batch in ProviderItemBatchModel.query(provider_item_uuid):
+        provider_item_batches.append(provider_item_batch)
+    return provider_item_batches

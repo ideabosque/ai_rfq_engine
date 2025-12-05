@@ -112,6 +112,20 @@ def purge_cache():
                     cascade_depth=3,
                 )
 
+                endpoint_id = args[0].context.get("endpoint_id") or kwargs.get(
+                    "endpoint_id"
+                )
+                if kwargs.get("segment_uuid") and endpoint_id:
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="segment_contact",
+                        context_keys={"endpoint_id": endpoint_id},
+                        entity_keys={"segment_uuid": kwargs.get("segment_uuid")},
+                        cascade_depth=3,
+                        custom_getter="get_segment_contacts_by_segment",
+                        custom_cache_keys=["context:endpoint_id", "key:segment_uuid"],
+                    )
+
                 ## Original function.
                 result = original_function(*args, **kwargs)
 
@@ -327,3 +341,20 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 def delete_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "segment_contact"),
+)
+def get_segment_contacts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
+    segment_contacts = []
+    for contact in SegmentContactModel.segment_uuid_index.query(
+        endpoint_id, SegmentContactModel.segment_uuid == segment_uuid
+    ):
+        segment_contacts.append(contact)
+    return segment_contacts

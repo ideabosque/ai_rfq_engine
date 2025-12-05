@@ -138,6 +138,20 @@ def purge_cache():
                     cascade_depth=3,
                 )
 
+                endpoint_id = args[0].context.get("endpoint_id") or kwargs.get(
+                    "endpoint_id"
+                )
+                if kwargs.get("item_uuid") and endpoint_id:
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="provider_item",
+                        context_keys={"endpoint_id": endpoint_id},
+                        entity_keys={"provider_item_uuid": kwargs.get("provider_item_uuid")},
+                        cascade_depth=3,
+                        custom_getter="get_provider_items_by_item",
+                        custom_cache_keys=["context:endpoint_id", "key:item_uuid"],
+                    )
+
                 ## Original function.
                 result = original_function(*args, **kwargs)
 
@@ -427,3 +441,20 @@ def delete_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 
     kwargs.get("entity").delete()
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "provider_item"),
+)
+def get_provider_items_by_item(endpoint_id: str, item_uuid: str) -> Any:
+    provider_items = []
+    for provider_item in ProviderItemModel.item_uuid_index.query(
+        endpoint_id, ProviderItemModel.item_uuid == item_uuid
+    ):
+        provider_items.append(provider_item)
+    return provider_items
