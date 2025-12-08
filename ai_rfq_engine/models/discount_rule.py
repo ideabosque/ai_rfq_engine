@@ -7,7 +7,7 @@ __author__ = "bibow"
 import functools
 import logging
 import traceback
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 import pendulum
 from graphene import ResolveInfo
@@ -123,7 +123,7 @@ def purge_cache():
                         context_keys=context_keys,
                         entity_keys={"item_uuid": kwargs.get("item_uuid")},
                         cascade_depth=3,
-                        custom_getter="get_discount_rules_by_item"
+                        custom_getter="get_discount_rules_by_item",
                     )
 
                 ## Original function.
