@@ -4,7 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from graphene import DateTime, Field, List, ObjectType, String
+from graphene import DateTime, Field, List, ObjectType, String, Int
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
@@ -16,10 +16,12 @@ from .request import RequestType
 class QuoteType(ObjectType):
     request_uuid = String()  # keep raw id
     quote_uuid = String()
+    endpoint_id = String()
     provider_corp_external_id = String()
     sales_rep_email = String()
-    quote_description = String()
-    payment_terms = String()
+    # quote_description = String()
+    # payment_terms = String()
+    rounds = Int()
     shipping_method = String()
     shipping_amount = String()
     total_quote_amount = String()

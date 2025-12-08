@@ -213,7 +213,7 @@ def purge_cache():
                         context_keys=context_keys,
                         entity_keys={"quote_uuid": kwargs.get("quote_uuid")},
                         cascade_depth=3,
-                        custom_getter="get_quote_items_by_quote",
+                        custom_options={"custom_getter": "get_quote_items_by_quote", "custom_cache_keys": ["key:quote_uuid"]}
                     )
 
                 ## Original function.

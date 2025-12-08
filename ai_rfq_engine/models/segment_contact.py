@@ -122,8 +122,7 @@ def purge_cache():
                         context_keys={"endpoint_id": endpoint_id},
                         entity_keys={"segment_uuid": kwargs.get("segment_uuid")},
                         cascade_depth=3,
-                        custom_getter="get_segment_contacts_by_segment",
-                        custom_cache_keys=["context:endpoint_id", "key:segment_uuid"],
+                        custom_options={"custom_getter": "get_segment_contacts_by_segment", "custom_cache_keys": ["context:endpoint_id", "key:segment_uuid"]}
                     )
 
                 ## Original function.

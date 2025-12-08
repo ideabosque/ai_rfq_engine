@@ -148,8 +148,7 @@ def purge_cache():
                         context_keys={"endpoint_id": endpoint_id},
                         entity_keys={"provider_item_uuid": kwargs.get("provider_item_uuid")},
                         cascade_depth=3,
-                        custom_getter="get_provider_items_by_item",
-                        custom_cache_keys=["context:endpoint_id", "key:item_uuid"],
+                        custom_options={"custom_getter": "get_provider_items_by_item", "custom_cache_keys": ["context:endpoint_id", "key:item_uuid"]}
                     )
 
                 ## Original function.

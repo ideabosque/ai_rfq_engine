@@ -102,7 +102,7 @@ def purge_cache():
                         context_keys=context_keys,
                         entity_keys={"request_uuid": kwargs.get("request_uuid")},
                         cascade_depth=3,
-                        custom_getter="get_files_by_request"
+                        custom_options={"custom_getter": "get_files_by_request", "custom_cache_keys": ["key:request_uuid"]}
                     )
 
                 ## Original function.

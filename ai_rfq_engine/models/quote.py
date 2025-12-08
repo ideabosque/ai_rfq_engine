@@ -126,7 +126,7 @@ def purge_cache():
                         context_keys=None,
                         entity_keys={"request_uuid": kwargs.get("request_uuid")},
                         cascade_depth=3,
-                        custom_getter="get_quotes_by_request",
+                        custom_options={"custom_getter": "get_quotes_by_request", "custom_cache_keys": ["key:request_uuid"]}
                     )
 
                 ## Original function.
@@ -286,8 +286,8 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
         ]
 
         quote_dict["quote_items"] = quote_items
-        quote_dict.pop("endpoint_id")
-        quote_dict.pop("request_uuid")
+        # quote_dict.pop("endpoint_id")
+        # quote_dict.pop("request_uuid")
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)

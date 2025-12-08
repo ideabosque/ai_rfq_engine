@@ -17,11 +17,13 @@ class InstallmentType(ObjectType):
     installment_uuid = String()
     request_uuid = String()  # keep raw id for convenience
     priority = Int()
+    endpoint_id = String()
     installment_amount = String()
     installment_ratio = String()
+    salesorder_no = String()
     scheduled_date = DateTime()
     payment_method = String()
-    payment_status = String()
+    status = String()
 
     # Nested resolver: strongly-typed nested relationship
     quote = Field(lambda: QuoteType)

@@ -16,9 +16,7 @@ class FileType(ObjectType):
     request_uuid = String()  # keep raw id
     file_name = String()
     email = String()
-    file_content = String()
-    file_size = String()
-    file_type = String()
+    endpoint_id = String()
 
     # Nested resolver: strongly-typed nested relationship
     request = Field(lambda: RequestType)

@@ -17,7 +17,7 @@ class ProviderItemType(ObjectType):
     endpoint_id = String()
     provider_item_uuid = String()
     provider_corp_external_id = String()
-    external_id = String()
+    # external_id = String()
     base_price_per_uom = String()
     item_spec = JSON()  # Keep as JSON since it's a MapAttribute
 

@@ -126,7 +126,7 @@ def purge_cache():
                         context_keys=context_keys,
                         entity_keys={"item_uuid": kwargs.get("item_uuid")},
                         cascade_depth=3,
-                        custom_getter="get_item_price_tiers_by_item"
+                        custom_options={"custom_getter": "get_item_price_tiers_by_item", "custom_cache_keys": ["key:item_uuid"]}
                     )
 
                 if kwargs.get("item_uuid") and kwargs.get("item_price_tier_uuid"):
@@ -136,7 +136,7 @@ def purge_cache():
                         context_keys=context_keys,
                         entity_keys={"item_uuid": kwargs.get("item_uuid"), "item_price_tier_uuid": kwargs.get("item_price_tier_uuid")},
                         cascade_depth=3,
-                        custom_getter="get_item_price_tiers_by_provider_item"
+                        custom_options={"custom_getter": "get_item_price_tiers_by_provider_item", "custom_cache_keys": ["key:item_uuid", "key:item_price_tier_uuid"]}
                     )
                    
                 ## Original function.

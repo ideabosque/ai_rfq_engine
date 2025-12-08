@@ -22,7 +22,7 @@ class ProviderItemBatchType(ObjectType):
     total_cost_per_uom = String()
     guardrail_margin_per_uom = String()
     guardrail_price_per_uom = String()
-    price_per_uom = String()  # Added based on usage in item_price_tier.py
+    # price_per_uom = String()  # Added based on usage in item_price_tier.py
     in_stock = Boolean()
     slow_move_item = Boolean()
 
