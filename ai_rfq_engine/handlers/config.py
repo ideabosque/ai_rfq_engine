@@ -100,13 +100,6 @@ class Config:
             "list_resolver": "ai_rfq_engine.queries.item_price_tier.resolve_item_price_tier_list",
             "cache_keys": ["key:item_uuid", "key:item_price_tier_uuid"],
         },
-        "discount_rule": {
-            "module": "ai_rfq_engine.models.discount_rule",
-            "model_class": "DiscountRuleModel",
-            "getter": "get_discount_rule",
-            "list_resolver": "ai_rfq_engine.queries.discount_rule.resolve_discount_rule_list",
-            "cache_keys": ["key:item_uuid", "key:discount_rule_uuid"],
-        },
         "installment": {
             "module": "ai_rfq_engine.models.installment",
             "model_class": "InstallmentModel",
@@ -120,6 +113,13 @@ class Config:
             "getter": "get_file",
             "list_resolver": "ai_rfq_engine.queries.file.resolve_file_list",
             "cache_keys": ["key:request_uuid", "key:file_uuid"],
+        },
+        "discount_prompt": {
+            "module": "ai_rfq_engine.models.discount_prompt",
+            "model_class": "DiscountPromptModel",
+            "getter": "get_discount_prompt",
+            "list_resolver": "ai_rfq_engine.queries.discount_prompt.resolve_discount_prompt_list",
+            "cache_keys": ["context:endpoint_id", "key:discount_prompt_uuid"],
         },
     }
 
@@ -172,9 +172,9 @@ class Config:
                 "dependency_key": "segment_uuid",
             },
             {
-                "entity_type": "discount_rule",
-                "list_resolver": "resolve_discount_rule_list",
-                "module": "discount_rule",
+                "entity_type": "discount_prompt",
+                "list_resolver": "resolve_discount_prompt_list",
+                "module": "discount_prompt",
                 "dependency_key": "segment_uuid",
             },
         ],
@@ -192,9 +192,9 @@ class Config:
                 "dependency_key": "item_uuid",
             },
             {
-                "entity_type": "discount_rule",
-                "list_resolver": "resolve_discount_rule_list",
-                "module": "discount_rule",
+                "entity_type": "discount_prompt",
+                "list_resolver": "resolve_discount_prompt_list",
+                "module": "discount_prompt",
                 "dependency_key": "item_uuid",
             },
         ],
@@ -212,9 +212,9 @@ class Config:
                 "dependency_key": "provider_item_uuid",
             },
             {
-                "entity_type": "discount_rule",
-                "list_resolver": "resolve_discount_rule_list",
-                "module": "discount_rule",
+                "entity_type": "discount_prompt",
+                "list_resolver": "resolve_discount_prompt_list",
+                "module": "discount_prompt",
                 "dependency_key": "provider_item_uuid",
             },
         ],

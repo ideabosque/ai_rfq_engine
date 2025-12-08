@@ -30,6 +30,7 @@ from silvaengine_utility import Utility, method_cache
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
+from ..types.discount_prompt import DiscountPromptListType, DiscountPromptType
 
 
 # Status constants for DiscountPrompt
@@ -44,6 +45,7 @@ class DiscountPromptScope:
     GLOBAL = "global"
     SEGMENT = "segment"
     ITEM = "item"
+    PROVIDER_ITEM = "provider_item"
 
 
 def validate_and_normalize_discount_rules(discount_rules):
@@ -251,6 +253,83 @@ def create_discount_prompt_table(logger: logging.Logger) -> bool:
     return True
 
 
+def get_discount_prompts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
+    """
+    Get all ACTIVE discount prompts with scope='segment' for a segment.
+
+    Note: Returns only SEGMENT-scoped prompts. GLOBAL scope is loaded separately
+    by the batch loader to avoid duplication.
+    """
+    prompts = []
+    for prompt in DiscountPromptModel.scope_index.query(
+        endpoint_id,
+        DiscountPromptModel.scope == DiscountPromptScope.SEGMENT,
+        filter_condition=(
+            DiscountPromptModel.status
+            == DiscountPromptStatus.ACTIVE
+            & DiscountPromptModel.tags.contains(segment_uuid)
+        ),
+    ):
+        prompts.append(prompt)
+    return prompts
+
+
+def get_discount_prompts_by_item(endpoint_id: str, item_uuid: str) -> Any:
+    """
+    Get all ACTIVE discount prompts with scope='item' for an item.
+
+    Note: Returns only ITEM-scoped prompts. GLOBAL and SEGMENT scopes are loaded
+    separately by the batch loader to avoid duplication.
+    """
+    prompts = []
+    for prompt in DiscountPromptModel.scope_index.query(
+        endpoint_id,
+        DiscountPromptModel.scope == DiscountPromptScope.ITEM,
+        filter_condition=(
+            DiscountPromptModel.status
+            == DiscountPromptStatus.ACTIVE
+            & DiscountPromptModel.tags.contains(item_uuid)
+        ),
+    ):
+        prompts.append(prompt)
+    return prompts
+
+
+def get_discount_prompts_by_provider_item(
+    endpoint_id: str, provider_item_uuid: str
+) -> Any:
+    """
+    Get all ACTIVE discount prompts with scope='provider_item'.
+
+    Note: Returns only PROVIDER_ITEM-scoped prompts. GLOBAL, SEGMENT, and ITEM scopes
+    are loaded separately by the batch loader to avoid duplication.
+    """
+    prompts = []
+    for prompt in DiscountPromptModel.scope_index.query(
+        endpoint_id,
+        DiscountPromptModel.scope == DiscountPromptScope.PROVIDER_ITEM,
+        filter_condition=(
+            DiscountPromptModel.status
+            == DiscountPromptStatus.ACTIVE
+            & DiscountPromptModel.tags.contains(provider_item_uuid)
+        ),
+    ):
+        prompts.append(prompt)
+    return prompts
+
+
+def get_global_discount_prompts(endpoint_id: str) -> Any:
+    """Get all ACTIVE global discount prompts for an endpoint."""
+    prompts = []
+    for prompt in DiscountPromptModel.scope_index.query(
+        endpoint_id,
+        DiscountPromptModel.scope == DiscountPromptScope.GLOBAL,
+        filter_condition=(DiscountPromptModel.status == DiscountPromptStatus.ACTIVE),
+    ):
+        prompts.append(prompt)
+    return prompts
+
+
 @retry(
     reraise=True,
     wait=wait_exponential(multiplier=1, max=60),
@@ -274,7 +353,7 @@ def get_discount_prompt_count(endpoint_id: str, discount_prompt_uuid: str) -> in
 
 def get_discount_prompt_type(
     info: ResolveInfo, discount_prompt: DiscountPromptModel
-) -> Dict[str, Any]:
+) -> DiscountPromptType:
     """
     Convert DiscountPromptModel to a dictionary type.
     """
@@ -285,12 +364,12 @@ def get_discount_prompt_type(
         info.context.get("logger").exception(log)
         raise
 
-    return Utility.json_normalize(prompt_dict)
+    return DiscountPromptType(**Utility.json_normalize(prompt_dict))
 
 
 def resolve_discount_prompt(
     info: ResolveInfo, **kwargs: Dict[str, Any]
-) -> Dict[str, Any] | None:
+) -> DiscountPromptType | None:
     count = get_discount_prompt_count(
         info.context["endpoint_id"], kwargs["discount_prompt_uuid"]
     )
@@ -315,7 +394,7 @@ def resolve_discount_prompt(
         "status",
         "updated_at",
     ],
-    list_type_class=dict,
+    list_type_class=DiscountPromptListType,
     type_funct=get_discount_prompt_type,
 )
 def resolve_discount_prompt_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:

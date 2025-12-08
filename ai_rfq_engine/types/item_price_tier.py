@@ -10,8 +10,6 @@ from silvaengine_utility import JSON
 
 from ..models.batch_loaders import get_loaders
 from ..utils.normalization import normalize_to_json
-from .provider_item import ProviderItemType
-from .segment import SegmentType
 
 
 class ItemPriceTierType(ObjectType):
@@ -121,3 +119,8 @@ class ItemPriceTierType(ObjectType):
 
 class ItemPriceTierListType(ListObjectType):
     item_price_tier_list = List(ItemPriceTierType)
+
+
+# Bottom imports - imported after class definitions to avoid circular imports
+from .provider_item import ProviderItemType
+from .segment import SegmentType

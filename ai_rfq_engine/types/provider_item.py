@@ -10,14 +10,13 @@ from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
 from ..models.batch_loaders import get_loaders
-from .item import ItemType
 
 
 class ProviderItemType(ObjectType):
     endpoint_id = String()
     provider_item_uuid = String()
     provider_corp_external_id = String()
-    # external_id = String()
+    provider_item_external_id = String()
     base_price_per_uom = String()
     item_spec = JSON()  # Keep as JSON since it's a MapAttribute
 
@@ -54,3 +53,7 @@ class ProviderItemType(ObjectType):
 
 class ProviderItemListType(ListObjectType):
     provider_item_list = List(ProviderItemType)
+
+
+# Bottom imports - imported after class definitions to avoid circular imports
+from .item import ItemType

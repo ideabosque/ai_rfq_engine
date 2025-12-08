@@ -4,12 +4,10 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from graphene import Boolean, DateTime, Field, List, ObjectType, String
+from graphene import Boolean, DateTime, Field, Float, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
 
 from ..models.batch_loaders import get_loaders
-from .item import ItemType
-from .provider_item import ProviderItemType
 
 
 class ProviderItemBatchType(ObjectType):
@@ -22,7 +20,6 @@ class ProviderItemBatchType(ObjectType):
     total_cost_per_uom = String()
     guardrail_margin_per_uom = String()
     guardrail_price_per_uom = String()
-    # price_per_uom = String()  # Added based on usage in item_price_tier.py
     in_stock = Boolean()
     slow_move_item = Boolean()
 
@@ -79,3 +76,8 @@ class ProviderItemBatchType(ObjectType):
 
 class ProviderItemBatchListType(ListObjectType):
     provider_item_batch_list = List(ProviderItemBatchType)
+
+
+# Bottom imports - imported after class definitions to avoid circular imports
+from .item import ItemType
+from .provider_item import ProviderItemType

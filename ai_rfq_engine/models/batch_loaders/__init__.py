@@ -7,7 +7,12 @@ __author__ = "bibow"
 from silvaengine_utility.cache import HybridCacheEngine
 
 from .base import Key, SafeDataLoader, normalize_model
-from .discount_rule_by_item_loader import DiscountRuleByItemLoader
+from .discount_prompt_by_scope_loaders import (
+    DiscountPromptGlobalLoader,
+    DiscountPromptByItemLoader,
+    DiscountPromptByProviderItemLoader,
+    DiscountPromptBySegmentLoader,
+)
 from .files_by_request_loader import FilesByRequestLoader
 from .installment_list_loader import InstallmentListLoader
 from .item_loader import ItemLoader
@@ -35,7 +40,10 @@ __all__ = [
     "_SafeDataLoader",
     "_normalize_model",
     "HybridCacheEngine",
-    "DiscountRuleByItemLoader",
+    "DiscountPromptGlobalLoader",
+    "DiscountPromptBySegmentLoader",
+    "DiscountPromptByItemLoader",
+    "DiscountPromptByProviderItemLoader",
     "FilesByRequestLoader",
     "InstallmentListLoader",
     "ItemLoader",

@@ -5,11 +5,9 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Field, Int, List, ObjectType, String
-
 from silvaengine_dynamodb_base import ListObjectType
 
 from ..models.batch_loaders import get_loaders
-from .quote import QuoteType
 
 
 class InstallmentType(ObjectType):
@@ -24,13 +22,12 @@ class InstallmentType(ObjectType):
     scheduled_date = DateTime()
     payment_method = String()
     status = String()
-
-    # Nested resolver: strongly-typed nested relationship
-    quote = Field(lambda: QuoteType)
-
     updated_by = String()
     created_at = DateTime()
     updated_at = DateTime()
+
+    # Nested resolver: strongly-typed nested relationship
+    quote = Field(lambda: QuoteType)
 
     # ------- Nested resolvers -------
 
@@ -57,3 +54,7 @@ class InstallmentType(ObjectType):
 
 class InstallmentListType(ListObjectType):
     installment_list = List(InstallmentType)
+
+
+# Bottom imports - imported after class definitions to avoid circular imports
+from .quote import QuoteType

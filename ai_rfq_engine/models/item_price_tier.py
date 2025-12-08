@@ -27,6 +27,43 @@ from ..handlers.config import Config
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
 
 
+def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, Any]:
+    """Helper to get provider_item data for eager loading."""
+    from .provider_item import get_provider_item, get_provider_item_count
+
+    count = get_provider_item_count(endpoint_id, provider_item_uuid)
+    if count == 0:
+        return {}
+
+    provider_item = get_provider_item(endpoint_id, provider_item_uuid)
+    return {
+        "endpoint_id": provider_item.endpoint_id,
+        "provider_item_uuid": provider_item.provider_item_uuid,
+        "provider_corp_external_id": provider_item.provider_corp_external_id,
+        "provider_item_external_id": getattr(provider_item, "provider_item_external_id", None),
+        "base_price_per_uom": provider_item.base_price_per_uom,
+        "item_uuid": provider_item.item_uuid,
+    }
+
+
+def _get_segment(endpoint_id: str, segment_uuid: str) -> Dict[str, Any]:
+    """Helper to get segment data for eager loading."""
+    from .segment import get_segment, get_segment_count
+
+    count = get_segment_count(endpoint_id, segment_uuid)
+    if count == 0:
+        return {}
+
+    segment = get_segment(endpoint_id, segment_uuid)
+    return {
+        "endpoint_id": segment.endpoint_id,
+        "segment_uuid": segment.segment_uuid,
+        "provider_corp_external_id": segment.provider_corp_external_id,
+        "segment_name": segment.segment_name,
+        "segment_description": segment.segment_description,
+    }
+
+
 class ProviderItemUuidIndex(LocalSecondaryIndex):
     """
     This class represents a local secondary index
@@ -198,12 +235,68 @@ def get_item_price_tier_type(
     info: ResolveInfo, item_price_tier: ItemPriceTierModel
 ) -> ItemPriceTierType:
     """
-    Nested resolver approach: return minimal item_price_tier data.
-    - Do NOT embed 'provider_item', 'segment', or 'provider_item_batches'.
-    Those are resolved lazily by ItemPriceTierType resolvers.
+    Convert ItemPriceTierModel to ItemPriceTierType with eager-loaded relationships.
+
+    Eagerly loads:
+    - provider_item data
+    - segment data
+    - provider_item_batches (if margin_per_uom is set)
     """
     try:
-        tier_dict = item_price_tier.__dict__["attribute_values"]
+        from .provider_item_batches import resolve_provider_item_batch_list
+
+        provider_item = _get_provider_item(
+            info.context["endpoint_id"], item_price_tier.provider_item_uuid
+        )
+        segment = _get_segment(
+            info.context["endpoint_id"], item_price_tier.segment_uuid
+        )
+
+        provider_item_batches = []
+        if item_price_tier.margin_per_uom is not None:
+            provider_item_batch_list = resolve_provider_item_batch_list(
+                info,
+                **{
+                    "item_uuid": item_price_tier.item_uuid,
+                    "provider_item_uuid": item_price_tier.provider_item_uuid,
+                    "in_stock": True,
+                    "expired_at_gt": pendulum.now("UTC"),
+                },
+            )
+            for (
+                provider_item_batch
+            ) in provider_item_batch_list.provider_item_batch_list:
+                margin_per_uom = float(item_price_tier.margin_per_uom)
+                if provider_item_batch.slow_move_item:
+                    margin_per_uom = 0.0
+                provider_item_batch.price_per_uom = float(
+                    provider_item_batch.guardrail_price_per_uom
+                ) * (1 + margin_per_uom / 100)
+                provider_item_batches.append(
+                    {
+                        "batch_no": provider_item_batch.batch_no,
+                        "price_per_uom": provider_item_batch.price_per_uom,
+                        "expired_at": provider_item_batch.expired_at,
+                        "slow_move_item": provider_item_batch.slow_move_item,
+                        "in_stock": provider_item_batch.in_stock,
+                    }
+                )
+
+        tier_dict: Dict = item_price_tier.__dict__["attribute_values"]
+        tier_dict.update(
+            {
+                "provider_item": provider_item,
+                "segment": segment,
+            }
+        )
+
+        if len(provider_item_batches) > 0:
+            tier_dict["provider_item_batches"] = provider_item_batches
+
+        tier_dict.pop("endpoint_id")
+        tier_dict.pop("provider_item_uuid")
+        tier_dict.pop("segment_uuid")
+        tier_dict.pop("item_uuid")
     except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)

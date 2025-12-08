@@ -32,8 +32,9 @@ sys.path.insert(0, os.path.join(base_dir, "silvaengine_utility"))
 sys.path.insert(1, os.path.join(base_dir, "silvaengine_dynamodb_base"))
 sys.path.insert(2, os.path.join(base_dir, "ai_rfq_engine"))
 
-from ai_rfq_engine import AIRFQEngine
 from silvaengine_utility import Utility
+
+from ai_rfq_engine import AIRFQEngine
 
 # Test settings
 SETTING = {
@@ -48,6 +49,7 @@ SETTING = {
     },
     "endpoint_id": os.getenv("endpoint_id"),
     "execute_mode": os.getenv("execute_mode", "local"),
+    "initialize_tables": os.getenv("initialize_tables", 0),
 }
 
 
@@ -165,9 +167,7 @@ def _raise_no_matches(filters_desc: str, items: Sequence[pytest.Item]) -> None:
     """Raise informative error when no tests matched filter."""
     sample = ", ".join(sorted(item.name for item in items)[:5])
     hint = f" Available sample: {sample}" if sample else ""
-    raise pytest.UsageError(
-        f"{filters_desc} did not match any collected tests.{hint}"
-    )
+    raise pytest.UsageError(f"{filters_desc} did not match any collected tests.{hint}")
 
 
 def pytest_collection_modifyitems(
@@ -200,9 +200,7 @@ def pytest_collection_modifyitems(
         name_match = not target_lower or test_func_name == target_lower
 
         # Check if any requested marker is present
-        marker_match = not markers or any(
-            item.get_closest_marker(m) for m in markers
-        )
+        marker_match = not markers or any(item.get_closest_marker(m) for m in markers)
 
         if name_match and marker_match:
             selected.append(item)
@@ -210,9 +208,7 @@ def pytest_collection_modifyitems(
             deselected.append(item)
 
     if not selected:
-        _raise_no_matches(
-            _format_filter_description(target, marker_filter_raw), items
-        )
+        _raise_no_matches(_format_filter_description(target, marker_filter_raw), items)
 
     items[:] = selected
     config.hook.pytest_deselected(items=deselected)

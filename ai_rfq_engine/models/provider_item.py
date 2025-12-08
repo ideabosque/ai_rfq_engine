@@ -30,7 +30,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.provider_item import ProviderItemListType, ProviderItemType
-from .discount_rule import resolve_discount_rule_list
 from .item_price_tier import resolve_item_price_tier_list
 from .quote_item import resolve_quote_item_list
 
@@ -398,16 +397,6 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
 )
 def delete_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     from .provider_item_batches import resolve_provider_item_batch_list
-
-    discount_rule_list = resolve_discount_rule_list(
-        info,
-        **{
-            "item_uuid": kwargs.get("entity").item_uuid,
-            "provider_item_uuid": kwargs.get("entity").provider_item_uuid,
-        },
-    )
-    if discount_rule_list.total > 0:
-        return False
 
     item_price_tier_list = resolve_item_price_tier_list(
         info,

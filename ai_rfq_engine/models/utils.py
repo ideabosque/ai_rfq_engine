@@ -8,7 +8,7 @@ from typing import Any, Dict
 
 
 def _initialize_tables(logger: logging.Logger) -> None:
-    from .discount_rule import create_discount_rule_table
+    from .discount_prompt import create_discount_prompt_table
     from .file import create_file_table
     from .installment import create_installment_table
     from .item import create_item_table
@@ -32,7 +32,7 @@ def _initialize_tables(logger: logging.Logger) -> None:
     create_request_table(logger)
     create_file_table(logger)
     create_installment_table(logger)
-    create_discount_rule_table(logger)
+    create_discount_prompt_table(logger)
     return
 
 

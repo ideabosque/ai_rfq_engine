@@ -292,39 +292,82 @@ graph TD
 
 **Table**: `are-discount_prompts`
 
+**File**: [ai_rfq_engine/models/discount_prompt.py](../ai_rfq_engine/models/discount_prompt.py)
+
 **Key Attributes**:
 - `endpoint_id` (Hash Key): Multi-tenant partition key
 - `discount_prompt_uuid` (Range Key): Unique identifier
-- `scope`: Targeting scope (GLOBAL, SEGMENT, ITEM) (indexed)
-- `tags`: List of tags for filtering
+- `scope`: Targeting scope (GLOBAL, SEGMENT, ITEM, PROVIDER_ITEM) (indexed via `ScopeIndex`)
+- `tags`: List of tags for flexible filtering and matching
 - `discount_prompt`: AI prompt text for negotiation guidance
-- `conditions`: List of conditional criteria
-- `discount_rules`: Embedded array of discount tiers with `greater_than`, `less_than`, `max_discount_percentage`
-- `priority`: Priority ranking (higher = more specific, takes precedence)
-- `status`: Prompt status (in_review, active, inactive)
-- `created_at`, `updated_by`, `updated_at`: Audit fields
+- `conditions`: List of conditional criteria for applicability
+- `discount_rules`: Embedded array of discount tiers (ListAttribute of MapAttribute)
+  - Each rule: `{"greater_than": float, "less_than": float|None, "max_discount_percentage": float}`
+- `priority`: Priority ranking for conflict resolution (NumberAttribute, default=0)
+- `status`: Prompt status (default: `in_review`)
+- `created_at`, `updated_by`, `updated_at`: Audit fields (UTCDateTimeAttribute)
 
-**Status Workflow**:
-- `in_review`: Awaiting business approval
-- `active`: Applied to pricing calculations
-- `inactive`: Temporarily disabled
+**Status Constants** ([models/discount_prompt.py:36-39](../ai_rfq_engine/models/discount_prompt.py#L36-L39)):
+- `IN_REVIEW = "in_review"`: Awaiting business approval
+- `ACTIVE = "active"`: Applied to pricing calculations
+- `INACTIVE = "inactive"`: Temporarily disabled
 
-**Scope Hierarchy** (by priority):
-- **GLOBAL** (10-30): System-wide defaults
-- **SEGMENT** (40-60): Customer segment-specific
-- **ITEM** (70-90): Item-specific
+**Scope Constants** ([models/discount_prompt.py:43-47](../ai_rfq_engine/models/discount_prompt.py#L43-L47)):
+- `GLOBAL = "global"`: System-wide defaults
+- `SEGMENT = "segment"`: Customer segment-specific
+- `ITEM = "item"`: Item-specific
+- `PROVIDER_ITEM = "provider_item"`: Provider-item specific
 
-**Discount Rules Validation**:
-- First tier must start at `greater_than: 0`
-- Last tier has no `less_than` (open-ended)
-- Tiers must be contiguous (no gaps/overlaps)
-- `max_discount_percentage` must INCREASE with higher tiers (better discounts for larger purchases)
+**Discount Rules Validation** ([models/discount_prompt.py:50-145](../ai_rfq_engine/models/discount_prompt.py#L50-L145)):
+
+The `validate_and_normalize_discount_rules()` function enforces:
+1. **Automatic Sorting**: Rules sorted by `greater_than` (low to high)
+2. **First Tier at Zero**: First tier must start at `greater_than: 0`
+3. **Contiguous Tiers**: Each tier's `less_than` must equal next tier's `greater_than` (no gaps/overlaps)
+4. **Open-Ended Last Tier**: Last tier has no `less_than` (unlimited upper bound)
+5. **Increasing Discounts**: `max_discount_percentage` must INCREASE with higher tiers (higher purchases = better discounts)
+6. **Valid Percentages**: All percentages must be 0-100
+
+**Example Valid discount_rules**:
+```python
+[
+    {"greater_than": 0, "less_than": 1000, "max_discount_percentage": 5},
+    {"greater_than": 1000, "less_than": 5000, "max_discount_percentage": 10},
+    {"greater_than": 5000, "max_discount_percentage": 15}  # No less_than
+]
+```
+
+**Indexes**:
+- `ScopeIndex`: Local secondary index on `scope` for scope-based queries
+- `UpdateAtIndex`: Local secondary index on `updated_at` for temporal queries
+
+**Cache Integration** ([models/discount_prompt.py:204-243](../ai_rfq_engine/models/discount_prompt.py#L204-L243)):
+- Uses cascading cache purging via `purge_entity_cascading_cache()`
+- Entity type: `"discount_prompt"`
+- Cascade depth: 3 levels
+
+**Query Function** ([models/discount_prompt.py:322-373](../ai_rfq_engine/models/discount_prompt.py#L322-L373)):
+`resolve_discount_prompt_list()` supports filtering by:
+- `scope`: Filter by specific scope value
+- `tags`: Filter by tag(s) - uses `contains()` condition
+- `status`: Filter by status (typically `status="active"`)
+- `updated_at_gt` / `updated_at_lt`: Temporal filtering
+
+**Merge Behavior on Update** ([models/discount_prompt.py:426-452](../ai_rfq_engine/models/discount_prompt.py#L426-L452)):
+- When updating `discount_rules`, new rules are merged with existing ones
+- Rules with same `greater_than` value are overridden by new rules
+- Merged rules are validated and normalized before saving
 
 **Integration with AI**:
 - AI queries prompts by scope hierarchy during pricing calculation
-- Filters by `status: active` and evaluates conditions
+- Filters by `status: ACTIVE` and evaluates conditions
 - Extracts `discount_rules` from matching prompts
 - Uses `max_discount_percentage` as upper bound for negotiations
+
+**Relationships**:
+- **Many-to-One** with Segment (via `tags` containing segment_uuid)
+- **Many-to-One** with Item (via `tags` containing item_uuid)
+- **Many-to-One** with ProviderItem (via `tags` containing provider_item_uuid)
 
 ---
 

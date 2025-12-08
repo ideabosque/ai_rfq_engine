@@ -27,7 +27,7 @@ class FilesByRequestLoader(SafeDataLoader):
             cache_meta = Config.get_cache_entity_config().get("file")
             self.cache_func_prefix = ""
             if cache_meta:
-                self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_discount_rules_by_item"])
+                self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_files_by_request"])
 
     def generate_cache_key(self, key: Key) -> str:
         key_data = ":".join([str(key), str({})])

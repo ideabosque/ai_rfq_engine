@@ -4,9 +4,9 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from graphene import DateTime, Field, Float, List, ObjectType, String
+from graphene import DateTime, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON, Utility
+from silvaengine_utility import JSON
 
 from ..models.batch_loaders import get_loaders
 
@@ -33,7 +33,6 @@ class RequestType(ObjectType):
     # Nested resolvers: strongly-typed nested relationships
     quotes = List(JSON)
     files = List(JSON)
-
     # ------- Nested resolvers -------
 
     def resolve_quotes(parent, info):

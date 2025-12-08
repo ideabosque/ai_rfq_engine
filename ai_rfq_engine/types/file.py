@@ -5,11 +5,9 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Field, List, ObjectType, String
-
 from silvaengine_dynamodb_base import ListObjectType
 
 from ..models.batch_loaders import get_loaders
-from .request import RequestType
 
 
 class FileType(ObjectType):
@@ -50,3 +48,7 @@ class FileType(ObjectType):
 
 class FileListType(ListObjectType):
     file_list = List(FileType)
+
+
+# Bottom imports - imported after class definitions to avoid circular imports
+from .request import RequestType

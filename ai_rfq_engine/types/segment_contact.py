@@ -5,11 +5,9 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Field, List, ObjectType, String
-
 from silvaengine_dynamodb_base import ListObjectType
 
 from ..models.batch_loaders import get_loaders
-from .segment import SegmentType
 
 
 class SegmentContactType(ObjectType):
@@ -51,3 +49,7 @@ class SegmentContactType(ObjectType):
 
 class SegmentContactListType(ListObjectType):
     segment_contact_list = List(SegmentContactType)
+
+
+# Bottom imports - imported after class definitions to avoid circular imports
+from .segment import SegmentType

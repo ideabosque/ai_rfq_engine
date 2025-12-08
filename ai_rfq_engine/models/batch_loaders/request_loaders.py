@@ -7,7 +7,12 @@ __author__ = "bibow"
 from typing import Any, Dict
 
 from ...handlers.config import Config
-from .discount_rule_by_item_loader import DiscountRuleByItemLoader
+from .discount_prompt_by_scope_loaders import (
+    DiscountPromptGlobalLoader,
+    DiscountPromptByItemLoader,
+    DiscountPromptByProviderItemLoader,
+    DiscountPromptBySegmentLoader,
+)
 from .files_by_request_loader import FilesByRequestLoader
 from .installment_list_loader import InstallmentListLoader
 from .item_loader import ItemLoader
@@ -55,9 +60,25 @@ class RequestLoaders:
         self.installment_list_loader = InstallmentListLoader(
             logger=logger, cache_enabled=cache_enabled
         )
-        self.discount_rule_by_item_loader = DiscountRuleByItemLoader(
+
+        # Create the global discount prompt loader first
+        self.discount_prompt_global_loader = DiscountPromptGlobalLoader(
             logger=logger, cache_enabled=cache_enabled
         )
+
+        # Create scope-specific loaders and inject the global loader via constructor
+        self.discount_prompt_by_segment_loader = DiscountPromptBySegmentLoader(
+            logger=logger, cache_enabled=cache_enabled, global_loader=self.discount_prompt_global_loader
+        )
+
+        self.discount_prompt_by_item_loader = DiscountPromptByItemLoader(
+            logger=logger, cache_enabled=cache_enabled, global_loader=self.discount_prompt_global_loader
+        )
+
+        self.discount_prompt_by_provider_item_loader = DiscountPromptByProviderItemLoader(
+            logger=logger, cache_enabled=cache_enabled, global_loader=self.discount_prompt_global_loader
+        )
+
         self.segment_loader = SegmentLoader(logger=logger, cache_enabled=cache_enabled)
         self.request_loader = RequestLoader(logger=logger, cache_enabled=cache_enabled)
         self.quote_loader = QuoteLoader(logger=logger, cache_enabled=cache_enabled)
@@ -136,12 +157,6 @@ class RequestLoaders:
                 self.item_price_tier_by_item_loader.cache.delete(
                     cache_key
                 )
-        elif entity_type == "discount_rule" and "item_uuid" in entity_keys:
-            cache_key = self.discount_rule_by_item_loader.generate_cache_key((entity_keys.get('item_uuid')))
-            if hasattr(self, "discount_rule_by_item_loader") and hasattr(
-                self.discount_rule_by_item_loader, "cache"
-            ):
-                self.discount_rule_by_item_loader.cache.delete(cache_key)
 
 
 def get_loaders(context: Dict[str, Any]) -> RequestLoaders:

@@ -326,23 +326,41 @@ class DiscountPromptModel(BaseModel):
 
     endpoint_id = UnicodeAttribute(hash_key=True)
     discount_prompt_uuid = UnicodeAttribute(range_key=True)
-    scope = UnicodeAttribute()                             # global, segment, or item
+    scope = UnicodeAttribute()                             # global, segment, item, or provider_item
     tags = ListAttribute()                                 # Flexible tagging system
     discount_prompt = UnicodeAttribute()                   # AI prompt for discount logic
     conditions = ListAttribute()                           # Conditional logic
     discount_rules = ListAttribute(of=MapAttribute)        # Tiered discount rules
     priority = NumberAttribute(default=0)                  # Priority for conflict resolution
-    status = UnicodeAttribute(default="in_review")         # in_review, active, inactive
+    status = UnicodeAttribute(default=DiscountPromptStatus.IN_REVIEW)  # in_review, active, inactive
+    created_at = UTCDateTimeAttribute()
+    updated_by = UnicodeAttribute()
+    updated_at = UTCDateTimeAttribute()
+    scope_index = ScopeIndex()                             # Local secondary index on scope
+    updated_at_index = UpdateAtIndex()                     # Local secondary index on updated_at
 ```
 
-**Scope Types**:
-- **GLOBAL**: Applies to all items and segments
-- **SEGMENT**: Applies to specific segment(s) via tags
-- **ITEM**: Applies to specific item(s) via tags
+**Status Constants** ([models/discount_prompt.py:36-39](../ai_rfq_engine/models/discount_prompt.py#L36-L39)):
+```python
+class DiscountPromptStatus:
+    IN_REVIEW = "in_review"
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+```
+
+**Scope Constants** ([models/discount_prompt.py:43-47](../ai_rfq_engine/models/discount_prompt.py#L43-L47)):
+```python
+class DiscountPromptScope:
+    GLOBAL = "global"           # Applies to all items and segments
+    SEGMENT = "segment"         # Applies to specific segment(s) via tags
+    ITEM = "item"               # Applies to specific item(s) via tags
+    PROVIDER_ITEM = "provider_item"  # Applies to specific provider_item(s) via tags
+```
 
 **Discount Logic**:
 
-Discount rules are stored as a list of tier objects with automatic validation:
+Discount rules are stored as a list of tier objects with automatic validation via `validate_and_normalize_discount_rules()` ([models/discount_prompt.py:50-145](../ai_rfq_engine/models/discount_prompt.py#L50-L145)):
+
 ```python
 discount_rules = [
     {"greater_than": 0, "less_than": 1000, "max_discount_percentage": 5},
@@ -352,12 +370,14 @@ discount_rules = [
 ```
 
 **Validation Rules**:
-1. Rules are automatically sorted by `greater_than` (low to high)
-2. First tier must start at 0
-3. Each tier's `less_than` must equal next tier's `greater_than` (no gaps/overlaps)
-4. Last tier has no `less_than` (open-ended upper bound)
-5. `max_discount_percentage` must INCREASE as tiers increase (higher purchases = better discounts)
-6. All percentages must be between 0 and 100
+1. **Automatic Normalization**: All values converted to floats
+2. **Automatic Sorting**: Rules sorted by `greater_than` (low to high)
+3. **First Tier at Zero**: First tier must start at `greater_than: 0`
+4. **Contiguous Tiers**: Each tier's `less_than` must equal next tier's `greater_than` (no gaps/overlaps)
+5. **Open-Ended Last Tier**: Last tier has no `less_than` (unlimited upper bound)
+6. **Increasing Discounts**: `max_discount_percentage` must INCREASE with higher tiers (higher purchases = better discounts)
+7. **Valid Percentages**: All percentages must be 0-100
+8. **Range Validation**: For non-last tiers, `less_than` must be > `greater_than`
 
 A rule matches when:
 ```
@@ -366,6 +386,24 @@ greater_than <= requested_subtotal < less_than
 
 **Priority System**:
 When multiple prompts match (e.g., GLOBAL + SEGMENT + ITEM), the highest priority wins. Higher priority numbers take precedence.
+
+**Merge Behavior on Update** ([models/discount_prompt.py:426-452](../ai_rfq_engine/models/discount_prompt.py#L426-L452)):
+- When updating `discount_rules`, new rules are merged with existing ones
+- Rules with same `greater_than` value are overridden by new rules
+- Merged rules are validated and normalized before saving
+
+**Query Support** ([models/discount_prompt.py:322-373](../ai_rfq_engine/models/discount_prompt.py#L322-L373)):
+`resolve_discount_prompt_list()` supports filtering by:
+- `scope`: Filter by specific scope value (uses `ScopeIndex`)
+- `tags`: Filter by tag(s) - uses `contains()` condition
+- `status`: Filter by status (typically `status=DiscountPromptStatus.ACTIVE`)
+- `updated_at_gt` / `updated_at_lt`: Temporal filtering (uses `UpdateAtIndex`)
+
+**Cache Integration** ([models/discount_prompt.py:204-243](../ai_rfq_engine/models/discount_prompt.py#L204-L243)):
+- Uses cascading cache purging via `purge_entity_cascading_cache()`
+- Entity type: `"discount_prompt"`
+- Cascade depth: 3 levels
+- Cache purged on insert, update, and delete operations
 
 ---
 
@@ -796,6 +834,9 @@ erDiagram
         list discount_rules
         number priority
         string status
+        datetime created_at
+        string updated_by
+        datetime updated_at
     }
 
     QUOTE ||--|{ QUOTE_ITEM : "contains"
@@ -998,6 +1039,9 @@ sequenceDiagram
     and Fetch Item Prompts
         DiscountPrompt->>DiscountPrompt: Query WHERE scope = "item"<br/>AND tags CONTAINS item_uuid
         DiscountPrompt-->>GraphQL: Return item prompts
+    and Fetch Provider Item Prompts
+        DiscountPrompt->>DiscountPrompt: Query WHERE scope = "provider_item"<br/>AND tags CONTAINS provider_item_uuid
+        DiscountPrompt-->>GraphQL: Return provider_item prompts
     end
 
     GraphQL->>GraphQL: Merge all matching prompts
@@ -1057,17 +1101,19 @@ This diagram illustrates the decision-making process for matching and applying d
 
 ```mermaid
 flowchart TD
-    Start([Start: Apply Discount Request]) --> InputData[/Input:<br/>quote_item_uuid, item_uuid,<br/>segment_uuid, subtotal, context/]
+    Start([Start: Apply Discount Request]) --> InputData[/Input:<br/>quote_item_uuid, item_uuid,<br/>segment_uuid, provider_item_uuid,<br/>subtotal, context/]
 
     InputData --> QueryPrompts[Query DiscountPromptModel<br/>WHERE status = 'active']
 
     QueryPrompts --> FetchGlobal[Fetch GLOBAL prompts<br/>scope = 'global']
     QueryPrompts --> FetchSegment[Fetch SEGMENT prompts<br/>scope = 'segment'<br/>AND tags CONTAINS segment_uuid]
     QueryPrompts --> FetchItem[Fetch ITEM prompts<br/>scope = 'item'<br/>AND tags CONTAINS item_uuid]
+    QueryPrompts --> FetchProviderItem[Fetch PROVIDER_ITEM prompts<br/>scope = 'provider_item'<br/>AND tags CONTAINS provider_item_uuid]
 
     FetchGlobal --> MergePrompts[Merge all matching prompts]
     FetchSegment --> MergePrompts
     FetchItem --> MergePrompts
+    FetchProviderItem --> MergePrompts
 
     MergePrompts --> HasPrompts{Prompts<br/>Found?}
 
@@ -1139,13 +1185,13 @@ This diagram shows how conflicts are resolved when multiple prompts match.
 
 ```mermaid
 flowchart TD
-    Start([Multiple Prompts Match]) --> Collect[Collect all matching prompts:<br/>- GLOBAL prompts<br/>- SEGMENT prompts matching tags<br/>- ITEM prompts matching tags]
+    Start([Multiple Prompts Match]) --> Collect[Collect all matching prompts:<br/>- GLOBAL prompts<br/>- SEGMENT prompts matching tags<br/>- ITEM prompts matching tags<br/>- PROVIDER_ITEM prompts matching tags]
 
-    Collect --> Example[Example Scenario:<br/>Prompt A: GLOBAL, priority=10<br/>Prompt B: SEGMENT, priority=20<br/>Prompt C: ITEM, priority=15<br/>Prompt D: ITEM, priority=25]
+    Collect --> Example[Example Scenario:<br/>Prompt A: GLOBAL, priority=10<br/>Prompt B: SEGMENT, priority=20<br/>Prompt C: ITEM, priority=15<br/>Prompt D: PROVIDER_ITEM, priority=25]
 
     Example --> Sort[Sort by priority DESC]
 
-    Sort --> Sorted[Sorted Order:<br/>1. Prompt D priority=25 ITEM<br/>2. Prompt B priority=20 SEGMENT<br/>3. Prompt C priority=15 ITEM<br/>4. Prompt A priority=10 GLOBAL]
+    Sort --> Sorted[Sorted Order:<br/>1. Prompt D priority=25 PROVIDER_ITEM<br/>2. Prompt B priority=20 SEGMENT<br/>3. Prompt C priority=15 ITEM<br/>4. Prompt A priority=10 GLOBAL]
 
     Sorted --> ProcessD[Try Prompt D priority=25]
 
@@ -1153,7 +1199,7 @@ flowchart TD
     CondD -->|No| ProcessB
     CondD -->|Yes| TierD{Tier<br/>matches?}
     TierD -->|No| ProcessB
-    TierD -->|Yes| UseD[Use Prompt D<br/>Apply ITEM-specific discount]
+    TierD -->|Yes| UseD[Use Prompt D<br/>Apply PROVIDER_ITEM-specific discount]
     UseD --> End([End: Discount Applied])
 
     ProcessB[Try Prompt B priority=20]
@@ -1430,14 +1476,16 @@ Provider_Item_Batch
 Discount_Prompt
 ├── discount_prompt_uuid
 ├── endpoint_id (hash key)
-├── scope (global, segment, or item)
+├── scope (global, segment, item, or provider_item)
 ├── tags (flexible matching via tags)
 ├── discount_prompt (AI prompt for logic)
 ├── conditions (conditional logic)
 ├── discount_rules (list of tier objects)
 │   └── [{greater_than, less_than, max_discount_percentage}, ...]
 ├── priority (conflict resolution)
-└── status (in_review, active, inactive)
+├── status (in_review, active, inactive)
+├── created_at, updated_by, updated_at (audit fields)
+└── Indexes: ScopeIndex, UpdateAtIndex
 
 Quote_Item (Line item in a quote)
 ├── quote_item_uuid
