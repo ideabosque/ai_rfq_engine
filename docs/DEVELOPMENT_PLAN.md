@@ -1290,17 +1290,17 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
-    [*] --> initial: submit_rfq_request()
+    [*] --> initial: "submit_rfq_request()"
 
-    initial --> in_progress: add_item_to_rfq_request() OR<br/>assign_provider_item()<br/>(auto-transition)
+    initial --> in_progress: "add_item_to_rfq_request() / assign_provider_item()"
 
-    in_progress --> confirmed: update_rfq_request(status: confirmed)<br/>(manual confirmation)
+    in_progress --> confirmed: "update_rfq_request()"
 
-    confirmed --> modified: add_item_to_rfq_request() OR<br/>remove_item_from_rfq_request() OR<br/>assign_provider_item()<br/>(triggers quote disapproval)
+    confirmed --> modified: "add_item_to_rfq_request() / remove_item_from_rfq_request() / assign_provider_item()"
 
-    modified --> in_progress: (auto-transition after<br/>disapproving quotes)
+    modified --> in_progress: "auto-transition after disapproving quotes"
 
-    confirmed --> completed: (auto-transition when<br/>any quote completed)
+    confirmed --> completed: "auto-transition when any quote completed"
 
     completed --> [*]
 
@@ -1337,17 +1337,17 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> initial: create_quote()
+    [*] --> initial: "create_quote()"
 
-    initial --> in_progress: (auto-transition after<br/>quote_items created)
+    initial --> in_progress: "quote_items created (auto)"
 
-    in_progress --> confirmed: update_quote(status: confirmed)
+    in_progress --> confirmed: "update_quote()"
 
-    in_progress --> disapproved: Parent request modified OR<br/>competing quote confirmed<br/>(auto-transition)
+    in_progress --> disapproved: "Parent request modified / Competing quote confirmed"
 
-    confirmed --> completed: All installments paid<br/>(auto-transition)
+    confirmed --> completed: "All installments paid (auto)"
 
-    confirmed --> disapproved: Competing quote confirmed<br/>(auto-transition)
+    confirmed --> disapproved: "Competing quote confirmed (auto)"
 
     disapproved --> [*]
     completed --> [*]
@@ -1389,13 +1389,13 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending: create_installment() OR<br/>create_installments()
+    [*] --> pending: "create_installment() OR create_installments()"
 
-    pending --> paid: update_installment(status: paid)
+    pending --> paid: "update_installment()"
 
-    pending --> cancelled: update_installment(status: cancelled)<br/>(optional)
+    pending --> cancelled: "update_installment()"
 
-    paid --> [*]: Terminal state<br/>(may trigger quote/request completion)
+    paid --> [*]
 
     cancelled --> [*]
 
@@ -1427,16 +1427,16 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> in_review: create_discount_prompt()
 
-    in_review --> active: approve_prompt()<br/>(manual approval)
+    in_review --> active: approve_prompt()
 
-    in_review --> inactive: reject_prompt()<br/>(manual rejection)
+    in_review --> inactive: reject_prompt()
 
-    active --> inactive: deactivate_prompt()<br/>(temporary disable)
+    active --> inactive: deactivate_prompt()
 
-    inactive --> active: reactivate_prompt()<br/>(re-enable)
+    inactive --> active: reactivate_prompt()
 
-    active --> [*]: archive_prompt()<br/>(permanent removal)
-    inactive --> [*]: archive_prompt()<br/>(permanent removal)
+    active --> [*]: archive_prompt()
+    inactive --> [*]: archive_prompt()
 
     note right of in_review
         Initial state after creation
