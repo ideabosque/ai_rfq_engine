@@ -19,6 +19,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,7 +29,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility, method_cache
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.discount_prompt import DiscountPromptListType, DiscountPromptType
@@ -387,8 +388,6 @@ def resolve_discount_prompt(
         "endpoint_id",
         "discount_prompt_uuid",
         "scope",
-        "priority",
-        "status",
         "updated_at",
     ],
     list_type_class=DiscountPromptListType,

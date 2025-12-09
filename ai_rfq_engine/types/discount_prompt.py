@@ -4,17 +4,10 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from graphene import DateTime, Float, Int, List, ObjectType, String
+from graphene import DateTime, Int, List, ObjectType, String
+
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
-
-
-class DiscountRuleTierType(ObjectType):
-    """Represents a single discount rule tier within a discount prompt."""
-
-    greater_than = Float()
-    less_than = Float()
-    max_discount_percentage = Float()
 
 
 class DiscountPromptType(ObjectType):
