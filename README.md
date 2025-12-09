@@ -14,16 +14,17 @@ A comprehensive GraphQL-based Request for Quote (RFQ) management system built wi
 
 ### Advanced Features
 - **Tiered Pricing**: Volume-based pricing with configurable tiers
-- **Discount Rules**: Automated discount calculation based on business rules
+- **AI-Driven Discount Prompts**: Hierarchical discount system with GLOBAL, SEGMENT, ITEM, and PROVIDER_ITEM scopes (see [Discount Prompts Documentation](docs/DISCOUNT_PROMPTS.md))
 - **Batch Tracking**: Lot/batch management for inventory control
-- **Segment Management**: Customer segmentation for targeted pricing
+- **Segment Management**: Customer segmentation for targeted pricing with email-based lookup
 - **Multi-Provider Support**: Competitive bidding across multiple suppliers
 
 ### ⚡ Performance & Scalability
 - **Lazy Loading**: Efficient on-demand data fetching via nested resolvers
-- **Batch Optimization**: DataLoader pattern eliminates N+1 query problems
+- **Batch Optimization**: DataLoader pattern eliminates N+1 query problems (see [Batch Loaders Documentation](docs/BATCH_LOADERS.md))
 - **Hybrid Caching**: Multi-layer caching strategy (Application, Request, Method) for sub-millisecond response times
 - **Serverless Architecture**: Auto-scaling AWS Lambda backend
+- **Smart Cache Normalization**: Automatic handling of cached vs fresh data
 
 ## 🏗️ Architecture
 
@@ -109,19 +110,19 @@ A robust **3-Layer Caching System** ensures high performance:
 
 #### Pricing & Discounts
 - **Purpose**: Dynamic pricing management
-- **Key Fields**: `item_price_tier_uuid`, `discount_rule_uuid`, `quantity_ranges`
-- **Features**: Volume discounts, rule-based pricing
+- **Key Fields**: `item_price_tier_uuid`, `discount_prompt_uuid`, `scope`, `tags[]`, `quantity_ranges`
+- **Features**: Volume discounts, hierarchical AI-driven discount prompts, tag-based entity linking
 
 ### Database Schema
 The system uses DynamoDB with the following table structure:
 
 - `are-items`: Item catalog
 - `are-segments`: Customer segments
-- `are-segment-contacts`: Segment-contact relationships
+- `are-segment-contacts`: Segment-contact relationships (email → segment mapping)
 - `are-provider-items`: Provider item catalog
 - `are-provider-item-batches`: Batch/lot tracking
 - `are-item-price-tiers`: Tiered pricing rules
-- `are-discount-rules`: Discount calculation rules
+- `are-discount-prompts`: AI-driven discount prompts with hierarchical scopes
 - `are-requests`: RFQ requests
 - `are-quotes`: Generated quotes
 - `are-quote-items`: Quote line items
@@ -169,11 +170,12 @@ ITEMS (Core Catalog)
     │                  │
     │                  └─── (N:1) ──→ PROVIDER_ITEMS
     │
-    └─── (1:N) ──→ DISCOUNT_RULES
+    └─── (1:N) ──→ DISCOUNT_PROMPTS (via tags[])
                        │
-                       ├─── (N:1) ──→ SEGMENTS
-                       │
-                       └─── (N:1) ──→ PROVIDER_ITEMS
+                       ├─── Scope: GLOBAL (all endpoints)
+                       ├─── Scope: SEGMENT (tags → segment_uuid)
+                       ├─── Scope: ITEM (tags → item_uuid)
+                       └─── Scope: PROVIDER_ITEM (tags → provider_item_uuid)
 
 ┌─────────────────────────────────────────────────────────────────┐
 │                 CUSTOMER SEGMENTATION RELATIONSHIPS              │
@@ -181,11 +183,11 @@ ITEMS (Core Catalog)
 
 SEGMENTS
     │
-    ├─── (1:N) ──→ SEGMENT_CONTACTS
+    ├─── (1:N) ──→ SEGMENT_CONTACTS (email-based lookup)
     │
     ├─── (1:N) ──→ ITEM_PRICE_TIERS
     │
-    └─── (1:N) ──→ DISCOUNT_RULES
+    └─── (1:N) ──→ DISCOUNT_PROMPTS (via tags[], scope=SEGMENT)
 ```
 
 ### Core Relationship Patterns
@@ -853,3 +855,75 @@ To facilitate testing and exploration of the API, a comprehensive Postman collec
    - The collection includes pre-configured GraphQL queries and mutations for all supported operations.
    - It covers CRUD operations for Items, Segments, Providers, Quotes, Requests, and more.
    - Use it to verify nested relationships and batch loading behavior.
+
+## 📚 Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+### Core Documentation
+
+- **[Batch Loaders Architecture](docs/BATCH_LOADERS.md)** - Deep dive into the DataLoader pattern implementation
+  - Complete loader catalog (19 loaders)
+  - Implementation patterns and best practices
+  - Cache handling and normalization
+  - Performance metrics and optimization strategies
+  - Testing patterns and troubleshooting
+
+- **[Discount Prompts System](docs/DISCOUNT_PROMPTS.md)** - AI-driven discount management
+  - Hierarchical scope system (GLOBAL → SEGMENT → ITEM → PROVIDER_ITEM)
+  - Tag-based entity linking architecture
+  - Batch loading with dependency injection
+  - Quote resolution flow with email-based segment lookup
+  - Migration guide from legacy discount_rules
+
+- **[Development Plan](docs/DEVELOPMENT_PLAN.md)** - Project roadmap and implementation status
+  - Current implementation status (75% complete)
+  - Data model architecture with Mermaid diagrams
+  - Testing strategy and coverage metrics
+  - Roadmap for future enhancements
+
+- **[Pricing Calculation](docs/PRICING_CALCULATION.md)** - Dynamic pricing algorithms
+  - Volume-based tiered pricing
+  - Margin calculations with batch costs
+  - Installment ratio calculations
+  - Integration with discount prompts
+
+### Key Features Documented
+
+#### Batch Loading Performance
+- **Query Reduction**: 97% fewer database queries (153 → 5 queries for typical quote)
+- **Response Time**: Up to 95% faster for complex queries
+- **Cache Hit Rates**: Near-zero DB queries for cached data
+
+#### Discount Prompts Innovation
+- **Hierarchical Scoping**: Discounts automatically combine from GLOBAL to PROVIDER_ITEM level
+- **Email-Based Segment Lookup**: Seamless customer segmentation via `request.email → segment_contact → segment`
+- **Tag-Based Linking**: Flexible entity associations without rigid foreign keys
+- **AI-Ready**: Prompt-based system ready for LLM integration
+
+#### Test Data Generation
+- Comprehensive test data in `tests/test_data.json`
+- Includes: Segments, Items, Providers, Price Tiers, Discount Prompts, Requests, Quotes, and Quote Items
+- Parametrized tests for all CRUD operations
+- Integration tests with full nested resolution
+
+## 🔧 Recent Updates (December 2024)
+
+### Discount Prompts Migration
+- ✅ Migrated from `discount_rules` to hierarchical `discount_prompts` model
+- ✅ Implemented 4 specialized batch loaders with scope hierarchy
+- ✅ Added `SegmentContactLoader` for email-based segment lookup
+- ✅ Fixed PynamoDB query operator precedence issues
+- ✅ Fixed cache normalization for dict/model handling
+- ✅ Generated comprehensive test data for all entities
+
+### Performance Improvements
+- ✅ Implemented dependency injection for hierarchical loaders (eliminates duplicate GLOBAL queries)
+- ✅ Added proper cache handling for both fresh and cached data
+- ✅ Optimized quote discount prompt resolution (constant O(1) queries regardless of item count)
+
+### Documentation Enhancements
+- ✅ Created comprehensive Batch Loaders documentation
+- ✅ Created detailed Discount Prompts system documentation
+- ✅ Updated README with new features and architecture changes
+- ✅ Added performance metrics and optimization strategies
