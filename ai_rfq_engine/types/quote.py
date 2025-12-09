@@ -103,9 +103,12 @@ class QuoteType(ObjectType):
 
         Loads prompts from:
         - GLOBAL scope (always)
-        - SEGMENT scope (from request)
+        - SEGMENT scope (from request email via segment_contact lookup)
         - ITEM scope (for all unique items in quote_items)
         - PROVIDER_ITEM scope (for all unique provider items in quote_items)
+
+        Uses the combine_all_discount_prompts utility function from models.utils
+        to handle the complex Promise chaining and hierarchical loading logic.
         """
         from promise import Promise
 
@@ -125,94 +128,37 @@ class QuoteType(ObjectType):
 
         loaders = get_loaders(info.context)
 
-        def combine_all_prompts(results):
-            """Combine prompts from all loaded scopes and deduplicate."""
+        # Load request and quote_items in parallel, then combine all prompts
+        # using the utility function from models.utils
+        def combine_prompts_wrapper(results):
+            """
+            Wrapper to unpack results and call the utility function.
+
+            Uses the combine_all_discount_prompts utility from models.utils
+            to handle the complex Promise chaining and hierarchical loading logic.
+
+            Args:
+                results: Tuple of (request_dict, quote_items) from parent Promise
+
+            Returns:
+                Promise that resolves to combined list of discount prompts
+            """
+            from ..models.utils import _combine_all_discount_prompts
+
             request_dict, quote_items = results
-
-            seen_uuids = set()
-
-            # Load GLOBAL prompts
-            global_promise = loaders.discount_prompt_global_loader.load(endpoint_id)
-
-            # First, get segment_contact to find segment_uuid from request email
             email = request_dict.get("email") if request_dict else None
-            segment_contact_promise = None
-            if email:
-                segment_contact_promise = loaders.segment_contact_loader.load(
-                    (endpoint_id, email)
-                )
-
-            # Collect ITEM and PROVIDER_ITEM info
-            item_promises = []
-            provider_item_promises = []
-            if quote_items:
-                unique_item_uuids = set()
-                unique_provider_items = set()
-
-                for qi in quote_items:
-                    item_uuid = qi.get("item_uuid")
-                    provider_item_uuid = qi.get("provider_item_uuid")
-
-                    if item_uuid:
-                        unique_item_uuids.add(item_uuid)
-
-                    if item_uuid and provider_item_uuid:
-                        unique_provider_items.add((item_uuid, provider_item_uuid))
-
-                # Load ITEM prompts
-                for item_uuid in unique_item_uuids:
-                    item_promises.append(
-                        loaders.discount_prompt_by_item_loader.load((endpoint_id, item_uuid))
-                    )
-
-                # Load PROVIDER_ITEM prompts
-                for item_uuid, provider_item_uuid in unique_provider_items:
-                    provider_item_promises.append(
-                        loaders.discount_prompt_by_provider_item_loader.load(
-                            (endpoint_id, item_uuid, provider_item_uuid)
-                        )
-                    )
-
-            def load_segment_prompts_and_merge(segment_contact):
-                """After segment_contact is loaded, load segment prompts and merge all."""
-                promises_to_resolve = [global_promise]
-
-                # If segment_contact exists, load SEGMENT prompts
-                if segment_contact and segment_contact.get("segment_uuid"):
-                    segment_uuid = segment_contact["segment_uuid"]
-                    segment_promise = loaders.discount_prompt_by_segment_loader.load(
-                        (endpoint_id, segment_uuid)
-                    )
-                    promises_to_resolve.append(segment_promise)
-
-                promises_to_resolve.extend(item_promises)
-                promises_to_resolve.extend(provider_item_promises)
-
-                def merge_prompts(prompt_lists):
-                    """Merge all prompt lists and deduplicate by discount_prompt_uuid."""
-                    merged = []
-                    for prompt_list in prompt_lists:
-                        for prompt in (prompt_list or []):
-                            prompt_uuid = prompt.get("discount_prompt_uuid")
-                            if prompt_uuid and prompt_uuid not in seen_uuids:
-                                seen_uuids.add(prompt_uuid)
-                                merged.append(normalize_to_json(prompt))
-                    return merged
-
-                return Promise.all(promises_to_resolve).then(merge_prompts)
-
-            # Chain: first load segment_contact, then load segment prompts and merge all
-            if segment_contact_promise:
-                return segment_contact_promise.then(load_segment_prompts_and_merge)
-            else:
-                # No segment_contact, proceed directly
-                return load_segment_prompts_and_merge(None)
+            return _combine_all_discount_prompts(
+                endpoint_id, email, quote_items, loaders
+            )
 
         # Load request and quote_items in parallel, then combine all prompts
-        return Promise.all([
-            loaders.request_loader.load((endpoint_id, request_uuid)),
-            loaders.quote_item_list_loader.load(quote_uuid)
-        ]).then(combine_all_prompts)
+        # using the utility function from models.utils
+        return Promise.all(
+            [
+                loaders.request_loader.load((endpoint_id, request_uuid)),
+                loaders.quote_item_list_loader.load(quote_uuid),
+            ]
+        ).then(combine_prompts_wrapper)
 
 
 class QuoteListType(ListObjectType):
