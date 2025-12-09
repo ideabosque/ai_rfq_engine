@@ -100,7 +100,7 @@ def run_graphql_mutation(engine, query, variables):
         return None
 
     if parsed.get("errors"):
-        print("GraphQL Error:", json.dumps(parsed["errors"], indent=2))
+        print("GraphQL Error:", Utility.json_dumps(parsed["errors"]))
         return None
 
     data = parsed.get("data")
@@ -480,19 +480,23 @@ def generate_and_load_data(engine):
             prompt_configs = [
                 {
                     "scope": "GLOBAL",
-                    "prompt": f"Apply volume discount for orders over $1000",
+                    "prompt_text": "Apply volume discount for orders over $1000",
+                    "tags": [],
                 },
                 {
                     "scope": "SEGMENT",
-                    "prompt": f"Special segment pricing available",
+                    "prompt_text": "Special segment pricing available",
+                    "tags": [segment_api_uuid],
                 },
                 {
                     "scope": "ITEM",
-                    "prompt": f"Bulk discount available for this item",
+                    "prompt_text": f"Bulk discount available for this item",
+                    "tags": [item_api_uuid],
                 },
                 {
                     "scope": "PROVIDER_ITEM",
-                    "prompt": f"Provider-specific pricing rules apply",
+                    "prompt_text": f"Provider-specific pricing rules apply",
+                    "tags": [provider_item_api_uuid],
                 },
             ]
             for prompt_config in prompt_configs:
@@ -500,18 +504,16 @@ def generate_and_load_data(engine):
                     f"Creating Discount Prompt for scope {prompt_config['scope']} (Item {item_api_uuid})..."
                 )
                 prompt_mutation = """
-                mutation InsertUpdateDiscountPrompt($scope: String!, $iid: String, $pid: String, $sid: String, $prompt: String!, $stat: String, $by: String!) {
-                    insertUpdateDiscountPrompt(scope: $scope, itemUuid: $iid, providerItemUuid: $pid, segmentUuid: $sid, prompt: $prompt, status: $stat, updatedBy: $by) {
+                mutation InsertUpdateDiscountPrompt($scope: String!, $tags: [String], $prompt: String!, $stat: String, $by: String!) {
+                    insertUpdateDiscountPrompt(scope: $scope, tags: $tags, discountPrompt: $prompt, status: $stat, updatedBy: $by) {
                         discountPrompt { discountPromptUuid }
                     }
                 }
                 """
                 prompt_variables = {
                     "scope": prompt_config["scope"],
-                    "iid": item_api_uuid if prompt_config["scope"] in ["ITEM", "PROVIDER_ITEM"] else None,
-                    "pid": provider_item_api_uuid if prompt_config["scope"] == "PROVIDER_ITEM" else None,
-                    "sid": segment_api_uuid if prompt_config["scope"] == "SEGMENT" else None,
-                    "prompt": prompt_config["prompt"],
+                    "tags": prompt_config["tags"],
+                    "prompt": prompt_config["prompt_text"],
                     "stat": "active",
                     "by": UPDATED_BY,
                 }
@@ -527,10 +529,8 @@ def generate_and_load_data(engine):
                         {
                             "discountPromptUuid": discount_prompt_uuid,
                             "scope": prompt_config["scope"],
-                            "itemUuid": prompt_variables["iid"],
-                            "providerItemUuid": prompt_variables["pid"],
-                            "segmentUuid": prompt_variables["sid"],
-                            "prompt": prompt_config["prompt"],
+                            "tags": prompt_config["tags"],
+                            "discountPrompt": prompt_config["prompt_text"],
                             "status": "active",
                             "updatedBy": UPDATED_BY,
                         }

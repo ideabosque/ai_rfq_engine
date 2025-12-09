@@ -22,6 +22,8 @@ class ProviderItemBatchType(ObjectType):
     guardrail_price_per_uom = String()
     in_stock = Boolean()
     slow_move_item = Boolean()
+    expired_at = DateTime()
+    produced_at = DateTime()
 
     # Nested resolvers: strongly-typed nested relationships
     item = Field(lambda: ItemType)

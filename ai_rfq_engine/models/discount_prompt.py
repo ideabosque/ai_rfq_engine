@@ -467,6 +467,8 @@ def insert_update_discount_prompt(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 
     if kwargs.get("entity") is None:
         cols = {
+            "conditions": [],
+            "discount_rules": [],
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
