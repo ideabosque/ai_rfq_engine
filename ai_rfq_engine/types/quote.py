@@ -134,15 +134,15 @@ class QuoteType(ObjectType):
             # Load GLOBAL prompts
             global_promise = loaders.discount_prompt_global_loader.load(endpoint_id)
 
-            # Load SEGMENT prompts if request has segment_uuid
-            segment_promise = None
-            segment_uuid = request_dict.get("segment_uuid") if request_dict else None
-            if segment_uuid:
-                segment_promise = loaders.discount_prompt_by_segment_loader.load(
-                    (endpoint_id, segment_uuid)
+            # First, get segment_contact to find segment_uuid from request email
+            email = request_dict.get("email") if request_dict else None
+            segment_contact_promise = None
+            if email:
+                segment_contact_promise = loaders.segment_contact_loader.load(
+                    (endpoint_id, email)
                 )
 
-            # Load ITEM and PROVIDER_ITEM prompts for all unique items in quote_items
+            # Collect ITEM and PROVIDER_ITEM info
             item_promises = []
             provider_item_promises = []
             if quote_items:
@@ -173,25 +173,40 @@ class QuoteType(ObjectType):
                         )
                     )
 
-            # Combine all promises
-            promises_to_resolve = [global_promise]
-            if segment_promise:
-                promises_to_resolve.append(segment_promise)
-            promises_to_resolve.extend(item_promises)
-            promises_to_resolve.extend(provider_item_promises)
+            def load_segment_prompts_and_merge(segment_contact):
+                """After segment_contact is loaded, load segment prompts and merge all."""
+                promises_to_resolve = [global_promise]
 
-            def merge_prompts(prompt_lists):
-                """Merge all prompt lists and deduplicate by discount_prompt_uuid."""
-                merged = []
-                for prompt_list in prompt_lists:
-                    for prompt in (prompt_list or []):
-                        prompt_uuid = prompt.get("discount_prompt_uuid")
-                        if prompt_uuid and prompt_uuid not in seen_uuids:
-                            seen_uuids.add(prompt_uuid)
-                            merged.append(normalize_to_json(prompt))
-                return merged
+                # If segment_contact exists, load SEGMENT prompts
+                if segment_contact and segment_contact.get("segment_uuid"):
+                    segment_uuid = segment_contact["segment_uuid"]
+                    segment_promise = loaders.discount_prompt_by_segment_loader.load(
+                        (endpoint_id, segment_uuid)
+                    )
+                    promises_to_resolve.append(segment_promise)
 
-            return Promise.all(promises_to_resolve).then(merge_prompts)
+                promises_to_resolve.extend(item_promises)
+                promises_to_resolve.extend(provider_item_promises)
+
+                def merge_prompts(prompt_lists):
+                    """Merge all prompt lists and deduplicate by discount_prompt_uuid."""
+                    merged = []
+                    for prompt_list in prompt_lists:
+                        for prompt in (prompt_list or []):
+                            prompt_uuid = prompt.get("discount_prompt_uuid")
+                            if prompt_uuid and prompt_uuid not in seen_uuids:
+                                seen_uuids.add(prompt_uuid)
+                                merged.append(normalize_to_json(prompt))
+                    return merged
+
+                return Promise.all(promises_to_resolve).then(merge_prompts)
+
+            # Chain: first load segment_contact, then load segment prompts and merge all
+            if segment_contact_promise:
+                return segment_contact_promise.then(load_segment_prompts_and_merge)
+            else:
+                # No segment_contact, proceed directly
+                return load_segment_prompts_and_merge(None)
 
         # Load request and quote_items in parallel, then combine all prompts
         return Promise.all([

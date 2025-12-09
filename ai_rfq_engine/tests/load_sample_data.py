@@ -479,22 +479,22 @@ def generate_and_load_data(engine):
             # Create multiple Discount Prompts with different scopes
             prompt_configs = [
                 {
-                    "scope": "GLOBAL",
+                    "scope": "global",
                     "prompt_text": "Apply volume discount for orders over $1000",
                     "tags": [],
                 },
                 {
-                    "scope": "SEGMENT",
+                    "scope": "segment",
                     "prompt_text": "Special segment pricing available",
                     "tags": [segment_api_uuid],
                 },
                 {
-                    "scope": "ITEM",
+                    "scope": "item",
                     "prompt_text": f"Bulk discount available for this item",
                     "tags": [item_api_uuid],
                 },
                 {
-                    "scope": "PROVIDER_ITEM",
+                    "scope": "provider_item",
                     "prompt_text": f"Provider-specific pricing rules apply",
                     "tags": [provider_item_api_uuid],
                 },

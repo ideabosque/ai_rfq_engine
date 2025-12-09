@@ -50,7 +50,11 @@ class DiscountPromptGlobalLoader(SafeDataLoader):
         if cached_item is None:
             return None
         if isinstance(cached_item, list):
-            return [normalize_model(item) for item in cached_item]
+            # Check if items are already dicts (from cache) or models
+            return [item if isinstance(item, dict) else normalize_model(item) for item in cached_item]
+        # Single item case
+        if isinstance(cached_item, dict):
+            return [cached_item]
         return [normalize_model(cached_item)]
 
     def set_cache_data(self, key: Key, data: Any) -> None:
@@ -128,7 +132,11 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
         if cached_item is None:
             return None
         if isinstance(cached_item, list):
-            return [normalize_model(item) for item in cached_item]
+            # Check if items are already dicts (from cache) or models
+            return [item if isinstance(item, dict) else normalize_model(item) for item in cached_item]
+        # Single item case
+        if isinstance(cached_item, dict):
+            return [cached_item]
         return [normalize_model(cached_item)]
 
     def set_cache_data(self, key: Key, data: Any) -> None:
@@ -231,7 +239,11 @@ class DiscountPromptByItemLoader(SafeDataLoader):
         if cached_item is None:
             return None
         if isinstance(cached_item, list):
-            return [normalize_model(item) for item in cached_item]
+            # Check if items are already dicts (from cache) or models
+            return [item if isinstance(item, dict) else normalize_model(item) for item in cached_item]
+        # Single item case
+        if isinstance(cached_item, dict):
+            return [cached_item]
         return [normalize_model(cached_item)]
 
     def set_cache_data(self, key: Key, data: Any) -> None:
@@ -334,7 +346,11 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
         if cached_item is None:
             return None
         if isinstance(cached_item, list):
-            return [normalize_model(item) for item in cached_item]
+            # Check if items are already dicts (from cache) or models
+            return [item if isinstance(item, dict) else normalize_model(item) for item in cached_item]
+        # Single item case
+        if isinstance(cached_item, dict):
+            return [cached_item]
         return [normalize_model(cached_item)]
 
     def set_cache_data(self, key: Key, data: Any) -> None:

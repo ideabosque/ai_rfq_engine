@@ -265,8 +265,7 @@ def get_discount_prompts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
         endpoint_id,
         DiscountPromptModel.scope == DiscountPromptScope.SEGMENT,
         filter_condition=(
-            DiscountPromptModel.status
-            == DiscountPromptStatus.ACTIVE
+            (DiscountPromptModel.status == DiscountPromptStatus.ACTIVE)
             & DiscountPromptModel.tags.contains(segment_uuid)
         ),
     ):
@@ -286,8 +285,7 @@ def get_discount_prompts_by_item(endpoint_id: str, item_uuid: str) -> Any:
         endpoint_id,
         DiscountPromptModel.scope == DiscountPromptScope.ITEM,
         filter_condition=(
-            DiscountPromptModel.status
-            == DiscountPromptStatus.ACTIVE
+            (DiscountPromptModel.status == DiscountPromptStatus.ACTIVE)
             & DiscountPromptModel.tags.contains(item_uuid)
         ),
     ):
@@ -309,8 +307,7 @@ def get_discount_prompts_by_provider_item(
         endpoint_id,
         DiscountPromptModel.scope == DiscountPromptScope.PROVIDER_ITEM,
         filter_condition=(
-            DiscountPromptModel.status
-            == DiscountPromptStatus.ACTIVE
+            (DiscountPromptModel.status == DiscountPromptStatus.ACTIVE)
             & DiscountPromptModel.tags.contains(provider_item_uuid)
         ),
     ):

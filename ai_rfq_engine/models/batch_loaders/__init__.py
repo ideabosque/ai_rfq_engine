@@ -27,6 +27,7 @@ from .quotes_by_request_loader import QuotesByRequestLoader
 from .request_loaders import RequestLoaders, clear_loaders, get_loaders
 from .request_loader import RequestLoader
 from .segment_contact_by_segment_loader import SegmentContactBySegmentLoader
+from .segment_contact_loader import SegmentContactLoader
 from .segment_loader import SegmentLoader
 
 # Backwards-compatible aliases for prior internal names
@@ -58,6 +59,7 @@ __all__ = [
     "RequestLoaders",
     "RequestLoader",
     "SegmentContactBySegmentLoader",
+    "SegmentContactLoader",
     "SegmentLoader",
     "clear_loaders",
     "get_loaders",

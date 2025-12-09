@@ -26,6 +26,7 @@ from .quote_loader import QuoteLoader
 from .quotes_by_request_loader import QuotesByRequestLoader
 from .request_loader import RequestLoader
 from .segment_contact_by_segment_loader import SegmentContactBySegmentLoader
+from .segment_contact_loader import SegmentContactLoader
 from .segment_loader import SegmentLoader
 
 
@@ -89,6 +90,9 @@ class RequestLoaders:
             logger=logger, cache_enabled=cache_enabled
         )
         self.segment_contact_by_segment_loader = SegmentContactBySegmentLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
+        self.segment_contact_loader = SegmentContactLoader(
             logger=logger, cache_enabled=cache_enabled
         )
 
