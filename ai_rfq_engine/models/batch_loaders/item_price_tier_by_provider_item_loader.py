@@ -15,7 +15,16 @@ from .base import Key, SafeDataLoader, normalize_model
 
 class ItemPriceTierByProviderItemLoader(SafeDataLoader):
     """
-    Batch loader returning price tiers keyed by (item_uuid, provider_item_uuid).
+    Batch loader returning price tiers keyed by (item_uuid, provider_item_uuid, segment_uuid).
+
+    The segment_uuid is optional (can be None) for backward compatibility.
+
+    Usage:
+        # With segment filtering
+        loaders.item_price_tier_by_provider_item_loader.load((item_uuid, provider_item_uuid, segment_uuid))
+
+        # Without segment filtering (backward compatible)
+        loaders.item_price_tier_by_provider_item_loader.load((item_uuid, provider_item_uuid, None))
     """
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
@@ -32,7 +41,10 @@ class ItemPriceTierByProviderItemLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_item_price_tiers_by_provider_item"])
 
     def generate_cache_key(self, key: Key) -> str:
-        key_data = ":".join([str(key), str({})])
+        # Key is (item_uuid, provider_item_uuid, segment_uuid)
+        # Convert None to empty string for cache key
+        key_parts = [str(k) if k is not None else "" for k in key]
+        key_data = ":".join([":".join(key_parts), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
             key_data
@@ -69,16 +81,28 @@ class ItemPriceTierByProviderItemLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        for item_uuid, provider_item_uuid in uncached_keys:
+        # Keys are now (item_uuid, provider_item_uuid, segment_uuid)
+        for key in uncached_keys:
+            # Handle both 2-tuple (backward compatible) and 3-tuple keys
+            if len(key) == 2:
+                item_uuid, provider_item_uuid = key
+                segment_uuid = None
+            else:
+                item_uuid, provider_item_uuid, segment_uuid = key
+
             try:
-                tiers = get_item_price_tiers_by_provider_item(item_uuid=item_uuid, provider_item_uuid=provider_item_uuid)
+                tiers = get_item_price_tiers_by_provider_item(
+                    item_uuid=item_uuid,
+                    provider_item_uuid=provider_item_uuid,
+                    segment_uuid=segment_uuid
+                )
                 if self.cache_enabled:
-                    self.set_cache_data((item_uuid, provider_item_uuid), tiers)
+                    self.set_cache_data(key, tiers)
                 normalized = [normalize_model(tier) for tier in tiers]
-                key_map[(item_uuid, provider_item_uuid)] = normalized
+                key_map[key] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
-                key_map[(item_uuid, provider_item_uuid)] = []
+                key_map[key] = []
 
         return Promise.resolve([key_map.get(key, []) for key in keys])

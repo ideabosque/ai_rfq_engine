@@ -235,68 +235,11 @@ def get_item_price_tier_type(
     info: ResolveInfo, item_price_tier: ItemPriceTierModel
 ) -> ItemPriceTierType:
     """
-    Convert ItemPriceTierModel to ItemPriceTierType with eager-loaded relationships.
-
-    Eagerly loads:
-    - provider_item data
-    - segment data
-    - provider_item_batches (if margin_per_uom is set)
+    Convert ItemPriceTierModel to ItemPriceTierType.
+    Nested relationships are lazily loaded via nested resolvers.
     """
     try:
-        from .provider_item_batches import resolve_provider_item_batch_list
-
-        provider_item = _get_provider_item(
-            info.context["endpoint_id"], item_price_tier.provider_item_uuid
-        )
-        segment = _get_segment(
-            info.context["endpoint_id"], item_price_tier.segment_uuid
-        )
-
-        provider_item_batches = []
-        if item_price_tier.margin_per_uom is not None:
-            provider_item_batch_list = resolve_provider_item_batch_list(
-                info,
-                **{
-                    "item_uuid": item_price_tier.item_uuid,
-                    "provider_item_uuid": item_price_tier.provider_item_uuid,
-                    "in_stock": True,
-                    "expired_at_gt": pendulum.now("UTC"),
-                },
-            )
-            for (
-                provider_item_batch
-            ) in provider_item_batch_list.provider_item_batch_list:
-                margin_per_uom = float(item_price_tier.margin_per_uom)
-                if provider_item_batch.slow_move_item:
-                    margin_per_uom = 0.0
-                provider_item_batch.price_per_uom = float(
-                    provider_item_batch.guardrail_price_per_uom
-                ) * (1 + margin_per_uom / 100)
-                provider_item_batches.append(
-                    {
-                        "batch_no": provider_item_batch.batch_no,
-                        "price_per_uom": provider_item_batch.price_per_uom,
-                        "expired_at": provider_item_batch.expired_at,
-                        "slow_move_item": provider_item_batch.slow_move_item,
-                        "in_stock": provider_item_batch.in_stock,
-                    }
-                )
-
         tier_dict: Dict = item_price_tier.__dict__["attribute_values"]
-        tier_dict.update(
-            {
-                "provider_item": provider_item,
-                "segment": segment,
-            }
-        )
-
-        if len(provider_item_batches) > 0:
-            tier_dict["provider_item_batches"] = provider_item_batches
-
-        tier_dict.pop("endpoint_id")
-        tier_dict.pop("provider_item_uuid")
-        tier_dict.pop("segment_uuid")
-        tier_dict.pop("item_uuid")
     except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
@@ -632,11 +575,31 @@ def get_item_price_tiers_by_item(
     cache_name=Config.get_cache_name("models", "item_price_tier"),
 )
 def get_item_price_tiers_by_provider_item(
-    item_uuid: str, provider_item_uuid: str
+    item_uuid: str, provider_item_uuid: str, segment_uuid: str = None
 ) -> Any:
+    """
+    Get item price tiers by provider_item_uuid with optional segment filtering.
+
+    Args:
+        item_uuid: The item UUID (hash key)
+        provider_item_uuid: The provider item UUID to filter by
+        segment_uuid: Optional segment UUID to filter results
+
+    Returns:
+        List of ItemPriceTierModel instances matching the criteria
+    """
     item_price_tiers = []
+
+    # Build the range key condition
+    range_key_condition = ItemPriceTierModel.provider_item_uuid == provider_item_uuid
+
+    # Build filter condition for segment if provided
+    filter_condition = None
+    if segment_uuid:
+        filter_condition = ItemPriceTierModel.segment_uuid == segment_uuid
+
     for item_price_tier in ItemPriceTierModel.provider_item_uuid_index.query(
-        item_uuid, ItemPriceTierModel.provider_item_uuid == provider_item_uuid
+        item_uuid, range_key_condition, filter_condition=filter_condition
     ):
         item_price_tiers.append(item_price_tier)
     return item_price_tiers

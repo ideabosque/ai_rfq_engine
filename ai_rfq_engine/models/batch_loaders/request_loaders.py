@@ -149,11 +149,20 @@ class RequestLoaders:
             and "item_uuid" in entity_keys
             and "provider_item_uuid" in entity_keys
         ):
-            cache_key = self.item_price_tier_by_provider_item_loader.generate_cache_key((entity_keys.get('item_uuid'), entity_keys['provider_item_uuid']))
-            if hasattr(self, "item_price_tier_by_provider_item_loader") and hasattr(
-                self.item_price_tier_by_provider_item_loader, "cache"
-            ):
-                self.item_price_tier_by_provider_item_loader.cache.delete(cache_key)
+            # Invalidate provider_item loader cache (3-part key with segment_uuid)
+            # If segment_uuid is available, invalidate specific cache entry
+            # Otherwise, rely on item_by_item_loader to clear all
+            if "segment_uuid" in entity_keys:
+                cache_key = self.item_price_tier_by_provider_item_loader.generate_cache_key(
+                    (entity_keys.get('item_uuid'), entity_keys['provider_item_uuid'], entity_keys.get('segment_uuid'))
+                )
+                if hasattr(self, "item_price_tier_by_provider_item_loader") and hasattr(
+                    self.item_price_tier_by_provider_item_loader, "cache"
+                ):
+                    self.item_price_tier_by_provider_item_loader.cache.delete(cache_key)
+
+            # Always invalidate the item-level cache to clear all price tiers for this item
+            # This ensures all segments/providers are cleared even if segment_uuid is unknown
             if hasattr(self, "item_price_tier_by_item_loader") and hasattr(
                 self.item_price_tier_by_item_loader, "cache"
             ):

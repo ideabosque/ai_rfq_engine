@@ -7,7 +7,8 @@ import logging
 from typing import Any, Dict, List
 
 from promise import Promise
-from silvaengine_utility import Utility
+
+from ..utils.normalization import normalize_to_json
 
 
 def _initialize_tables(logger: logging.Logger) -> None:
@@ -136,10 +137,6 @@ def _combine_all_discount_prompts(
         Promise that resolves to combined list of discount prompts
     """
 
-    def normalize_to_json(obj):
-        """Normalize object to JSON-serializable dict."""
-        return Utility.json_normalize(obj) if obj else {}
-
     # Track which prompts we've already added to prevent duplicates
     # (same prompt might be returned by multiple loaders due to hierarchical nature)
     seen_uuids = set()
@@ -267,3 +264,114 @@ def _combine_all_discount_prompts(
     else:
         # No email in request, skip segment lookup and proceed directly
         return load_segment_prompts_and_merge(None)
+
+
+def _combine_all_item_price_tiers(
+    endpoint_id: str,
+    email: str,
+    quote_items: List[Dict[str, Any]],
+    loaders: Any,
+) -> Any:
+    """
+    Combine item price tiers for quote items using batch loaders.
+
+    This function implements a multi-stage loading strategy:
+    1. Look up segment_uuid from email via segment_contact_loader
+    2. Load price tiers for each item/provider_item combination (filtered by segment at DB level)
+    3. Filter tiers based on quantity thresholds
+    4. Return tier models for conversion at the query layer
+
+    Args:
+        endpoint_id: The tenant/endpoint identifier
+        email: Customer email for segment lookup (can be None)
+        quote_items: List of quote items to determine which price tiers to load
+        loaders: RequestLoaders instance containing all batch loaders
+
+    Returns:
+        Promise that resolves to list of ItemPriceTierModel instances (as dicts)
+    """
+    from promise import Promise
+
+    from .item_price_tier import ItemPriceTierModel
+
+    # STEP 1: Load segment_contact to get segment_uuid from email
+    def process_with_segment(segment_contact):
+        """Process price tiers after segment lookup."""
+        seg_uuid = segment_contact.get("segment_uuid") if segment_contact else None
+
+        # STEP 2: Prepare to load price tiers for each quote item
+        # Group items by (item_uuid, provider_item_uuid) to avoid duplicate loads
+        item_keys = set()
+        item_data_map = {}  # Map keys to item data for later processing
+
+        for item in quote_items:
+            item_uuid = item.get("item_uuid")
+            provider_item_uuid = item.get("provider_item_uuid")
+
+            if item_uuid and provider_item_uuid:
+                key = (item_uuid, provider_item_uuid)
+                item_keys.add(key)
+                # Store item data for quantity filtering
+                if key not in item_data_map:
+                    item_data_map[key] = []
+                item_data_map[key].append(item)
+
+        # STEP 3: Load all price tiers in parallel using batch loader with segment filtering
+        tier_promises = []
+        key_list = list(item_keys)
+        for item_uuid, provider_item_uuid in key_list:
+            # Pass segment_uuid to the loader for efficient database-level filtering
+            tier_promises.append(
+                loaders.item_price_tier_by_provider_item_loader.load(
+                    (item_uuid, provider_item_uuid, seg_uuid)
+                )
+            )
+
+        def process_tiers(all_tier_lists):
+            """Process loaded price tiers and apply filtering/pricing logic."""
+            result_tiers = []
+
+            # Process each (item_uuid, provider_item_uuid) group
+            for idx, tier_list in enumerate(all_tier_lists):
+                if not tier_list:
+                    continue
+
+                key = key_list[idx]
+                items_for_key = item_data_map.get(key, [])
+
+                # Process each item instance for this key
+                for item in items_for_key:
+                    item_qty = item.get("qty", 0)
+
+                    # STEP 4: Filter tiers by quantity
+                    # The segment_uuid filtering is now handled by the batch loader
+                    # Find tiers where quantity_greater_then <= item_qty < quantity_less_then
+                    for tier_dict in tier_list:
+                        qty_greater = tier_dict.get("quantity_greater_then", 0)
+                        qty_less = tier_dict.get("quantity_less_then", float("inf"))
+
+                        # Check if this tier applies to the item quantity
+                        if qty_greater <= item_qty < qty_less:
+                            # STEP 5: Convert dict to model for query layer processing
+                            # The query layer will handle conversion to ItemPriceTierType
+                            tier_model = ItemPriceTierModel()
+                            tier_model.attribute_values = tier_dict
+                            result_tiers.append(tier_model)
+
+            return result_tiers
+
+        # If no items to process, return empty list
+        if not tier_promises:
+            return Promise.resolve([])
+
+        # Load all tiers and process them
+        return Promise.all(tier_promises).then(process_tiers)
+
+    # Start by loading segment contact
+    if email:
+        return loaders.segment_contact_loader.load((endpoint_id, email)).then(
+            process_with_segment
+        )
+    else:
+        # No email, process without segment
+        return process_with_segment(None)
