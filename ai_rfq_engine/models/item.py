@@ -161,6 +161,21 @@ def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
 
 
 def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType | None:
+    if "item_external_id" in kwargs:
+        # Get item by external id
+        item = ItemModel.query(
+            kwargs["endpoint_id"],
+            None,
+            ItemModel.item_external_id == kwargs["item_external_id"],
+        ).first()
+        if item:
+            return get_item_type(info, item)
+        return None
+
+    # Validate item_uuid is provided
+    if "item_uuid" not in kwargs:
+        return None
+
     count = get_item_count(info.context["endpoint_id"], kwargs["item_uuid"])
     if count == 0:
         return None

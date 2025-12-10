@@ -19,7 +19,6 @@ from graphene import (
     ResolveInfo,
     String,
 )
-
 from silvaengine_utility import JSON
 
 from .mutations.discount_prompt import DeleteDiscountPrompt, InsertUpdateDiscountPrompt
@@ -114,7 +113,8 @@ class Query(ObjectType):
 
     item = Field(
         ItemType,
-        item_uuid=String(required=True),
+        item_uuid=String(required=False),
+        item_external_id=String(required=False),
     )
 
     item_list = Field(
