@@ -162,3 +162,6 @@ cython_debug/
 #.idea/
 
 .vscode/
+test_data.json
+.claude
+.zed

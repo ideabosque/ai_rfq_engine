@@ -1,0 +1,102 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-rfq-engine"
+version = "0.0.1"
+description = "AI RFQ Engine"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Idea Bosque", email = "ideabosque@gmail.com"}
+]
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "graphene",
+    "pendulum",
+    "tenacity",
+    "SilvaEngine-DynamoDB-Base",
+    "SilvaEngine-Utility",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "flake8>=6.0",
+    "mypy>=1.0",
+]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "python-dotenv>=1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ai_rfq_engine*"]
+exclude = ["tests*", "*.tests*"]
+
+[tool.setuptools.package-data]
+ai_rfq_engine = ["py.typed"]
+
+[tool.black]
+line-length = 88
+target-version = ["py38", "py39", "py310", "py311"]
+include = '\.pyi?$'
+
+[tool.pytest.ini_options]
+testpaths = ["ai_rfq_engine/tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --strict-markers --tb=short --color=yes"
+markers = [
+    "unit: Unit tests that don't require external dependencies",
+    "integration: Integration tests that require external services (DB, API, etc.)",
+    "slow: Tests that take significant time to run",
+    "skip: Tests that are temporarily disabled",
+]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+minversion = "7.0"
+console_output_style = "progress"
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pyright]
+typeCheckingMode = "basic"
+reportCallIssue = "none"
+reportArgumentType = "none"
+reportArgumentTypeIssues = "none"
+reportRedeclaration = "none"
+reportOptionalMemberAccess = "none"
+reportAttributeAccessIssue = "none"
