@@ -26,6 +26,102 @@ A comprehensive GraphQL-based Request for Quote (RFQ) management system built wi
 - **Serverless Architecture**: Auto-scaling AWS Lambda backend
 - **Smart Cache Normalization**: Automatic handling of cached vs fresh data
 
+## 🤖 MCP Integration
+
+The AI RFQ Engine integrates seamlessly with AI assistants through the **[MCP RFQ Processor](../mcp_rfq_processor)** - a Model Context Protocol (MCP) server that exposes the GraphQL backend as 28 intelligent tools for AI-driven RFQ workflow automation.
+
+### MCP RFQ Processor Overview
+
+**Version**: 0.1.1 | **Tools**: 28 | **Supports**: Claude, Custom MCP Clients
+
+The MCP RFQ Processor provides AI assistants with high-level operations that abstract away complex GraphQL queries and mutations. It handles:
+
+- **Automated Workflows**: Multi-step processes like "confirm request and create quotes" in single tool calls
+- **Intelligent Pricing**: Batch-optimized price tier and discount prompt queries using email-based segment lookup
+- **Status Management**: Validated state transitions with automatic business rule enforcement
+- **Provider Assignment**: Smart assignment of provider items to request items with batch tracking
+
+### Architecture Integration
+
+```mermaid
+graph TB
+    subgraph AI_Layer["🤖 AI Assistant Layer"]
+        Claude[Claude / AI Assistant]
+    end
+
+    subgraph MCP_Layer["🔌 MCP Protocol Layer"]
+        MCPServer[MCP RFQ Processor<br/>28 Tools<br/>v0.1.1]
+
+        subgraph Processors["Specialized Processors"]
+            ReqProc[Request Processor<br/>8 tools]
+            ItemProc[Item Processor<br/>4 tools]
+            QuoteProc[Quote Processor<br/>5 tools]
+            PriceProc[Pricing Processor<br/>3 tools]
+            InstProc[Installment Processor<br/>4 tools]
+            FileProc[File Processor<br/>2 tools]
+            SegProc[Segment Processor<br/>1 tool]
+            WorkProc[Workflow Helpers<br/>2 tools]
+        end
+    end
+
+    subgraph Backend_Layer["⚙️ GraphQL Backend Layer"]
+        GraphQL[ai_rfq_engine<br/>GraphQL API<br/>This Package]
+        BatchLoaders[Batch Loaders<br/>DataLoader Pattern<br/>19 Loaders]
+    end
+
+    subgraph Data_Layer["💾 Data Layer"]
+        DDB[(DynamoDB<br/>11 Tables)]
+        S3[(S3 Storage<br/>Documents)]
+    end
+
+    Claude -->|MCP Protocol| MCPServer
+    MCPServer --> Processors
+    Processors -->|GraphQL Mutations/Queries| GraphQL
+    GraphQL --> BatchLoaders
+    BatchLoaders -->|Optimized Queries| DDB
+    GraphQL -->|File Operations| S3
+
+    style AI_Layer fill:#e1f5ff
+    style MCP_Layer fill:#fff4e1
+    style Backend_Layer fill:#e1ffe1
+    style Data_Layer fill:#ffe1f5
+```
+
+### Key Benefits
+
+1. **AI-Native Interface**: Tools designed for natural language interaction
+2. **Batch Optimization**: Single GraphQL queries for multi-item operations
+3. **Email-Based Segment Lookup**: Automatic customer segmentation via `email → segment_contact → segment`
+4. **Business Rule Enforcement**: Automatic status transitions and validations
+5. **Workflow Abstraction**: Complex multi-step processes in single tool calls
+
+### Quick Example
+
+```python
+# AI Assistant using MCP RFQ Processor
+from mcp_rfq_processor import MCPRfqProcessor
+
+processor = MCPRfqProcessor(endpoint_id="demo")
+
+# Step 1: Calculate pricing (batch-optimized)
+pricing = processor.calculate_quote_pricing(
+    request_uuid="req_001",
+    email="buyer@company.com"  # Auto-resolves segment
+)
+# Returns grouped pricing by provider with discount prompts
+
+# Step 2: Create quotes for all providers (single call)
+result = processor.confirm_request_and_create_quotes(
+    request_uuid="req_001",
+    provider_corp_external_ids=["PROV_001", "PROV_002"]
+)
+# Creates quotes with auto-generated quote items from request
+```
+
+**Learn More**: See [mcp_rfq_processor/README.md](../mcp_rfq_processor/README.md) for complete tool catalog and workflow examples.
+
+---
+
 ## 🏗️ Architecture
 
 ### Technology Stack
@@ -34,6 +130,7 @@ A comprehensive GraphQL-based Request for Quote (RFQ) management system built wi
 - **API**: GraphQL with Graphene
 - **Cloud**: AWS Lambda (Serverless)
 - **Framework**: SilvaEngine (Custom framework)
+- **MCP Integration**: Model Context Protocol server for AI assistants
 
 ### Project Structure
 ```

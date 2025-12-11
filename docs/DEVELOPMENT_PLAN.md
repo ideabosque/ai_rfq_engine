@@ -696,21 +696,34 @@ The AI RFQ Engine has successfully implemented a modern, high-performance GraphQ
 
 ### 9.1 System Overview
 
-The **MCP RFQ Processor** is a Model Context Protocol (MCP) server that provides 29 tools for complete RFQ lifecycle management. It connects AI assistants to the AI RFQ Engine GraphQL backend, enabling intelligent automation of procurement workflows.
+The **MCP RFQ Processor** is a Model Context Protocol (MCP) server that provides 28 tools for complete RFQ lifecycle management. It connects AI assistants to the AI RFQ Engine GraphQL backend, enabling intelligent automation of procurement workflows.
+
+**Version**: 0.1.1 | **Package**: `mcp-rfq-processor` | **Location**: `../mcp_rfq_processor`
 
 **Architecture Pattern**: Layered Processor Design
 ```
-AI Assistant (Claude, ChatGPT, etc.)
+AI Assistant (Claude, Custom Clients)
          ↓
 MCP Protocol (JSON-RPC)
          ↓
-MCP RFQ Processor (29 Tools)
+MCP RFQ Processor (28 Tools)
+  ├── Request Processor (8 tools)
+  ├── Item Processor (4 tools)
+  ├── Quote Processor (5 tools)
+  ├── Pricing Processor (3 tools)
+  ├── Installment Processor (4 tools)
+  ├── File Processor (2 tools)
+  ├── Segment Processor (1 tool)
+  └── Workflow Helpers (2 tools)
          ↓
 GraphQL Client (AWS Lambda)
          ↓
-AI RFQ Engine (GraphQL API)
+AI RFQ Engine (GraphQL API - This Package)
+  ├── Batch Loaders (19 loaders)
+  ├── Nested Resolvers
+  └── Business Rules Engine
          ↓
-DynamoDB
+DynamoDB (11 Tables) + S3 (File Storage)
 ```
 
 ### 9.2 Sequence Diagrams
@@ -785,20 +798,26 @@ sequenceDiagram
     MCP->>GQL: insertUpdateQuote mutation
     GQL->>DB: Create quote from request.items
     GQL->>GQL: Auto-create quote_items
-    GQL->>GQL: Calculate totals
+    GQL->>GQL: Calculate totals (rounds=0)
     DB-->>GQL: quote_uuid
     GQL-->>MCP: Quote created with items
-    MCP-->>AI: {quote_uuid, quote_items[], totals}
+    MCP-->>AI: {quote_uuid, quote_items[], totals, rounds: 0}
 
-    Note over AI,DB: Phase 6: Quote Confirmation
-    AI->>MCP: update_quote_item(discount_amount)
-    MCP->>GQL: insertUpdateQuoteItem mutation
-    GQL->>DB: Update quote_item
-    GQL->>GQL: Recalculate quote totals
-    DB-->>GQL: Updated
-    GQL-->>MCP: Quote item updated
-    MCP-->>AI: {new_totals}
+    Note over AI,DB: Phase 6: Negotiation (rounds increment)
+    loop Negotiation Rounds
+        AI->>MCP: update_quote_item(discount_amount) OR<br/>update_quote(shipping_amount, notes)
+        MCP->>GQL: insertUpdateQuoteItem/Quote mutation
+        GQL->>GQL: Increment rounds counter
+        GQL->>DB: Update quote_item/quote
+        GQL->>GQL: Recalculate quote totals
+        DB-->>GQL: Updated
+        GQL-->>MCP: Quote updated (rounds++)
+        MCP-->>AI: {new_totals, rounds: N}
 
+        Note over AI: Present to customer,<br/>get feedback, negotiate
+    end
+
+    Note over AI,DB: Phase 7: Quote Confirmation
     AI->>MCP: update_quote(status: confirmed)
     MCP->>GQL: insertUpdateQuote mutation
     GQL->>GQL: Validate status transition
@@ -806,9 +825,9 @@ sequenceDiagram
     GQL->>DB: Update quote & competitors
     DB-->>GQL: Updated
     GQL-->>MCP: Quote confirmed
-    MCP-->>AI: {status: confirmed}
+    MCP-->>AI: {status: confirmed, final_rounds: N}
 
-    Note over AI,DB: Phase 7: Payment Schedule
+    Note over AI,DB: Phase 8: Payment Schedule
     AI->>MCP: create_installments(quote_uuid, num_installments)
     MCP->>GQL: Multiple insertUpdateInstallment mutations
     GQL->>GQL: Auto-calculate amounts & dates
@@ -817,7 +836,7 @@ sequenceDiagram
     GQL-->>MCP: Installments created
     MCP-->>AI: {installments[]}
 
-    Note over AI,DB: Phase 8: Payment Processing
+    Note over AI,DB: Phase 9: Payment Processing
     AI->>MCP: update_installment(status: paid)
     MCP->>GQL: insertUpdateInstallment mutation
     GQL->>DB: Update installment
@@ -1091,6 +1110,35 @@ sequenceDiagram
     Note over AI: Generate Pricing Strategy
     AI-->>AI: Selected discount prompt applied
 ```
+
+#### 9.2.5 Negotiation Rounds Tracking
+
+The `rounds` field on Quote tracks negotiation iterations automatically:
+
+**Automatic Increment Triggers:**
+- Any `update_quote()` call (shipping, notes, status changes)
+- Any `update_quote_item()` call (price, discount changes)
+
+**Use Cases:**
+1. **Track Negotiation Progress**: Monitor how many back-and-forth iterations occurred
+2. **Audit Trail**: Maintain history of quote modifications for compliance
+3. **Performance Metrics**: Analyze average rounds to close for optimization
+
+**Example Flow:**
+```
+Quote Created           → rounds = 0
+Update shipping         → rounds = 1
+Update discount         → rounds = 2
+Update notes            → rounds = 3
+Confirm quote          → rounds = 3 (final)
+```
+
+**Key Points:**
+- `rounds` is **read-only** - cannot be manually set via MCP tools
+- Increments on **every** quote/quote_item update mutation
+- Does **not** increment when quote is initially created
+- Final `rounds` value represents total negotiation cycles
+- Available in `get_quote()` and `search_quotes()` responses
 
 ### 9.3 Activity Diagrams
 
@@ -1571,20 +1619,21 @@ stateDiagram-v2
 ```mermaid
 graph TB
     subgraph "AI Assistant Layer"
-        AI[AI Assistant<br/>Claude/ChatGPT]
+        AI[AI Assistant<br/>Claude/Custom MCP Client]
     end
 
     subgraph "MCP Server Layer"
-        MCP[MCP RFQ Processor]
+        MCP[MCP RFQ Processor<br/>v0.1.1 - 28 Tools]
 
         subgraph "Processor Hierarchy"
-            RP[Request Processor]
-            IP[Item Processor]
-            QP[Quote Processor]
-            PP[Pricing Processor]
-            InstP[Installment Processor]
-            FP[File Processor]
-            SP[Segment Processor]
+            RP[Request Processor<br/>8 tools]
+            IP[Item Processor<br/>4 tools]
+            QP[Quote Processor<br/>5 tools]
+            PP[Pricing Processor<br/>3 tools]
+            InstP[Installment Processor<br/>4 tools]
+            FP[File Processor<br/>2 tools]
+            SP[Segment Processor<br/>1 tool]
+            WP[Workflow Helpers<br/>2 tools]
         end
 
         subgraph "Supporting Services"
@@ -1596,11 +1645,12 @@ graph TB
 
     subgraph "Backend Layer"
         Lambda[AWS Lambda<br/>ai_rfq_graphql]
-        Engine[AI RFQ Engine<br/>GraphQL API]
-        DB[(DynamoDB<br/>Tables)]
+        Engine[AI RFQ Engine<br/>GraphQL API - This Package<br/>19 Batch Loaders]
+        DB[(DynamoDB<br/>11 Tables)]
+        S3[(S3 Storage<br/>Documents)]
     end
 
-    AI -->|MCP Tools| MCP
+    AI -->|MCP Protocol| MCP
     MCP --> RP
     MCP --> IP
     MCP --> QP
@@ -1608,10 +1658,12 @@ graph TB
     MCP --> InstP
     MCP --> FP
     MCP --> SP
+    MCP --> WP
 
     RP --> SM
     QP --> SM
     InstP --> SM
+    WP --> SM
 
     RP --> GQL
     IP --> GQL
@@ -1620,16 +1672,19 @@ graph TB
     InstP --> GQL
     FP --> GQL
     SP --> GQL
+    WP --> GQL
 
     RP --> EH
     IP --> EH
     QP --> EH
     PP --> EH
     InstP --> EH
+    WP --> EH
 
     GQL -->|boto3.invoke| Lambda
     Lambda --> Engine
     Engine --> DB
+    Engine --> S3
 
     style AI fill:#e1f5ff
     style MCP fill:#fff3e0
