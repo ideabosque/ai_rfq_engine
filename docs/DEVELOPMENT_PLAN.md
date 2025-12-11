@@ -696,21 +696,34 @@ The AI RFQ Engine has successfully implemented a modern, high-performance GraphQ
 
 ### 9.1 System Overview
 
-The **MCP RFQ Processor** is a Model Context Protocol (MCP) server that provides 29 tools for complete RFQ lifecycle management. It connects AI assistants to the AI RFQ Engine GraphQL backend, enabling intelligent automation of procurement workflows.
+The **MCP RFQ Processor** is a Model Context Protocol (MCP) server that provides 28 tools for complete RFQ lifecycle management. It connects AI assistants to the AI RFQ Engine GraphQL backend, enabling intelligent automation of procurement workflows.
+
+**Version**: 0.1.1 | **Package**: `mcp-rfq-processor` | **Location**: `../mcp_rfq_processor`
 
 **Architecture Pattern**: Layered Processor Design
 ```
-AI Assistant (Claude, ChatGPT, etc.)
+AI Assistant (Claude, Custom Clients)
          ↓
 MCP Protocol (JSON-RPC)
          ↓
-MCP RFQ Processor (29 Tools)
+MCP RFQ Processor (28 Tools)
+  ├── Request Processor (8 tools)
+  ├── Item Processor (4 tools)
+  ├── Quote Processor (5 tools)
+  ├── Pricing Processor (3 tools)
+  ├── Installment Processor (4 tools)
+  ├── File Processor (2 tools)
+  ├── Segment Processor (1 tool)
+  └── Workflow Helpers (2 tools)
          ↓
 GraphQL Client (AWS Lambda)
          ↓
-AI RFQ Engine (GraphQL API)
+AI RFQ Engine (GraphQL API - This Package)
+  ├── Batch Loaders (19 loaders)
+  ├── Nested Resolvers
+  └── Business Rules Engine
          ↓
-DynamoDB
+DynamoDB (11 Tables) + S3 (File Storage)
 ```
 
 ### 9.2 Sequence Diagrams
@@ -1571,20 +1584,21 @@ stateDiagram-v2
 ```mermaid
 graph TB
     subgraph "AI Assistant Layer"
-        AI[AI Assistant<br/>Claude/ChatGPT]
+        AI[AI Assistant<br/>Claude/Custom MCP Client]
     end
 
     subgraph "MCP Server Layer"
-        MCP[MCP RFQ Processor]
+        MCP[MCP RFQ Processor<br/>v0.1.1 - 28 Tools]
 
         subgraph "Processor Hierarchy"
-            RP[Request Processor]
-            IP[Item Processor]
-            QP[Quote Processor]
-            PP[Pricing Processor]
-            InstP[Installment Processor]
-            FP[File Processor]
-            SP[Segment Processor]
+            RP[Request Processor<br/>8 tools]
+            IP[Item Processor<br/>4 tools]
+            QP[Quote Processor<br/>5 tools]
+            PP[Pricing Processor<br/>3 tools]
+            InstP[Installment Processor<br/>4 tools]
+            FP[File Processor<br/>2 tools]
+            SP[Segment Processor<br/>1 tool]
+            WP[Workflow Helpers<br/>2 tools]
         end
 
         subgraph "Supporting Services"
@@ -1596,11 +1610,12 @@ graph TB
 
     subgraph "Backend Layer"
         Lambda[AWS Lambda<br/>ai_rfq_graphql]
-        Engine[AI RFQ Engine<br/>GraphQL API]
-        DB[(DynamoDB<br/>Tables)]
+        Engine[AI RFQ Engine<br/>GraphQL API - This Package<br/>19 Batch Loaders]
+        DB[(DynamoDB<br/>11 Tables)]
+        S3[(S3 Storage<br/>Documents)]
     end
 
-    AI -->|MCP Tools| MCP
+    AI -->|MCP Protocol| MCP
     MCP --> RP
     MCP --> IP
     MCP --> QP
@@ -1608,10 +1623,12 @@ graph TB
     MCP --> InstP
     MCP --> FP
     MCP --> SP
+    MCP --> WP
 
     RP --> SM
     QP --> SM
     InstP --> SM
+    WP --> SM
 
     RP --> GQL
     IP --> GQL
@@ -1620,16 +1637,19 @@ graph TB
     InstP --> GQL
     FP --> GQL
     SP --> GQL
+    WP --> GQL
 
     RP --> EH
     IP --> EH
     QP --> EH
     PP --> EH
     InstP --> EH
+    WP --> EH
 
     GQL -->|boto3.invoke| Lambda
     Lambda --> Engine
     Engine --> DB
+    Engine --> S3
 
     style AI fill:#e1f5ff
     style MCP fill:#fff3e0
