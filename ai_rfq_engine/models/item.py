@@ -163,14 +163,16 @@ def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
 def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType | None:
     if "item_external_id" in kwargs:
         # Get item by external id
-        item = ItemModel.query(
-            kwargs["endpoint_id"],
+        results = ItemModel.query(
+            info.context["endpoint_id"],
             None,
             ItemModel.item_external_id == kwargs["item_external_id"],
-        ).first()
-        if item:
+        )
+        try:
+            item = results.next()
             return get_item_type(info, item)
-        return None
+        except Exception:
+            return None
 
     # Validate item_uuid is provided
     if "item_uuid" not in kwargs:
