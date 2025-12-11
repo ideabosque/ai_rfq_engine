@@ -51,11 +51,23 @@ def call_method(
 
     try:
         result = method(**arguments)
+
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
         logger.info(
             f"Method response: cid={cid} op={op} elapsed_ms={elapsed_ms} "
             f"success=True result={result}"
         )
+
+        # Parse JSON string response if needed (graphql_execute returns JSON string)
+        if isinstance(result, (str, bytes)):
+            import json
+
+            result = (
+                json.loads(result)
+                if isinstance(result, str)
+                else json.loads(result.decode("utf-8"))
+            )
+
         return result, None
     except Exception as exc:
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
@@ -132,3 +144,7 @@ def validate_graphql_result(
         assert key in current, f"{path_str} missing expected key '{key}'"
 
     logger.info(f"Validated structure at {path_str}: {list(current.keys())}")
+
+
+# Alias for backward compatibility or specific usage context
+validate_nested_resolver_result = validate_graphql_result

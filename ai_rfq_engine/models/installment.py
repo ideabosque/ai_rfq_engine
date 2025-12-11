@@ -4,6 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict
@@ -19,9 +20,10 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
+from silvaengine_utility import Utility, method_cache
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..handlers.config import Config
 from ..types.installment import InstallmentListType, InstallmentType
 from .utils import _get_quote
 
@@ -62,6 +64,53 @@ class InstallmentModel(BaseModel):
     updated_at_index = UpdateAtIndex()
 
 
+def purge_cache():
+    def actual_decorator(original_function):
+        @functools.wraps(original_function)
+        def wrapper_function(*args, **kwargs):
+            try:
+                # Use cascading cache purging for installments
+                from ..models.cache import purge_entity_cascading_cache
+
+                context_keys = None
+                entity_keys = {}
+                if kwargs.get("quote_uuid"):
+                    entity_keys["quote_uuid"] = kwargs.get("quote_uuid")
+                if kwargs.get("installment_uuid"):
+                    entity_keys["installment_uuid"] = kwargs.get("installment_uuid")
+
+                result = purge_entity_cascading_cache(
+                    args[0].context.get("logger"),
+                    entity_type="installment",
+                    context_keys=context_keys,
+                    entity_keys=entity_keys if entity_keys else None,
+                    cascade_depth=3,
+                )
+
+                if kwargs.get("quote_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="installment",
+                        context_keys=context_keys,
+                        entity_keys={"quote_uuid": kwargs.get("quote_uuid")},
+                        cascade_depth=3,
+                        custom_options={"custom_getter": "get_installments_by_quote", "custom_cache_keys": ["key:quote_uuid"]}
+                    )
+
+                ## Original function.
+                result = original_function(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                log = traceback.format_exc()
+                args[0].context.get("logger").error(log)
+                raise e
+
+        return wrapper_function
+
+    return actual_decorator
+
+
 def create_installment_table(logger: logging.Logger) -> bool:
     """Create the Installment table if it doesn't exist."""
     if not InstallmentModel.exists():
@@ -76,7 +125,20 @@ def create_installment_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "installment"),
+)
 def get_installment(quote_uuid: str, installment_uuid: str) -> InstallmentModel:
+    return InstallmentModel.get(quote_uuid, installment_uuid)
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_installment(quote_uuid: str, installment_uuid: str) -> InstallmentModel:
     return InstallmentModel.get(quote_uuid, installment_uuid)
 
 
@@ -120,17 +182,19 @@ def _calculate_installment_ratio(
 def get_installment_type(
     info: ResolveInfo, installment: InstallmentModel
 ) -> InstallmentType:
+    """
+    Nested resolver approach: return minimal installment data.
+    - Do NOT embed 'quote'.
+    'quote' is resolved lazily by InstallmentType.resolve_quote.
+    """
     try:
-        quote = _get_quote(installment.request_uuid, installment.quote_uuid)
-        installment: Dict = installment.__dict__["attribute_values"]
-        installment["quote"] = quote
-        installment.pop("request_uuid")
-        installment.pop("quote_uuid")
-    except Exception as e:
+        inst_dict = installment.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return InstallmentType(**Utility.json_normalize(installment))
+        raise
+
+    return InstallmentType(**Utility.json_normalize(inst_dict))
 
 
 def resolve_installment(
@@ -219,12 +283,13 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
     return inquiry_funct, count_funct, args
 
 
+@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "quote_uuid",
         "range_key": "installment_uuid",
     },
-    model_funct=get_installment,
+    model_funct=_get_installment,
     count_funct=get_installment_count,
     type_funct=get_installment_type,
 )
@@ -301,6 +366,7 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
     return
 
 
+@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -311,3 +377,18 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
 def delete_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "installment"),
+)
+def get_installments_by_quote(quote_uuid: str) -> Any:
+    installments = []
+    for installment in InstallmentModel.query(quote_uuid):
+        installments.append(installment)
+    return installments

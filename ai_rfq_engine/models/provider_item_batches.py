@@ -4,6 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict
@@ -24,14 +25,14 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
+from silvaengine_utility import Utility, method_cache
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..handlers.config import Config
 from ..types.provider_item_batches import (
     ProviderItemBatchListType,
     ProviderItemBatchType,
 )
-from .utils import _get_item, _get_provider_item
 
 
 class ItemUuidIndex(LocalSecondaryIndex):
@@ -89,6 +90,53 @@ class ProviderItemBatchModel(BaseModel):
     updated_at_index = UpdateAtIndex()
 
 
+def purge_cache():
+    def actual_decorator(original_function):
+        @functools.wraps(original_function)
+        def wrapper_function(*args, **kwargs):
+            try:
+                # Use cascading cache purging for provider_item_batchs
+                from ..models.cache import purge_entity_cascading_cache
+
+                context_keys = None
+                entity_keys = {}
+                if kwargs.get("provider_item_uuid"):
+                    entity_keys["provider_item_uuid"] = kwargs.get("provider_item_uuid")
+                if kwargs.get("batch_no"):
+                    entity_keys["batch_no"] = kwargs.get("batch_no")
+
+                result = purge_entity_cascading_cache(
+                    args[0].context.get("logger"),
+                    entity_type="provider_item_batch",
+                    context_keys=context_keys,
+                    entity_keys=entity_keys if entity_keys else None,
+                    cascade_depth=3,
+                )
+
+                if kwargs.get("provider_item_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="provider_item_batch",
+                        context_keys=context_keys,
+                        entity_keys={"provider_item_uuid": kwargs.get("provider_item_uuid")},
+                        cascade_depth=3,
+                        custom_options={"custom_getter": "get_provider_item_batches_by_provider_item", "custom_cache_keys": ["key:provider_item_uuid"]}
+                    )
+
+                ## Original function.
+                result = original_function(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                log = traceback.format_exc()
+                args[0].context.get("logger").error(log)
+                raise e
+
+        return wrapper_function
+
+    return actual_decorator
+
+
 def create_provider_item_batch_table(logger: logging.Logger) -> bool:
     """Create the ProviderItemBatch table if it doesn't exist."""
     if not ProviderItemBatchModel.exists():
@@ -103,7 +151,22 @@ def create_provider_item_batch_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "provider_item_batch"),
+)
 def get_provider_item_batch(
+    provider_item_uuid: str, batch_no: str
+) -> ProviderItemBatchModel:
+    return ProviderItemBatchModel.get(provider_item_uuid, batch_no)
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_provider_item_batch(
     provider_item_uuid: str, batch_no: str
 ) -> ProviderItemBatchModel:
     return ProviderItemBatchModel.get(provider_item_uuid, batch_no)
@@ -118,26 +181,22 @@ def get_provider_item_batch_count(provider_item_uuid: str, batch_no: str) -> int
 def get_provider_item_batch_type(
     info: ResolveInfo, provider_item_batch: ProviderItemBatchModel
 ) -> ProviderItemBatchType:
+    """
+    Nested resolver approach: return minimal batch data.
+    - Do NOT embed 'item' or 'provider_item'.
+    Those are resolved lazily by ProviderItemBatchType resolvers.
+    """
     try:
-        item = _get_item(info.context["endpoint_id"], provider_item_batch.item_uuid)
-        provider_item = _get_provider_item(
-            info.context["endpoint_id"], provider_item_batch.provider_item_uuid
-        )
-        provider_item_batch: Dict = provider_item_batch.__dict__["attribute_values"]
-        provider_item_batch.update(
-            {
-                "item": item,
-                "provider_item": provider_item,
-            }
-        )
-        provider_item_batch.pop("endpoint_id")
-        provider_item_batch.pop("item_uuid")
-        provider_item_batch.pop("provider_item_uuid")
-    except Exception as e:
+        batch_dict = provider_item_batch.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return ProviderItemBatchType(**Utility.json_normalize(provider_item_batch))
+        raise
+
+    batch_dict.pop("endpoint_id", None)
+    valid_fields = ProviderItemBatchType._meta.fields.keys()
+    filtered_batch_dict = {k: v for k, v in batch_dict.items() if k in valid_fields}
+    return ProviderItemBatchType(**Utility.json_normalize(filtered_batch_dict))
 
 
 def resolve_provider_item_batch(
@@ -244,13 +303,14 @@ def resolve_provider_item_batch_list(
     return inquiry_funct, count_funct, args
 
 
+@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "provider_item_uuid",
         "range_key": "batch_no",
     },
     range_key_required=True,
-    model_funct=get_provider_item_batch,
+    model_funct=_get_provider_item_batch,
     count_funct=get_provider_item_batch_count,
     type_funct=get_provider_item_batch_type,
 )
@@ -348,6 +408,7 @@ def insert_update_provider_item_batch(
     return
 
 
+@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "provider_item_uuid",
@@ -358,3 +419,20 @@ def insert_update_provider_item_batch(
 def delete_provider_item_batch(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "provider_item_batch"),
+)
+def get_provider_item_batches_by_provider_item(
+    provider_item_uuid: str
+) -> Any:
+    provider_item_batches = []
+    for provider_item_batch in ProviderItemBatchModel.query(provider_item_uuid):
+        provider_item_batches.append(provider_item_batch)
+    return provider_item_batches

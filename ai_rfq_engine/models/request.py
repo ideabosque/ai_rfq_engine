@@ -4,6 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict
@@ -17,8 +18,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -26,8 +25,10 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
+from silvaengine_utility import Utility, method_cache
+from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..handlers.config import Config
 from ..types.request import RequestListType, RequestType
 from .file import resolve_file_list
 from .quote import resolve_quote_list
@@ -90,6 +91,43 @@ class RequestModel(BaseModel):
     updated_at_index = UpdateAtIndex()
 
 
+def purge_cache():
+    def actual_decorator(original_function):
+        @functools.wraps(original_function)
+        def wrapper_function(*args, **kwargs):
+            try:
+                # Use cascading cache purging for requests
+                from ..models.cache import purge_entity_cascading_cache
+
+                endpoint_id = args[0].context.get("endpoint_id") or kwargs.get(
+                    "endpoint_id"
+                )
+                entity_keys = {}
+                if kwargs.get("request_uuid"):
+                    entity_keys["request_uuid"] = kwargs.get("request_uuid")
+
+                result = purge_entity_cascading_cache(
+                    args[0].context.get("logger"),
+                    entity_type="request",
+                    context_keys={"endpoint_id": endpoint_id} if endpoint_id else None,
+                    entity_keys=entity_keys if entity_keys else None,
+                    cascade_depth=3,
+                )
+
+                ## Original function.
+                result = original_function(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                log = traceback.format_exc()
+                args[0].context.get("logger").error(log)
+                raise e
+
+        return wrapper_function
+
+    return actual_decorator
+
+
 def create_request_table(logger: logging.Logger) -> bool:
     """Create the Request table if it doesn't exist."""
     if not RequestModel.exists():
@@ -104,7 +142,19 @@ def create_request_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
+@method_cache(
+    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "request")
+)
 def get_request(endpoint_id: str, request_uuid: str) -> RequestModel:
+    return RequestModel.get(endpoint_id, request_uuid)
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_request(endpoint_id: str, request_uuid: str) -> RequestModel:
     return RequestModel.get(endpoint_id, request_uuid)
 
 
@@ -123,9 +173,7 @@ def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType | None:
-    count = get_request_count(
-        info.context["endpoint_id"], kwargs["request_uuid"]
-    )
+    count = get_request_count(info.context["endpoint_id"], kwargs["request_uuid"])
     if count == 0:
         return None
 
@@ -235,12 +283,13 @@ def _validate_request_items(endpoint_id: str, items: list) -> None:
                             )
 
 
+@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "endpoint_id",
         "range_key": "request_uuid",
     },
-    model_funct=get_request,
+    model_funct=_get_request,
     count_funct=get_request_count,
     type_funct=get_request_type,
 )
@@ -308,6 +357,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     return
 
 
+@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "endpoint_id",

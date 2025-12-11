@@ -4,6 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict
@@ -12,8 +13,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -21,10 +20,11 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
+from silvaengine_utility import Utility, method_cache
+from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..handlers.config import Config
 from ..types.quote import QuoteListType, QuoteType
-from .utils import _get_request
 
 
 class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
@@ -97,6 +97,52 @@ class QuoteModel(BaseModel):
     updated_at_index = UpdatedAtIndex()
 
 
+def purge_cache():
+    def actual_decorator(original_function):
+        @functools.wraps(original_function)
+        def wrapper_function(*args, **kwargs):
+            try:
+                # Use cascading cache purging for quotes
+                from ..models.cache import purge_entity_cascading_cache
+
+                entity_keys = {}
+                if kwargs.get("request_uuid"):
+                    entity_keys["request_uuid"] = kwargs.get("request_uuid")
+                if kwargs.get("quote_uuid"):
+                    entity_keys["quote_uuid"] = kwargs.get("quote_uuid")
+
+                result = purge_entity_cascading_cache(
+                    args[0].context.get("logger"),
+                    entity_type="quote",
+                    context_keys=None,
+                    entity_keys=entity_keys if entity_keys else None,
+                    cascade_depth=3,
+                )
+
+                if kwargs.get("request_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="quote",
+                        context_keys=None,
+                        entity_keys={"request_uuid": kwargs.get("request_uuid")},
+                        cascade_depth=3,
+                        custom_options={"custom_getter": "get_quotes_by_request", "custom_cache_keys": ["key:request_uuid"]}
+                    )
+
+                ## Original function.
+                result = original_function(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                log = traceback.format_exc()
+                args[0].context.get("logger").error(log)
+                raise e
+
+        return wrapper_function
+
+    return actual_decorator
+
+
 def create_quote_table(logger: logging.Logger) -> bool:
     """Create the Quote table if it doesn't exist."""
     if not QuoteModel.exists():
@@ -111,7 +157,19 @@ def create_quote_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
+@method_cache(
+    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "quote")
+)
 def get_quote(request_uuid: str, quote_uuid: str) -> QuoteModel:
+    return QuoteModel.get(request_uuid, quote_uuid)
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_quote(request_uuid: str, quote_uuid: str) -> QuoteModel:
     return QuoteModel.get(request_uuid, quote_uuid)
 
 
@@ -188,14 +246,19 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -
 
 
 def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
+    """
+    Nested resolver approach: return minimal quote data.
+    - Do NOT embed 'request'.
+    'request' is resolved lazily by QuoteType.resolve_request.
+    - 'quote_items' ARE still embedded for now (List(JSON)).
+    """
     try:
         # Import here to avoid circular dependency
         from .quote_item import resolve_quote_item_list
 
-        request = _get_request(info.context["endpoint_id"], quote.request_uuid)
         quote_dict: Dict = quote.__dict__["attribute_values"]
 
-        # Get quote items for this quote
+        # Get quote items for this quote (still eager for now)
         quote_item_list = resolve_quote_item_list(
             info, **{"quote_uuid": quote.quote_uuid}
         )
@@ -222,10 +285,9 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
             for item in quote_item_list.quote_item_list
         ]
 
-        quote_dict["request"] = request
         quote_dict["quote_items"] = quote_items
-        quote_dict.pop("endpoint_id")
-        quote_dict.pop("request_uuid")
+        # quote_dict.pop("endpoint_id")
+        # quote_dict.pop("request_uuid")
     except Exception as e:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
@@ -339,12 +401,13 @@ def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
+@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "request_uuid",
         "range_key": "quote_uuid",
     },
-    model_funct=get_quote,
+    model_funct=_get_quote,
     count_funct=get_quote_count,
     type_funct=get_quote_type,
 )
@@ -416,6 +479,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     return
 
 
+@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "request_uuid",
@@ -443,3 +507,17 @@ def delete_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 
     kwargs.get("entity").delete()
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "quote")
+)
+def get_quotes_by_request(request_uuid: str) -> Any:
+    quotes = []
+    for quote in QuoteModel.query(request_uuid):
+        quotes.append(quote)
+    return quotes

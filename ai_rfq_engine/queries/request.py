@@ -8,6 +8,10 @@ from typing import Any, Dict
 
 from graphene import ResolveInfo
 
+from silvaengine_utility import method_cache
+
+from ..handlers.config import Config
+
 from ..models import request
 from ..types.request import RequestListType, RequestType
 
@@ -16,6 +20,7 @@ def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType:
     return request.resolve_request(info, **kwargs)
 
 
+@method_cache(ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name('queries', 'request'))
 def resolve_request_list(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> RequestListType:

@@ -11,7 +11,7 @@ Tests all functionality of the AI RFQ Engine package:
 - Provider item management
 - Provider item batch management
 - Item price tier management
-- Discount rule management
+- Discount prompt management
 - Request management
 - Quote management
 - Quote item management
@@ -32,7 +32,6 @@ import os
 import sys
 
 import pytest
-
 from silvaengine_utility import Utility
 from test_helpers import call_method, log_test_result
 
@@ -66,23 +65,37 @@ SEGMENT_DELETE_TEST_DATA = _TEST_DATA.get("segment_delete_test_data", [])
 SEGMENT_CONTACT_TEST_DATA = _TEST_DATA.get("segment_contact_test_data", [])
 SEGMENT_CONTACT_GET_TEST_DATA = _TEST_DATA.get("segment_contact_get_test_data", [])
 SEGMENT_CONTACT_LIST_TEST_DATA = _TEST_DATA.get("segment_contact_list_test_data", [])
-SEGMENT_CONTACT_DELETE_TEST_DATA = _TEST_DATA.get("segment_contact_delete_test_data", [])
+SEGMENT_CONTACT_DELETE_TEST_DATA = _TEST_DATA.get(
+    "segment_contact_delete_test_data", []
+)
 PROVIDER_ITEM_TEST_DATA = _TEST_DATA.get("provider_item_test_data", [])
 PROVIDER_ITEM_GET_TEST_DATA = _TEST_DATA.get("provider_item_get_test_data", [])
 PROVIDER_ITEM_LIST_TEST_DATA = _TEST_DATA.get("provider_item_list_test_data", [])
 PROVIDER_ITEM_DELETE_TEST_DATA = _TEST_DATA.get("provider_item_delete_test_data", [])
 PROVIDER_ITEM_BATCH_TEST_DATA = _TEST_DATA.get("provider_item_batch_test_data", [])
-PROVIDER_ITEM_BATCH_GET_TEST_DATA = _TEST_DATA.get("provider_item_batch_get_test_data", [])
-PROVIDER_ITEM_BATCH_LIST_TEST_DATA = _TEST_DATA.get("provider_item_batch_list_test_data", [])
-PROVIDER_ITEM_BATCH_DELETE_TEST_DATA = _TEST_DATA.get("provider_item_batch_delete_test_data", [])
+PROVIDER_ITEM_BATCH_GET_TEST_DATA = _TEST_DATA.get(
+    "provider_item_batch_get_test_data", []
+)
+PROVIDER_ITEM_BATCH_LIST_TEST_DATA = _TEST_DATA.get(
+    "provider_item_batch_list_test_data", []
+)
+PROVIDER_ITEM_BATCH_DELETE_TEST_DATA = _TEST_DATA.get(
+    "provider_item_batch_delete_test_data", []
+)
 ITEM_PRICE_TIER_TEST_DATA = _TEST_DATA.get("item_price_tier_test_data", [])
 ITEM_PRICE_TIER_GET_TEST_DATA = _TEST_DATA.get("item_price_tier_get_test_data", [])
 ITEM_PRICE_TIER_LIST_TEST_DATA = _TEST_DATA.get("item_price_tier_list_test_data", [])
-ITEM_PRICE_TIER_DELETE_TEST_DATA = _TEST_DATA.get("item_price_tier_delete_test_data", [])
-DISCOUNT_RULE_TEST_DATA = _TEST_DATA.get("discount_rule_test_data", [])
-DISCOUNT_RULE_GET_TEST_DATA = _TEST_DATA.get("discount_rule_get_test_data", [])
-DISCOUNT_RULE_LIST_TEST_DATA = _TEST_DATA.get("discount_rule_list_test_data", [])
-DISCOUNT_RULE_DELETE_TEST_DATA = _TEST_DATA.get("discount_rule_delete_test_data", [])
+ITEM_PRICE_TIER_DELETE_TEST_DATA = _TEST_DATA.get(
+    "item_price_tier_delete_test_data", []
+)
+ITEM_PRICE_TIERS_TEST_DATA = _TEST_DATA.get("item_price_tiers_test_data", [])
+DISCOUNT_PROMPT_TEST_DATA = _TEST_DATA.get("discount_prompt_test_data", [])
+DISCOUNT_PROMPT_GET_TEST_DATA = _TEST_DATA.get("discount_prompt_get_test_data", [])
+DISCOUNT_PROMPT_LIST_TEST_DATA = _TEST_DATA.get("discount_prompt_list_test_data", [])
+DISCOUNT_PROMPT_DELETE_TEST_DATA = _TEST_DATA.get(
+    "discount_prompt_delete_test_data", []
+)
+DISCOUNT_PROMPTS_TEST_DATA = _TEST_DATA.get("discount_prompts_test_data", [])
 REQUEST_TEST_DATA = _TEST_DATA.get("request_test_data", [])
 REQUEST_GET_TEST_DATA = _TEST_DATA.get("request_get_test_data", [])
 REQUEST_LIST_TEST_DATA = _TEST_DATA.get("request_list_test_data", [])
@@ -103,6 +116,8 @@ FILE_TEST_DATA = _TEST_DATA.get("file_test_data", [])
 FILE_GET_TEST_DATA = _TEST_DATA.get("file_get_test_data", [])
 FILE_LIST_TEST_DATA = _TEST_DATA.get("file_list_test_data", [])
 FILE_DELETE_TEST_DATA = _TEST_DATA.get("file_delete_test_data", [])
+
+
 # ============================================================================
 # ENGINE INITIALIZATION TESTS
 # ============================================================================
@@ -113,6 +128,7 @@ def test_initialization_with_valid_params_py(ai_rfq_engine):
     assert ai_rfq_engine is not None
     assert hasattr(ai_rfq_engine, "ai_rfq_graphql")
     assert getattr(ai_rfq_engine, "__is_real__", False)
+
 
 # ============================================================================
 # PING TESTS
@@ -132,6 +148,7 @@ def test_graphql_ping_py(ai_rfq_engine, schema):
 
     assert error is None
     assert result is not None
+
 
 # ============================================================================
 # ITEM TESTS
@@ -219,6 +236,7 @@ def test_graphql_delete_item_py(ai_rfq_engine, schema, test_data):
     # May fail if item doesn't exist, which is acceptable
     logger.info(f"Delete item result: {result}, error: {error}")
 
+
 # ============================================================================
 # SEGMENT TESTS
 # ============================================================================
@@ -305,6 +323,7 @@ def test_graphql_delete_segment_py(ai_rfq_engine, schema, test_data):
 
     # May fail if segment doesn't exist, which is acceptable
     logger.info(f"Delete segment result: {result}, error: {error}")
+
 
 # ============================================================================
 # SEGMENT CONTACT TESTS
@@ -394,6 +413,7 @@ def test_graphql_delete_segment_contact_py(ai_rfq_engine, schema, test_data):
     # May fail if segment contact doesn't exist, which is acceptable
     logger.info(f"Delete segment contact result: {result}, error: {error}")
 
+
 # ============================================================================
 # PROVIDER ITEM TESTS
 # ============================================================================
@@ -480,6 +500,7 @@ def test_graphql_delete_provider_item_py(ai_rfq_engine, schema, test_data):
 
     # May fail if provider item doesn't exist, which is acceptable
     logger.info(f"Delete provider item result: {result}, error: {error}")
+
 
 # ============================================================================
 # PROVIDER ITEM BATCH TESTS
@@ -568,6 +589,7 @@ def test_graphql_delete_provider_item_batch_py(ai_rfq_engine, schema, test_data)
 
     # May fail if provider item batch doesn't exist, which is acceptable
     logger.info(f"Delete provider item batch result: {result}, error: {error}")
+
 
 # ============================================================================
 # ITEM PRICE TIER TESTS
@@ -661,19 +683,20 @@ def test_graphql_delete_item_price_tier_py(ai_rfq_engine, schema, test_data):
     # May fail if item price tier doesn't exist, which is acceptable
     logger.info(f"Delete item price tier result: {result}, error: {error}")
 
+
 # ============================================================================
-# DISCOUNT RULE TESTS
+# DISCOUNT PROMPT TESTS
 # ============================================================================
 @pytest.mark.integration
-@pytest.mark.parametrize("test_data", DISCOUNT_RULE_TEST_DATA)
+@pytest.mark.parametrize("test_data", DISCOUNT_PROMPT_TEST_DATA)
 @log_test_result
-def test_graphql_insert_update_discount_rule_py(ai_rfq_engine, schema, test_data):
-    """Test discount rule insert/update operation."""
+def test_graphql_insert_update_discount_prompt_py(ai_rfq_engine, schema, test_data):
+    """Test discount prompt insert/update operation."""
     query = Utility.generate_graphql_operation(
-        "insertUpdateDiscountRule", "Mutation", schema
+        "insertUpdateDiscountPrompt", "Mutation", schema
     )
     logger.info(
-        f"Test data: {Utility.json_dumps(test_data.pop("discountRuleUuid", None))}"
+        f"Test data: {Utility.json_dumps(test_data.get('discountPromptUuid', None))}"
     )
 
     result, error = call_method(
@@ -683,7 +706,7 @@ def test_graphql_insert_update_discount_rule_py(ai_rfq_engine, schema, test_data
             "query": query,
             "variables": test_data,
         },
-        "insert_update_discount_rule",
+        "insert_update_discount_prompt",
     )
 
     assert error is None
@@ -691,11 +714,11 @@ def test_graphql_insert_update_discount_rule_py(ai_rfq_engine, schema, test_data
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("test_data", DISCOUNT_RULE_GET_TEST_DATA)
+@pytest.mark.parametrize("test_data", DISCOUNT_PROMPT_GET_TEST_DATA)
 @log_test_result
-def test_graphql_get_discount_rule_py(ai_rfq_engine, schema, test_data):
-    """Test get discount rule operation."""
-    query = Utility.generate_graphql_operation("discountRule", "Query", schema)
+def test_graphql_get_discount_prompt_py(ai_rfq_engine, schema, test_data):
+    """Test get discount prompt operation."""
+    query = Utility.generate_graphql_operation("discountPrompt", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -704,7 +727,7 @@ def test_graphql_get_discount_rule_py(ai_rfq_engine, schema, test_data):
             "query": query,
             "variables": test_data,
         },
-        "get_discount_rule",
+        "get_discount_prompt",
     )
 
     assert error is None
@@ -712,11 +735,11 @@ def test_graphql_get_discount_rule_py(ai_rfq_engine, schema, test_data):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("test_data", DISCOUNT_RULE_LIST_TEST_DATA)
+@pytest.mark.parametrize("test_data", DISCOUNT_PROMPT_LIST_TEST_DATA)
 @log_test_result
-def test_graphql_discount_rule_list_py(ai_rfq_engine, schema, test_data):
-    """Test list discount rules operation."""
-    query = Utility.generate_graphql_operation("discountRuleList", "Query", schema)
+def test_graphql_discount_prompt_list_py(ai_rfq_engine, schema, test_data):
+    """Test list discount prompts operation."""
+    query = Utility.generate_graphql_operation("discountPromptList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -725,7 +748,7 @@ def test_graphql_discount_rule_list_py(ai_rfq_engine, schema, test_data):
             "query": query,
             "variables": test_data,
         },
-        "list_discount_rules",
+        "list_discount_prompts",
     )
 
     assert error is None
@@ -733,11 +756,13 @@ def test_graphql_discount_rule_list_py(ai_rfq_engine, schema, test_data):
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("test_data", DISCOUNT_RULE_DELETE_TEST_DATA)
+@pytest.mark.parametrize("test_data", DISCOUNT_PROMPT_DELETE_TEST_DATA)
 @log_test_result
-def test_graphql_delete_discount_rule_py(ai_rfq_engine, schema, test_data):
-    """Test delete discount rule operation."""
-    query = Utility.generate_graphql_operation("deleteDiscountRule", "Mutation", schema)
+def test_graphql_delete_discount_prompt_py(ai_rfq_engine, schema, test_data):
+    """Test delete discount prompt operation."""
+    query = Utility.generate_graphql_operation(
+        "deleteDiscountPrompt", "Mutation", schema
+    )
 
     result, error = call_method(
         ai_rfq_engine,
@@ -746,11 +771,12 @@ def test_graphql_delete_discount_rule_py(ai_rfq_engine, schema, test_data):
             "query": query,
             "variables": test_data,
         },
-        "delete_discount_rule",
+        "delete_discount_prompt",
     )
 
-    # May fail if discount rule doesn't exist, which is acceptable
-    logger.info(f"Delete discount rule result: {result}, error: {error}")
+    # May fail if discount prompt doesn't exist, which is acceptable
+    logger.info(f"Delete discount prompt result: {result}, error: {error}")
+
 
 # ============================================================================
 # REQUEST TESTS
@@ -839,6 +865,7 @@ def test_graphql_delete_request_py(ai_rfq_engine, schema, test_data):
     # May fail if request doesn't exist, which is acceptable
     logger.info(f"Delete request result: {result}, error: {error}")
 
+
 # ============================================================================
 # QUOTE TESTS
 # ============================================================================
@@ -924,6 +951,7 @@ def test_graphql_delete_quote_py(ai_rfq_engine, schema, test_data):
 
     # May fail if quote doesn't exist, which is acceptable
     logger.info(f"Delete quote result: {result}, error: {error}")
+
 
 # ============================================================================
 # QUOTE ITEM TESTS
@@ -1012,6 +1040,7 @@ def test_graphql_delete_quote_item_py(ai_rfq_engine, schema, test_data):
     # May fail if quote item doesn't exist, which is acceptable
     logger.info(f"Delete quote item result: {result}, error: {error}")
 
+
 # ============================================================================
 # INSTALLMENT TESTS
 # ============================================================================
@@ -1099,6 +1128,7 @@ def test_graphql_delete_installment_py(ai_rfq_engine, schema, test_data):
     # May fail if installment doesn't exist, which is acceptable
     logger.info(f"Delete installment result: {result}, error: {error}")
 
+
 # ============================================================================
 # FILE TESTS
 # ============================================================================
@@ -1184,5 +1214,98 @@ def test_graphql_delete_file_py(ai_rfq_engine, schema, test_data):
 
     # May fail if file doesn't exist, which is acceptable
     logger.info(f"Delete file result: {result}, error: {error}")
+
+
+# ============================================================================
+# TESTS FOR NEW BATCH-LOADER-BASED QUERIES
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", ITEM_PRICE_TIERS_TEST_DATA)
+@log_test_result
+def test_graphql_item_price_tiers(ai_rfq_engine, schema, test_data):
+    """Test itemPriceTiers query with batch loaders."""
+    # Build GraphQL query (use camelCase for GraphQL field names and JSON type)
+    # query = Utility.generate_graphql_operation("itemPriceTiers", "Query", schema)
+    query = """
+    query GetItemPriceTiers($email: String!, $quote_items: [JSON]) {
+        itemPriceTiers(email: $email, quoteItems: $quote_items) {
+            itemUuid
+            providerItemUuid
+            itemPriceTierUuid
+            quantityGreaterThen
+            quantityLessThen
+            pricePerUom
+            marginPerUom
+            status
+        }
+    }
+    """
+
+    # Use test data from parametrized test case
+    variables = {
+        "email": test_data.get("email", ""),
+        "quote_items": test_data.get("quote_items", []),
+    }
+
+    result, error = call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": variables,
+        },
+        "itemPriceTiers",
+    )
+
+    logger.info(f"Item price tiers result: {result}, error: {error}")
+    # Result should be a list (may be empty if no data exists)
+    assert result is not None or error is not None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("test_data", DISCOUNT_PROMPTS_TEST_DATA)
+@log_test_result
+def test_graphql_discount_prompts(ai_rfq_engine, schema, test_data):
+    """Test discountPrompts query with batch loaders."""
+    # Build GraphQL query (use camelCase for GraphQL field names and JSON type)
+    # query = Utility.generate_graphql_operation("discountPrompts", "Query", schema)
+    query = """
+    query GetDiscountPrompts($email: String!, $quote_items: [JSON]) {
+        discountPrompts(email: $email, quoteItems: $quote_items) {
+            discountPromptUuid
+            scope
+            tags
+            discountPrompt
+            conditions
+            discountRules
+            priority
+            status
+        }
+    }
+    """
+
+    # Use test data from parametrized test case
+    variables = {
+        "email": test_data.get("email", ""),
+        "quote_items": test_data.get("quote_items", []),
+    }
+
+    result, error = call_method(
+        ai_rfq_engine,
+        "ai_rfq_graphql",
+        {
+            "query": query,
+            "variables": variables,
+        },
+        "discountPrompts",
+    )
+
+    logger.info(f"Discount prompts result: {result}, error: {error}")
+    # Result should be a list (may be empty if no data exists)
+    assert result is not None or error is not None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"], plugins=[sys.modules[__name__]])

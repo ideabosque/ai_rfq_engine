@@ -4,6 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict
@@ -12,8 +13,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -21,10 +20,11 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
+from silvaengine_utility import Utility, method_cache
+from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..handlers.config import Config
 from ..types.segment_contact import SegmentContactListType, SegmentContactType
-from .utils import _get_segment
 
 
 class ConsumerCorpExternalIdIndex(LocalSecondaryIndex):
@@ -89,6 +89,56 @@ class SegmentContactModel(BaseModel):
     updated_at_index = UpdateAtIndex()
 
 
+def purge_cache():
+    def actual_decorator(original_function):
+        @functools.wraps(original_function)
+        def wrapper_function(*args, **kwargs):
+            try:
+                # Use cascading cache purging for segment_contacts
+                from ..models.cache import purge_entity_cascading_cache
+
+                context_keys = None
+                entity_keys = {}
+                if kwargs.get("segment_uuid"):
+                    entity_keys["segment_uuid"] = kwargs.get("segment_uuid")
+                if kwargs.get("email"):
+                    entity_keys["email"] = kwargs.get("email")
+
+                result = purge_entity_cascading_cache(
+                    args[0].context.get("logger"),
+                    entity_type="segment_contact",
+                    context_keys=context_keys,
+                    entity_keys=entity_keys if entity_keys else None,
+                    cascade_depth=3,
+                )
+
+                endpoint_id = args[0].context.get("endpoint_id") or kwargs.get(
+                    "endpoint_id"
+                )
+                if kwargs.get("segment_uuid") and endpoint_id:
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="segment_contact",
+                        context_keys={"endpoint_id": endpoint_id},
+                        entity_keys={"segment_uuid": kwargs.get("segment_uuid")},
+                        cascade_depth=3,
+                        custom_options={"custom_getter": "get_segment_contacts_by_segment", "custom_cache_keys": ["context:endpoint_id", "key:segment_uuid"]}
+                    )
+
+                ## Original function.
+                result = original_function(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                log = traceback.format_exc()
+                args[0].context.get("logger").error(log)
+                raise e
+
+        return wrapper_function
+
+    return actual_decorator
+
+
 def create_segment_contact_table(logger: logging.Logger) -> bool:
     """Create the Segment Contact table if it doesn't exist."""
     if not SegmentContactModel.exists():
@@ -103,7 +153,20 @@ def create_segment_contact_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "segment_contact"),
+)
 def get_segment_contact(endpoint_id: str, email: str) -> SegmentContactModel:
+    return SegmentContactModel.get(endpoint_id, email)
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_segment_contact(endpoint_id: str, email: str) -> SegmentContactModel:
     return SegmentContactModel.get(endpoint_id, email)
 
 
@@ -114,19 +177,19 @@ def get_segment_contact_count(endpoint_id: str, email: str) -> int:
 def get_segment_contact_type(
     info: ResolveInfo, segment_contact: SegmentContactModel
 ) -> SegmentContactType:
+    """
+    Nested resolver approach: return minimal segment_contact data.
+    - Do NOT embed 'segment'.
+    'segment' is resolved lazily by SegmentContactType.resolve_segment.
+    """
     try:
-        segment = _get_segment(
-            info.context["endpoint_id"], segment_contact.segment_uuid
-        )
-        segment_contact: Dict = segment_contact.__dict__["attribute_values"]
-        segment_contact["segment"] = segment
-        segment_contact.pop("endpoint_id")
-        segment_contact.pop("segment_uuid")
-    except Exception as e:
+        sc_dict = segment_contact.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return SegmentContactType(**Utility.json_normalize(segment_contact))
+        raise
+
+    return SegmentContactType(**Utility.json_normalize(sc_dict))
 
 
 def resolve_segment_contact(
@@ -213,13 +276,14 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     return inquiry_funct, count_funct, args
 
 
+@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "endpoint_id",
         "range_key": "email",
     },
     range_key_required=True,
-    model_funct=get_segment_contact,
+    model_funct=_get_segment_contact,
     count_funct=get_segment_contact_count,
     type_funct=get_segment_contact_type,
 )
@@ -265,6 +329,7 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     return
 
 
+@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "endpoint_id",
@@ -275,3 +340,20 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 def delete_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "segment_contact"),
+)
+def get_segment_contacts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
+    segment_contacts = []
+    for contact in SegmentContactModel.segment_uuid_index.query(
+        endpoint_id, SegmentContactModel.segment_uuid == segment_uuid
+    ):
+        segment_contacts.append(contact)
+    return segment_contacts

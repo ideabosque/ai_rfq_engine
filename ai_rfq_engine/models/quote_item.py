@@ -4,6 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict
@@ -24,12 +25,12 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, convert_decimal_to_number
+from silvaengine_utility import Utility, convert_decimal_to_number, method_cache
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..handlers.config import Config
 from ..types.quote_item import QuoteItemListType, QuoteItemType
 from .installment import resolve_installment_list
-from .utils import _get_quote
 
 
 def get_price_per_uom(
@@ -182,6 +183,53 @@ class QuoteItemModel(BaseModel):
     updated_at_index = UpdateAtIndex()
 
 
+def purge_cache():
+    def actual_decorator(original_function):
+        @functools.wraps(original_function)
+        def wrapper_function(*args, **kwargs):
+            try:
+                # Use cascading cache purging for quotes
+                from ..models.cache import purge_entity_cascading_cache
+
+                context_keys = None
+                entity_keys = {}
+                if kwargs.get("quote_uuid"):
+                    entity_keys["quote_uuid"] = kwargs.get("quote_uuid")
+                if kwargs.get("quote_item_uuid"):
+                    entity_keys["quote_item_uuid"] = kwargs.get("quote_item_uuid")
+
+                result = purge_entity_cascading_cache(
+                    args[0].context.get("logger"),
+                    entity_type="quote",
+                    context_keys=context_keys,
+                    entity_keys=entity_keys if entity_keys else None,
+                    cascade_depth=3,
+                )
+
+                if kwargs.get("quote_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="provider_item",
+                        context_keys=context_keys,
+                        entity_keys={"quote_uuid": kwargs.get("quote_uuid")},
+                        cascade_depth=3,
+                        custom_options={"custom_getter": "get_quote_items_by_quote", "custom_cache_keys": ["key:quote_uuid"]}
+                    )
+
+                ## Original function.
+                result = original_function(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                log = traceback.format_exc()
+                args[0].context.get("logger").error(log)
+                raise e
+
+        return wrapper_function
+
+    return actual_decorator
+
+
 def create_quote_item_table(logger: logging.Logger) -> bool:
     """Create the QuoteItem table if it doesn't exist."""
     if not QuoteItemModel.exists():
@@ -196,7 +244,19 @@ def create_quote_item_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
+@method_cache(
+    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "quote_item")
+)
 def get_quote_item(quote_uuid: str, quote_item_uuid: str) -> QuoteItemModel:
+    return QuoteItemModel.get(quote_uuid, quote_item_uuid)
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_quote_item(quote_uuid: str, quote_item_uuid: str) -> QuoteItemModel:
     return QuoteItemModel.get(quote_uuid, quote_item_uuid)
 
 
@@ -251,10 +311,10 @@ def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteI
     return QuoteItemType(**Utility.json_normalize(quote_item_dict))
 
 
-def resolve_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteItemType | None:
-    count = get_quote_item_count(
-        kwargs["quote_uuid"], kwargs["quote_item_uuid"]
-    )
+def resolve_quote_item(
+    info: ResolveInfo, **kwargs: Dict[str, Any]
+) -> QuoteItemType | None:
+    count = get_quote_item_count(kwargs["quote_uuid"], kwargs["quote_item_uuid"])
     if count == 0:
         return None
 
@@ -369,12 +429,14 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
+@purge_cache()
+@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "quote_uuid",
         "range_key": "quote_item_uuid",
     },
-    model_funct=get_quote_item,
+    model_funct=_get_quote_item,
     count_funct=get_quote_item_count,
     type_funct=get_quote_item_type,
 )
@@ -498,6 +560,8 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
     return
 
 
+@purge_cache()
+@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -528,3 +592,17 @@ def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     update_quote_totals(info, request_uuid, quote_uuid)
 
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "quote_item")
+)
+def get_quote_items_by_quote(quote_uuid: str) -> Any:
+    quote_items = []
+    for quote_item in QuoteItemModel.query(quote_uuid):
+        quote_items.append(quote_item)
+    return quote_items

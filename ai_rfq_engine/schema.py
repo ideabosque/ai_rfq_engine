@@ -6,6 +6,7 @@ __author__ = "bibow"
 
 import time
 from typing import Any, Dict
+from typing import List as List_Type
 
 from graphene import (
     Boolean,
@@ -19,7 +20,9 @@ from graphene import (
     String,
 )
 
-from .mutations.discount_rule import DeleteDiscountRule, InsertUpdateDiscountRule
+from silvaengine_utility import JSON
+
+from .mutations.discount_prompt import DeleteDiscountPrompt, InsertUpdateDiscountPrompt
 from .mutations.file import DeleteFile, InsertUpdateFile
 from .mutations.installment import DeleteInstallment, InsertUpdateInstallment
 from .mutations.item import DeleteItem, InsertUpdateItem
@@ -34,13 +37,18 @@ from .mutations.quote_item import DeleteQuoteItem, InsertUpdateQuoteItem
 from .mutations.request import DeleteRequest, InsertUpdateRequest
 from .mutations.segment import DeleteSegment, InsertUpdateSegment
 from .mutations.segment_contact import DeleteSegmentContact, InsertUpdateSegmentContact
-from .queries.discount_rule import resolve_discount_rule, resolve_discount_rule_list
+from .queries.discount_prompt import (
+    resolve_discount_prompt,
+    resolve_discount_prompt_list,
+    resolve_discount_prompts,
+)
 from .queries.file import resolve_file, resolve_file_list
 from .queries.installment import resolve_installment, resolve_installment_list
 from .queries.item import resolve_item, resolve_item_list
 from .queries.item_price_tier import (
     resolve_item_price_tier,
     resolve_item_price_tier_list,
+    resolve_item_price_tiers,
 )
 from .queries.provider_item import resolve_provider_item, resolve_provider_item_list
 from .queries.provider_item_batches import (
@@ -55,7 +63,7 @@ from .queries.segment_contact import (
     resolve_segment_contact,
     resolve_segment_contact_list,
 )
-from .types.discount_rule import DiscountRuleListType, DiscountRuleType
+from .types.discount_prompt import DiscountPromptListType, DiscountPromptType
 from .types.file import FileListType, FileType
 from .types.installment import InstallmentListType, InstallmentType
 from .types.item import ItemListType, ItemType
@@ -74,8 +82,8 @@ from .types.segment_contact import SegmentContactListType, SegmentContactType
 
 def type_class():
     return [
-        DiscountRuleType,
-        DiscountRuleListType,
+        DiscountPromptType,
+        DiscountPromptListType,
         FileType,
         FileListType,
         InstallmentType,
@@ -106,7 +114,8 @@ class Query(ObjectType):
 
     item = Field(
         ItemType,
-        item_uuid=String(required=True),
+        item_uuid=String(required=False),
+        item_external_id=String(required=False),
     )
 
     item_list = Field(
@@ -151,7 +160,8 @@ class Query(ObjectType):
 
     provider_item = Field(
         ProviderItemType,
-        provider_item_uuid=String(required=True),
+        provider_item_uuid=String(required=False),
+        provider_item_external_id=String(required=False),
     )
 
     provider_item_list = Field(
@@ -210,23 +220,32 @@ class Query(ObjectType):
         status=String(required=False),
     )
 
-    discount_rule = Field(
-        DiscountRuleType,
-        item_uuid=String(required=True),
-        discount_rule_uuid=String(required=True),
+    item_price_tiers = List(
+        ItemPriceTierType,
+        email=String(required=True),
+        quote_items=List(JSON, required=False),
     )
 
-    discount_rule_list = Field(
-        DiscountRuleListType,
+    discount_prompt = Field(
+        DiscountPromptType,
+        discount_prompt_uuid=String(required=True),
+    )
+
+    discount_prompt_list = Field(
+        DiscountPromptListType,
         page_number=Int(required=False),
         limit=Int(required=False),
-        item_uuid=String(required=False),
-        provider_item_uuid=String(required=False),
-        segment_uuid=String(required=False),
-        subtotal_value=Float(required=False),
-        max_discount_percentage=Float(required=False),
-        min_discount_percentage=Float(required=False),
+        scope=String(required=False),
+        tags=List(String, required=False),
         status=String(required=False),
+        updated_at_gt=DateTime(required=False),
+        updated_at_lt=DateTime(required=False),
+    )
+
+    discount_prompts = List(
+        DiscountPromptType,
+        email=String(required=True),
+        quote_items=List(JSON, required=False),
     )
 
     request = Field(
@@ -395,15 +414,25 @@ class Query(ObjectType):
     ) -> ItemPriceTierListType:
         return resolve_item_price_tier_list(info, **kwargs)
 
-    def resolve_discount_rule(
+    def resolve_item_price_tiers(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> DiscountRuleType:
-        return resolve_discount_rule(info, **kwargs)
+    ) -> List_Type[ItemPriceTierType]:
+        return resolve_item_price_tiers(info, **kwargs)
 
-    def resolve_discount_rule_list(
+    def resolve_discount_prompt(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> DiscountRuleListType:
-        return resolve_discount_rule_list(info, **kwargs)
+    ) -> DiscountPromptType:
+        return resolve_discount_prompt(info, **kwargs)
+
+    def resolve_discount_prompt_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> DiscountPromptListType:
+        return resolve_discount_prompt_list(info, **kwargs)
+
+    def resolve_discount_prompts(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> List_Type[DiscountPromptType]:
+        return resolve_discount_prompts(info, **kwargs)
 
     def resolve_request(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
@@ -465,8 +494,8 @@ class Mutations(ObjectType):
     delete_provider_item_batch = DeleteProviderItemBatch.Field()
     insert_update_item_price_tier = InsertUpdateItemPriceTier.Field()
     delete_item_price_tier = DeleteItemPriceTier.Field()
-    insert_update_discount_rule = InsertUpdateDiscountRule.Field()
-    delete_discount_rule = DeleteDiscountRule.Field()
+    insert_update_discount_prompt = InsertUpdateDiscountPrompt.Field()
+    delete_discount_prompt = DeleteDiscountPrompt.Field()
     insert_update_request = InsertUpdateRequest.Field()
     delete_request = DeleteRequest.Field()
     insert_update_quote = InsertUpdateQuote.Field()

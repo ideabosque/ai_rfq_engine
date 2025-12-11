@@ -4,6 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict
@@ -19,9 +20,10 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
+from silvaengine_utility import Utility, method_cache
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..handlers.config import Config
 from ..types.item import ItemListType, ItemType
 from .provider_item import resolve_provider_item_list
 
@@ -74,6 +76,46 @@ class ItemModel(BaseModel):
     updated_at_index = UpdateAtIndex()
 
 
+def purge_cache():
+    def actual_decorator(original_function):
+        @functools.wraps(original_function)
+        def wrapper_function(*args, **kwargs):
+            try:
+                # Use cascading cache purging for items
+                from ..models.cache import purge_entity_cascading_cache
+
+                endpoint_id = args[0].context.get("endpoint_id") or kwargs.get(
+                    "endpoint_id"
+                )
+                context_keys = {"endpoint_id": endpoint_id} if endpoint_id else None
+                entity_keys = {}
+                if kwargs.get("endpoint_id"):
+                    entity_keys["endpoint_id"] = kwargs.get("endpoint_id")
+                if kwargs.get("item_uuid"):
+                    entity_keys["item_uuid"] = kwargs.get("item_uuid")
+
+                result = purge_entity_cascading_cache(
+                    args[0].context.get("logger"),
+                    entity_type="item",
+                    context_keys=context_keys,
+                    entity_keys=entity_keys if entity_keys else None,
+                    cascade_depth=3,
+                )
+
+                ## Original function.
+                result = original_function(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                log = traceback.format_exc()
+                args[0].context.get("logger").error(log)
+                raise e
+
+        return wrapper_function
+
+    return actual_decorator
+
+
 def create_item_table(logger: logging.Logger) -> bool:
     """Create the Item table if it doesn't exist."""
     if not ItemModel.exists():
@@ -88,7 +130,19 @@ def create_item_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
+@method_cache(
+    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "item")
+)
 def get_item(endpoint_id: str, item_uuid: str) -> ItemModel:
+    return ItemModel.get(endpoint_id, item_uuid)
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_item(endpoint_id: str, item_uuid: str) -> ItemModel:
     return ItemModel.get(endpoint_id, item_uuid)
 
 
@@ -107,9 +161,24 @@ def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
 
 
 def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType | None:
-    count = get_item_count(
-        info.context["endpoint_id"], kwargs["item_uuid"]
-    )
+    if "item_external_id" in kwargs:
+        # Get item by external id
+        results = ItemModel.query(
+            info.context["endpoint_id"],
+            None,
+            ItemModel.item_external_id == kwargs["item_external_id"],
+        )
+        try:
+            item = results.next()
+            return get_item_type(info, item)
+        except Exception:
+            return None
+
+    # Validate item_uuid is provided
+    if "item_uuid" not in kwargs:
+        return None
+
+    count = get_item_count(info.context["endpoint_id"], kwargs["item_uuid"])
     if count == 0:
         return None
 
@@ -157,12 +226,13 @@ def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
+@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "endpoint_id",
         "range_key": "item_uuid",
     },
-    model_funct=get_item,
+    model_funct=_get_item,
     count_funct=get_item_count,
     type_funct=get_item_type,
 )
@@ -216,6 +286,7 @@ def insert_update_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     return
 
 
+@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "endpoint_id",

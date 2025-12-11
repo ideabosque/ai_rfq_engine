@@ -4,6 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
+import functools
 import logging
 import traceback
 from typing import Any, Dict
@@ -19,12 +20,48 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility
+from silvaengine_utility import Utility, method_cache
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ..handlers.config import Config
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
-from .provider_item_batches import resolve_provider_item_batch_list
-from .utils import _get_provider_item, _get_segment
+
+
+def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, Any]:
+    """Helper to get provider_item data for eager loading."""
+    from .provider_item import get_provider_item, get_provider_item_count
+
+    count = get_provider_item_count(endpoint_id, provider_item_uuid)
+    if count == 0:
+        return {}
+
+    provider_item = get_provider_item(endpoint_id, provider_item_uuid)
+    return {
+        "endpoint_id": provider_item.endpoint_id,
+        "provider_item_uuid": provider_item.provider_item_uuid,
+        "provider_corp_external_id": provider_item.provider_corp_external_id,
+        "provider_item_external_id": getattr(provider_item, "provider_item_external_id", None),
+        "base_price_per_uom": provider_item.base_price_per_uom,
+        "item_uuid": provider_item.item_uuid,
+    }
+
+
+def _get_segment(endpoint_id: str, segment_uuid: str) -> Dict[str, Any]:
+    """Helper to get segment data for eager loading."""
+    from .segment import get_segment, get_segment_count
+
+    count = get_segment_count(endpoint_id, segment_uuid)
+    if count == 0:
+        return {}
+
+    segment = get_segment(endpoint_id, segment_uuid)
+    return {
+        "endpoint_id": segment.endpoint_id,
+        "segment_uuid": segment.segment_uuid,
+        "provider_corp_external_id": segment.provider_corp_external_id,
+        "segment_name": segment.segment_name,
+        "segment_description": segment.segment_description,
+    }
 
 
 class ProviderItemUuidIndex(LocalSecondaryIndex):
@@ -94,6 +131,65 @@ class ItemPriceTierModel(BaseModel):
     updated_at_index = UpdateAtIndex()
 
 
+def purge_cache():
+    def actual_decorator(original_function):
+        @functools.wraps(original_function)
+        def wrapper_function(*args, **kwargs):
+            try:
+                # Use cascading cache purging for item_price_tiers
+                from ..models.cache import purge_entity_cascading_cache
+
+                context_keys = None
+                entity_keys = {}
+                if kwargs.get("item_uuid"):
+                    entity_keys["item_uuid"] = kwargs.get("item_uuid")
+                if kwargs.get("item_price_tier_uuid"):
+                    entity_keys["item_price_tier_uuid"] = kwargs.get(
+                        "item_price_tier_uuid"
+                    )
+
+                result = purge_entity_cascading_cache(
+                    args[0].context.get("logger"),
+                    entity_type="item_price_tier",
+                    context_keys=context_keys,
+                    entity_keys=entity_keys if entity_keys else None,
+                    cascade_depth=3,
+                )
+
+                if kwargs.get("item_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="item_price_tier",
+                        context_keys=context_keys,
+                        entity_keys={"item_uuid": kwargs.get("item_uuid")},
+                        cascade_depth=3,
+                        custom_options={"custom_getter": "get_item_price_tiers_by_item", "custom_cache_keys": ["key:item_uuid"]}
+                    )
+
+                if kwargs.get("item_uuid") and kwargs.get("item_price_tier_uuid"):
+                   result = purge_entity_cascading_cache(
+                        args[0].context.get("logger"),
+                        entity_type="item_price_tier",
+                        context_keys=context_keys,
+                        entity_keys={"item_uuid": kwargs.get("item_uuid"), "item_price_tier_uuid": kwargs.get("item_price_tier_uuid")},
+                        cascade_depth=3,
+                        custom_options={"custom_getter": "get_item_price_tiers_by_provider_item", "custom_cache_keys": ["key:item_uuid", "key:item_price_tier_uuid"]}
+                    )
+                   
+                ## Original function.
+                result = original_function(*args, **kwargs)
+
+                return result
+            except Exception as e:
+                log = traceback.format_exc()
+                args[0].context.get("logger").error(log)
+                raise e
+
+        return wrapper_function
+
+    return actual_decorator
+
+
 def create_item_price_tier_table(logger: logging.Logger) -> bool:
     """Create the ItemPriceTier table if it doesn't exist."""
     if not ItemPriceTierModel.exists():
@@ -108,7 +204,22 @@ def create_item_price_tier_table(logger: logging.Logger) -> bool:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "item_price_tier"),
+)
 def get_item_price_tier(
+    item_uuid: str, item_price_tier_uuid: str
+) -> ItemPriceTierModel:
+    return ItemPriceTierModel.get(item_uuid, item_price_tier_uuid)
+
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+def _get_item_price_tier(
     item_uuid: str, item_price_tier_uuid: str
 ) -> ItemPriceTierModel:
     return ItemPriceTierModel.get(item_uuid, item_price_tier_uuid)
@@ -123,64 +234,18 @@ def get_item_price_tier_count(item_uuid: str, item_price_tier_uuid: str) -> int:
 def get_item_price_tier_type(
     info: ResolveInfo, item_price_tier: ItemPriceTierModel
 ) -> ItemPriceTierType:
+    """
+    Convert ItemPriceTierModel to ItemPriceTierType.
+    Nested relationships are lazily loaded via nested resolvers.
+    """
     try:
-        provider_item = _get_provider_item(
-            info.context["endpoint_id"], item_price_tier.provider_item_uuid
-        )
-        segment = _get_segment(
-            info.context["endpoint_id"], item_price_tier.segment_uuid
-        )
-
-        provider_item_batches = []
-        if item_price_tier.margin_per_uom is not None:
-            provider_item_batch_list = resolve_provider_item_batch_list(
-                info,
-                **{
-                    "item_uuid": item_price_tier.item_uuid,
-                    "provider_item_uuid": item_price_tier.provider_item_uuid,
-                    "in_stock": True,
-                    "expired_at_gt": pendulum.now("UTC"),
-                },
-            )
-            for (
-                provider_item_batch
-            ) in provider_item_batch_list.provider_item_batch_list:
-                margin_per_uom = float(item_price_tier.margin_per_uom)
-                if provider_item_batch.slow_move_item:
-                    margin_per_uom = 0.0
-                provider_item_batch.price_per_uom = float(
-                    provider_item_batch.guardrail_price_per_uom
-                ) * (1 + margin_per_uom / 100)
-                provider_item_batches.append(
-                    {
-                        "batch_no": provider_item_batch.batch_no,
-                        "price_per_uom": provider_item_batch.price_per_uom,
-                        "expired_at": provider_item_batch.expired_at,
-                        "slow_move_item": provider_item_batch.slow_move_item,
-                        "in_stock": provider_item_batch.in_stock,
-                    }
-                )
-
-        item_price_tier: Dict = item_price_tier.__dict__["attribute_values"]
-        item_price_tier.update(
-            {
-                "provider_item": provider_item,
-                "segment": segment,
-            }
-        )
-
-        if len(provider_item_batches) > 0:
-            item_price_tier["provider_item_batches"] = provider_item_batches
-
-        item_price_tier.pop("endpoint_id")
-        item_price_tier.pop("provider_item_uuid")
-        item_price_tier.pop("segment_uuid")
-        item_price_tier.pop("item_uuid")
-    except Exception as e:
+        tier_dict: Dict = item_price_tier.__dict__["attribute_values"]
+    except Exception:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
-        raise e
-    return ItemPriceTierType(**Utility.json_normalize(item_price_tier))
+        raise
+
+    return ItemPriceTierType(**Utility.json_normalize(tier_dict))
 
 
 def resolve_item_price_tier(
@@ -320,7 +385,7 @@ def _get_previous_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     """
 
     item_uuid = kwargs.get("item_uuid")
-    quantity_greater_then = kwargs.get("quantity_greater_then")
+    quantity_greater_then = float(kwargs.get("quantity_greater_then", 0))
     provider_item_uuid = kwargs.get("provider_item_uuid")
     segment_uuid = kwargs.get("segment_uuid")
 
@@ -393,12 +458,13 @@ def _update_previous_tier(
     )
 
 
+@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "item_uuid",
         "range_key": "item_price_tier_uuid",
     },
-    model_funct=get_item_price_tier,
+    model_funct=_get_item_price_tier,
     count_funct=get_item_price_tier_count,
     type_funct=get_item_price_tier_type,
 )
@@ -473,6 +539,7 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     return
 
 
+@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "item_uuid",
@@ -483,3 +550,56 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 def delete_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "item_price_tier"),
+)
+def get_item_price_tiers_by_item(
+    item_uuid: str
+) -> Any:
+    return ItemPriceTierModel.query(item_uuid)
+
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "item_price_tier"),
+)
+def get_item_price_tiers_by_provider_item(
+    item_uuid: str, provider_item_uuid: str, segment_uuid: str = None
+) -> Any:
+    """
+    Get item price tiers by provider_item_uuid with optional segment filtering.
+
+    Args:
+        item_uuid: The item UUID (hash key)
+        provider_item_uuid: The provider item UUID to filter by
+        segment_uuid: Optional segment UUID to filter results
+
+    Returns:
+        List of ItemPriceTierModel instances matching the criteria
+    """
+    item_price_tiers = []
+
+    # Build the range key condition
+    range_key_condition = ItemPriceTierModel.provider_item_uuid == provider_item_uuid
+
+    # Build filter condition for segment if provided
+    filter_condition = None
+    if segment_uuid:
+        filter_condition = ItemPriceTierModel.segment_uuid == segment_uuid
+
+    for item_price_tier in ItemPriceTierModel.provider_item_uuid_index.query(
+        item_uuid, range_key_condition, filter_condition=filter_condition
+    ):
+        item_price_tiers.append(item_price_tier)
+    return item_price_tiers

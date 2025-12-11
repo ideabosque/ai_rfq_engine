@@ -100,7 +100,7 @@ def run_graphql_mutation(engine, query, variables):
         return None
 
     if parsed.get("errors"):
-        print("GraphQL Error:", json.dumps(parsed["errors"], indent=2))
+        print("GraphQL Error:", Utility.json_dumps(parsed["errors"]))
         return None
 
     data = parsed.get("data")
@@ -160,9 +160,9 @@ def generate_and_load_data(engine):
         "item_price_tier_test_data": [],
         "item_price_tier_get_test_data": [],
         "item_price_tier_list_test_data": [],
-        "discount_rule_test_data": [],
-        "discount_rule_get_test_data": [],
-        "discount_rule_list_test_data": [],
+        "discount_prompt_test_data": [],
+        "discount_prompt_get_test_data": [],
+        "discount_prompt_list_test_data": [],
     }
 
     # 1. Segments
@@ -392,16 +392,16 @@ def generate_and_load_data(engine):
                         {"providerItemUuid": variables["pid"], "limit": 10, "offset": 0}
                     )
 
-    # 5. Item Price Tiers & Discount Rules
+    # 5. Item Price Tiers & Discount Prompts
     print(
-        "\n--- Loading Item Price Tiers & Discount Rules ---\n"
+        "\n--- Loading Item Price Tiers & Discount Prompts ---\n"
     )  # Added newline for better formatting
     if not segment_map:
-        print("No segments created, skipping price tiers and discount rules.")
+        print("No segments created, skipping price tiers and discount prompts.")
         persist_test_data(test_data_updates)
         return
 
-    # Use the first created segment for all price tiers and discount rules
+    # Use the first created segment for all price tiers and discount prompts
     first_segment_api_uuid = list(segment_map.values())[0]
 
     for local_item_id, item_api_uuid in item_map.items():
@@ -476,77 +476,72 @@ def generate_and_load_data(engine):
                         {"itemUuid": item_api_uuid, "limit": 10, "offset": 0}
                     )
 
-            # Create multiple Discount Rules with increasing subtotal thresholds
-            discount_configs = [
+            # Create multiple Discount Prompts with different scopes
+            prompt_configs = [
                 {
-                    "subtotal": 100,
-                    "discount": round(random.uniform(2.0, 5.0), 1),
-                },  # Small orders\
+                    "scope": "global",
+                    "prompt_text": "Apply volume discount for orders over $1000",
+                    "tags": [],
+                },
                 {
-                    "subtotal": 1000,
-                    "discount": round(random.uniform(5.0, 10.0), 1),
-                },  # Medium orders\
+                    "scope": "segment",
+                    "prompt_text": "Special segment pricing available",
+                    "tags": [segment_api_uuid],
+                },
                 {
-                    "subtotal": 5000,
-                    "discount": round(random.uniform(10.0, 15.0), 1),
-                },  # Large orders\
+                    "scope": "item",
+                    "prompt_text": f"Bulk discount available for this item",
+                    "tags": [item_api_uuid],
+                },
                 {
-                    "subtotal": 10000,
-                    "discount": round(random.uniform(15.0, 20.0), 1),
-                },  # VIP orders\
-                {
-                    "subtotal": 25000,
-                    "discount": round(random.uniform(20.0, 25.0), 1),
-                },  # Enterprise orders\
+                    "scope": "provider_item",
+                    "prompt_text": f"Provider-specific pricing rules apply",
+                    "tags": [provider_item_api_uuid],
+                },
             ]
-            for discount_config in discount_configs:
+            for prompt_config in prompt_configs:
                 print(
-                    f"Creating Discount Rule for Item {item_api_uuid} (subtotal > {discount_config['subtotal']}) in Segment {segment_api_uuid}..."
+                    f"Creating Discount Prompt for scope {prompt_config['scope']} (Item {item_api_uuid})..."
                 )
-                rule_mutation = """
-                mutation InsertUpdateDiscountRule($iid: String!, $pid: String, $sid: String, $subtotal: Float, $perc: Float, $stat: String, $by: String!) {
-                    insertUpdateDiscountRule(itemUuid: $iid, providerItemUuid: $pid, segmentUuid: $sid, subtotalGreaterThan: $subtotal, maxDiscountPercentage: $perc, status: $stat, updatedBy: $by) {
-                        discountRule { discountRuleUuid }
+                prompt_mutation = """
+                mutation InsertUpdateDiscountPrompt($scope: String!, $tags: [String], $prompt: String!, $stat: String, $by: String!) {
+                    insertUpdateDiscountPrompt(scope: $scope, tags: $tags, discountPrompt: $prompt, status: $stat, updatedBy: $by) {
+                        discountPrompt { discountPromptUuid }
                     }
                 }
                 """
-                rule_variables = {
-                    "iid": item_api_uuid,
-                    "pid": provider_item_api_uuid,
-                    "sid": segment_api_uuid,
-                    "subtotal": float(discount_config["subtotal"]),
-                    "perc": discount_config["discount"],
+                prompt_variables = {
+                    "scope": prompt_config["scope"],
+                    "tags": prompt_config["tags"],
+                    "prompt": prompt_config["prompt_text"],
                     "stat": "active",
                     "by": UPDATED_BY,
                 }
-                rule_result = run_graphql_mutation(
-                    engine, rule_mutation, rule_variables
+                prompt_result = run_graphql_mutation(
+                    engine, prompt_mutation, prompt_variables
                 )
-                if rule_result:
+                if prompt_result:
                     print(f"  -> Success.")
-                    discount_rule_uuid = rule_result["insertUpdateDiscountRule"][
-                        "discountRule"
-                    ]["discountRuleUuid"]
-                    test_data_updates["discount_rule_test_data"].append(
+                    discount_prompt_uuid = prompt_result["insertUpdateDiscountPrompt"][
+                        "discountPrompt"
+                    ]["discountPromptUuid"]
+                    test_data_updates["discount_prompt_test_data"].append(
                         {
-                            "itemUuid": item_api_uuid,
-                            "discountRuleUuid": discount_rule_uuid,
-                            "providerItemUuid": provider_item_api_uuid,
-                            "segmentUuid": segment_api_uuid,
-                            "subtotalGreaterThan": discount_config["subtotal"],
-                            "maxDiscountPercentage": discount_config["discount"],
+                            "discountPromptUuid": discount_prompt_uuid,
+                            "scope": prompt_config["scope"],
+                            "tags": prompt_config["tags"],
+                            "discountPrompt": prompt_config["prompt_text"],
                             "status": "active",
                             "updatedBy": UPDATED_BY,
                         }
                     )
-                    test_data_updates["discount_rule_get_test_data"].append(
+                    test_data_updates["discount_prompt_get_test_data"].append(
                         {
-                            "itemUuid": item_api_uuid,
-                            "discountRuleUuid": discount_rule_uuid,
+                            "discountPromptUuid": discount_prompt_uuid,
                         }
                     )
-                    test_data_updates["discount_rule_list_test_data"].append(
-                        {"itemUuid": item_api_uuid, "limit": 10, "offset": 0}
+                    test_data_updates["discount_prompt_list_test_data"].append(
+                        {"scope": prompt_config["scope"], "limit": 10, "offset": 0}
                     )
 
     # Persist generated data for tests
