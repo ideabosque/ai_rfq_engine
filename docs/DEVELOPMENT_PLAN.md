@@ -798,20 +798,26 @@ sequenceDiagram
     MCP->>GQL: insertUpdateQuote mutation
     GQL->>DB: Create quote from request.items
     GQL->>GQL: Auto-create quote_items
-    GQL->>GQL: Calculate totals
+    GQL->>GQL: Calculate totals (rounds=0)
     DB-->>GQL: quote_uuid
     GQL-->>MCP: Quote created with items
-    MCP-->>AI: {quote_uuid, quote_items[], totals}
+    MCP-->>AI: {quote_uuid, quote_items[], totals, rounds: 0}
 
-    Note over AI,DB: Phase 6: Quote Confirmation
-    AI->>MCP: update_quote_item(discount_amount)
-    MCP->>GQL: insertUpdateQuoteItem mutation
-    GQL->>DB: Update quote_item
-    GQL->>GQL: Recalculate quote totals
-    DB-->>GQL: Updated
-    GQL-->>MCP: Quote item updated
-    MCP-->>AI: {new_totals}
+    Note over AI,DB: Phase 6: Negotiation (rounds increment)
+    loop Negotiation Rounds
+        AI->>MCP: update_quote_item(discount_amount) OR<br/>update_quote(shipping_amount, notes)
+        MCP->>GQL: insertUpdateQuoteItem/Quote mutation
+        GQL->>GQL: Increment rounds counter
+        GQL->>DB: Update quote_item/quote
+        GQL->>GQL: Recalculate quote totals
+        DB-->>GQL: Updated
+        GQL-->>MCP: Quote updated (rounds++)
+        MCP-->>AI: {new_totals, rounds: N}
 
+        Note over AI: Present to customer,<br/>get feedback, negotiate
+    end
+
+    Note over AI,DB: Phase 7: Quote Confirmation
     AI->>MCP: update_quote(status: confirmed)
     MCP->>GQL: insertUpdateQuote mutation
     GQL->>GQL: Validate status transition
@@ -819,9 +825,9 @@ sequenceDiagram
     GQL->>DB: Update quote & competitors
     DB-->>GQL: Updated
     GQL-->>MCP: Quote confirmed
-    MCP-->>AI: {status: confirmed}
+    MCP-->>AI: {status: confirmed, final_rounds: N}
 
-    Note over AI,DB: Phase 7: Payment Schedule
+    Note over AI,DB: Phase 8: Payment Schedule
     AI->>MCP: create_installments(quote_uuid, num_installments)
     MCP->>GQL: Multiple insertUpdateInstallment mutations
     GQL->>GQL: Auto-calculate amounts & dates
@@ -830,7 +836,7 @@ sequenceDiagram
     GQL-->>MCP: Installments created
     MCP-->>AI: {installments[]}
 
-    Note over AI,DB: Phase 8: Payment Processing
+    Note over AI,DB: Phase 9: Payment Processing
     AI->>MCP: update_installment(status: paid)
     MCP->>GQL: insertUpdateInstallment mutation
     GQL->>DB: Update installment
@@ -1104,6 +1110,35 @@ sequenceDiagram
     Note over AI: Generate Pricing Strategy
     AI-->>AI: Selected discount prompt applied
 ```
+
+#### 9.2.5 Negotiation Rounds Tracking
+
+The `rounds` field on Quote tracks negotiation iterations automatically:
+
+**Automatic Increment Triggers:**
+- Any `update_quote()` call (shipping, notes, status changes)
+- Any `update_quote_item()` call (price, discount changes)
+
+**Use Cases:**
+1. **Track Negotiation Progress**: Monitor how many back-and-forth iterations occurred
+2. **Audit Trail**: Maintain history of quote modifications for compliance
+3. **Performance Metrics**: Analyze average rounds to close for optimization
+
+**Example Flow:**
+```
+Quote Created           → rounds = 0
+Update shipping         → rounds = 1
+Update discount         → rounds = 2
+Update notes            → rounds = 3
+Confirm quote          → rounds = 3 (final)
+```
+
+**Key Points:**
+- `rounds` is **read-only** - cannot be manually set via MCP tools
+- Increments on **every** quote/quote_item update mutation
+- Does **not** increment when quote is initially created
+- Final `rounds` value represents total negotiation cycles
+- Available in `get_quote()` and `search_quotes()` responses
 
 ### 9.3 Activity Diagrams
 
