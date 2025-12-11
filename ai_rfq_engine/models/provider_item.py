@@ -18,6 +18,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -26,7 +28,6 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility, method_cache
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.provider_item import ProviderItemListType, ProviderItemType
@@ -141,13 +142,21 @@ def purge_cache():
                     "endpoint_id"
                 )
                 if kwargs.get("item_uuid") and endpoint_id:
-                   result = purge_entity_cascading_cache(
+                    result = purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="provider_item",
                         context_keys={"endpoint_id": endpoint_id},
-                        entity_keys={"provider_item_uuid": kwargs.get("provider_item_uuid")},
+                        entity_keys={
+                            "provider_item_uuid": kwargs.get("provider_item_uuid")
+                        },
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_provider_items_by_item", "custom_cache_keys": ["context:endpoint_id", "key:item_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_provider_items_by_item",
+                            "custom_cache_keys": [
+                                "context:endpoint_id",
+                                "key:item_uuid",
+                            ],
+                        },
                     )
 
                 ## Original function.
@@ -222,6 +231,21 @@ def get_provider_item_type(
 def resolve_provider_item(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> ProviderItemType | None:
+    if "provider_item_external_id" in kwargs:
+        provider_item = ProviderItemModel.query(
+            kwargs["endpoint_id"],
+            None,
+            ProviderItemModel.provider_item_external_id
+            == kwargs["provider_item_external_id"],
+        ).first()
+        if provider_item:
+            return get_provider_item_type(info, provider_item)
+        return None
+
+    # Validate provider_item_uuid is provided
+    if "provider_item_uuid" not in kwargs:
+        return None
+
     count = get_provider_item_count(
         info.context["endpoint_id"], kwargs["provider_item_uuid"]
     )
@@ -429,6 +453,7 @@ def delete_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,
