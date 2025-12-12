@@ -30,6 +30,8 @@ class InstallmentListLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_installments_by_quote"])
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
@@ -59,7 +61,7 @@ class InstallmentListLoader(SafeDataLoader):
 
         if self.cache_enabled:
             for key in unique_keys:
-                cached_installments = self.get_cache_data((key))
+                cached_installments = self.get_cache_data(key)
                 if cached_installments is not None:
                     key_map[key] = cached_installments
                 else:
@@ -70,8 +72,8 @@ class InstallmentListLoader(SafeDataLoader):
         for quote_uuid in uncached_keys:
             try:
                 installments = get_installments_by_quote(quote_uuid)
-                if self.cache_enabled:
-                    self.set_cache_data((quote_uuid), installments)
+                # if self.cache_enabled:
+                #     self.set_cache_data((quote_uuid), installments)
                 normalized = [normalize_model(inst) for inst in installments]
                 key_map[quote_uuid] = normalized
 

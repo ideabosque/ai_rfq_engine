@@ -30,6 +30,8 @@ class FilesByRequestLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_files_by_request"])
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
@@ -59,7 +61,7 @@ class FilesByRequestLoader(SafeDataLoader):
 
         if self.cache_enabled:
             for key in unique_keys:
-                cached_rules = self.get_cache_data((key))
+                cached_rules = self.get_cache_data(key)
                 if cached_rules is not None:
                     key_map[key] = cached_rules
                 else:
@@ -70,8 +72,8 @@ class FilesByRequestLoader(SafeDataLoader):
         for request_uuid in uncached_keys:
             try:
                 files = get_files_by_request(request_uuid)
-                if self.cache_enabled:
-                    self.set_cache_data((request_uuid), files)
+                # if self.cache_enabled:
+                #     self.set_cache_data((request_uuid,), files)
                 normalized = [normalize_model(file) for file in files]
                 key_map[request_uuid] = normalized
             except Exception as exc:  # pragma: no cover - defensive

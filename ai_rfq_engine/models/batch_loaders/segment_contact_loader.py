@@ -40,6 +40,8 @@ class SegmentContactLoader(SafeDataLoader):
                 )
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         # Key is (endpoint_id, email)
         key_data = ":".join([str(k) for k in key])
         return self.cache._generate_key(self.cache_func_prefix, key_data)
@@ -74,20 +76,18 @@ class SegmentContactLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        # Load uncached segment_contacts from database
-        for endpoint_id, email in uncached_keys:
+        if uncached_keys:
             try:
-                segment_contact = SegmentContactModel.get(endpoint_id, email)
-                normalized = normalize_model(segment_contact)
-                if self.cache_enabled:
-                    self.set_cache_data((endpoint_id, email), normalized)
-                key_map[(endpoint_id, email)] = normalized
-            except SegmentContactModel.DoesNotExist:
-                # Return None for non-existent segment contacts
-                key_map[(endpoint_id, email)] = None
-            except Exception as exc:
+                for segment_contact in SegmentContactModel.batch_get(uncached_keys):
+                    key = (segment_contact.endpoint_id, segment_contact.email)
+
+                    if self.cache_enabled:
+                        self.set_cache_data(key, segment_contact)
+                    normalized = normalize_model(segment_contact)
+                    key_map[key] = normalized
+
+            except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
-                key_map[(endpoint_id, email)] = None
 
         return Promise.resolve([key_map.get(key) for key in keys])

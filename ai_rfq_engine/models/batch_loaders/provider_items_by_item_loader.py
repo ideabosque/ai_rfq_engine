@@ -30,6 +30,8 @@ class ProviderItemsByItemLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_provider_items_by_item"])
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
@@ -70,9 +72,9 @@ class ProviderItemsByItemLoader(SafeDataLoader):
 
         for endpoint_id, item_uuid in uncached_keys:
             try:
-                provider_items = get_provider_items_by_item(endpoint_id=endpoint_id, item_uuid=item_uuid)
-                if self.cache_enabled:
-                    self.set_cache_data((endpoint_id, item_uuid), provider_items)
+                provider_items = get_provider_items_by_item(endpoint_id, item_uuid)
+                # if self.cache_enabled:
+                #     self.set_cache_data((endpoint_id, item_uuid), provider_items)
                 normalized = [normalize_model(pi) for pi in provider_items]
                 key_map[(endpoint_id, item_uuid)] = normalized
                 

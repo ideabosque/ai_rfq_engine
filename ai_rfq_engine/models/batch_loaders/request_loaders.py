@@ -69,15 +69,15 @@ class RequestLoaders:
 
         # Create scope-specific loaders and inject the global loader via constructor
         self.discount_prompt_by_segment_loader = DiscountPromptBySegmentLoader(
-            logger=logger, cache_enabled=cache_enabled, global_loader=self.discount_prompt_global_loader
+            logger=logger, cache_enabled=cache_enabled
         )
 
         self.discount_prompt_by_item_loader = DiscountPromptByItemLoader(
-            logger=logger, cache_enabled=cache_enabled, global_loader=self.discount_prompt_global_loader
+            logger=logger, cache_enabled=cache_enabled
         )
 
         self.discount_prompt_by_provider_item_loader = DiscountPromptByProviderItemLoader(
-            logger=logger, cache_enabled=cache_enabled, global_loader=self.discount_prompt_global_loader
+            logger=logger, cache_enabled=cache_enabled
         )
 
         self.segment_loader = SegmentLoader(logger=logger, cache_enabled=cache_enabled)
