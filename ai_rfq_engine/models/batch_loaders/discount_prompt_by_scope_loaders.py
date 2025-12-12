@@ -4,7 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from promise import Promise
 from silvaengine_utility.cache import HybridCacheEngine
@@ -41,6 +41,8 @@ class DiscountPromptGlobalLoader(SafeDataLoader):
 
     def generate_cache_key(self, key: Key) -> str:
         # Key is just endpoint_id
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key)] + [str({})])
         return self.cache._generate_key(self.cache_func_prefix, key_data)
 
@@ -83,8 +85,8 @@ class DiscountPromptGlobalLoader(SafeDataLoader):
                 # Load GLOBAL prompts for this endpoint
                 global_prompts = get_global_discount_prompts(endpoint_id)
                 normalized = [normalize_model(p) for p in global_prompts]
-                if self.cache_enabled:
-                    self.set_cache_data(endpoint_id, normalized)
+                # if self.cache_enabled:
+                #     self.set_cache_data(endpoint_id, normalized)
                 key_map[endpoint_id] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
@@ -105,11 +107,10 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
         List of active discount prompts with scopes GLOBAL + SEGMENT for the given segment
     """
 
-    def __init__(self, logger=None, cache_enabled=True, global_loader=None, **kwargs):
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
         super(DiscountPromptBySegmentLoader, self).__init__(
             logger=logger, cache_enabled=cache_enabled, **kwargs
         )
-        self.global_loader = global_loader
         if self.cache_enabled:
             self.cache = HybridCacheEngine(
                 Config.get_cache_name("models", "discount_prompt")
@@ -123,7 +124,9 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
 
     def generate_cache_key(self, key: Key) -> str:
         # Key is (endpoint_id, segment_uuid)
-        key_data = ":".join([str(k) for k in key] + [str({})])
+        if not isinstance(key, tuple):
+            key = (key,)
+        key_data = ":".join([str(key)] + [str({})])
         return self.cache._generate_key(self.cache_func_prefix, key_data)
 
     def get_cache_data(self, key: Key) -> List[Dict[str, Any]] | None:
@@ -160,45 +163,21 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        # Collect unique endpoint_ids to batch load GLOBAL prompts
-        unique_endpoint_ids = list(set(endpoint_id for endpoint_id, _ in uncached_keys))
+        for endpoint_id, segment_uuid in uncached_keys:
+            try:
+                # Load SEGMENT-specific prompts
+                segment_prompts = get_discount_prompts_by_segment(endpoint_id, segment_uuid)
+                normalized = [normalize_model(p) for p in segment_prompts]
+                # if self.cache_enabled:
+                #     self.set_cache_data((endpoint_id, segment_uuid), normalized)
+                key_map[(endpoint_id, segment_uuid)] = normalized
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[(endpoint_id, segment_uuid)] = []
 
-        # Use the global loader passed via constructor
-        global_loader = self.global_loader
+        return Promise.resolve([key_map.get(key, []) for key in keys])
 
-        def process_with_globals(global_prompts_by_endpoint):
-            """Process segment prompts after GLOBAL prompts are loaded."""
-            for endpoint_id, segment_uuid in uncached_keys:
-                try:
-                    # Get GLOBAL prompts for this endpoint
-                    global_prompts = global_prompts_by_endpoint.get(endpoint_id, [])
-
-                    # Load SEGMENT-specific prompts
-                    segment_prompts = get_discount_prompts_by_segment(endpoint_id, segment_uuid)
-
-                    # Combine GLOBAL + SEGMENT prompts
-                    all_prompts = global_prompts + [normalize_model(p) for p in segment_prompts]
-
-                    if self.cache_enabled:
-                        self.set_cache_data((endpoint_id, segment_uuid), all_prompts)
-                    key_map[(endpoint_id, segment_uuid)] = all_prompts
-                except Exception as exc:  # pragma: no cover - defensive
-                    if self.logger:
-                        self.logger.exception(exc)
-                    key_map[(endpoint_id, segment_uuid)] = []
-
-            return [key_map.get(key, []) for key in keys]
-
-        if global_loader and unique_endpoint_ids:
-            # Load GLOBAL prompts for all unique endpoints in parallel
-            return Promise.all([
-                global_loader.load(endpoint_id) for endpoint_id in unique_endpoint_ids
-            ]).then(lambda global_results: process_with_globals(
-                dict(zip(unique_endpoint_ids, global_results))
-            ))
-        else:
-            # Fallback: no global prompts
-            return Promise.resolve(process_with_globals({}))
 
 
 class DiscountPromptByItemLoader(SafeDataLoader):
@@ -213,11 +192,10 @@ class DiscountPromptByItemLoader(SafeDataLoader):
         Note: SEGMENT scope is not included as segment_uuid is not available at this level
     """
 
-    def __init__(self, logger=None, cache_enabled=True, global_loader=None, **kwargs):
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
         super(DiscountPromptByItemLoader, self).__init__(
             logger=logger, cache_enabled=cache_enabled, **kwargs
         )
-        self.global_loader = global_loader
         if self.cache_enabled:
             self.cache = HybridCacheEngine(
                 Config.get_cache_name("models", "discount_prompt")
@@ -230,7 +208,9 @@ class DiscountPromptByItemLoader(SafeDataLoader):
                 )
 
     def generate_cache_key(self, key: Key) -> str:
-        key_data = ":".join([str(k) for k in key] + [str({})])
+        if not isinstance(key, tuple):
+            key = (key,)
+        key_data = ":".join([str(key)] + [str({})])
         return self.cache._generate_key(self.cache_func_prefix, key_data)
 
     def get_cache_data(self, key: Key) -> List[Dict[str, Any]] | None:
@@ -267,45 +247,22 @@ class DiscountPromptByItemLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        # Collect unique endpoint_ids to batch load GLOBAL prompts
-        unique_endpoint_ids = list(set(endpoint_id for endpoint_id, _ in uncached_keys))
+        for endpoint_id, item_uuid in uncached_keys:
+            try:
+                # Load ITEM-specific prompts
+                item_prompts = get_discount_prompts_by_item(endpoint_id, item_uuid)
 
-        # Use the global loader passed via constructor
-        global_loader = self.global_loader
+                # Combine GLOBAL + ITEM prompts
+                normalized = [normalize_model(p) for p in item_prompts]
+                # if self.cache_enabled:
+                #     self.set_cache_data((endpoint_id, item_uuid), normalized)
+                key_map[(endpoint_id, item_uuid)] = normalized
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[(endpoint_id, item_uuid)] = []
 
-        def process_with_globals(global_prompts_by_endpoint):
-            """Process item prompts after GLOBAL prompts are loaded."""
-            for endpoint_id, item_uuid in uncached_keys:
-                try:
-                    # Get GLOBAL prompts for this endpoint
-                    global_prompts = global_prompts_by_endpoint.get(endpoint_id, [])
-
-                    # Load ITEM-specific prompts
-                    item_prompts = get_discount_prompts_by_item(endpoint_id, item_uuid)
-
-                    # Combine GLOBAL + ITEM prompts
-                    all_prompts = global_prompts + [normalize_model(p) for p in item_prompts]
-
-                    if self.cache_enabled:
-                        self.set_cache_data((endpoint_id, item_uuid), all_prompts)
-                    key_map[(endpoint_id, item_uuid)] = all_prompts
-                except Exception as exc:  # pragma: no cover - defensive
-                    if self.logger:
-                        self.logger.exception(exc)
-                    key_map[(endpoint_id, item_uuid)] = []
-
-            return [key_map.get(key, []) for key in keys]
-
-        if global_loader and unique_endpoint_ids:
-            # Load GLOBAL prompts for all unique endpoints in parallel
-            return Promise.all([
-                global_loader.load(endpoint_id) for endpoint_id in unique_endpoint_ids
-            ]).then(lambda global_results: process_with_globals(
-                dict(zip(unique_endpoint_ids, global_results))
-            ))
-        else:
-            # Fallback: no global prompts
-            return Promise.resolve(process_with_globals({}))
+        return Promise.resolve([key_map.get(key, []) for key in keys])
 
 
 class DiscountPromptByProviderItemLoader(SafeDataLoader):
@@ -320,11 +277,10 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
         Note: SEGMENT and ITEM scopes are not included as segment_uuid is not available at this level
     """
 
-    def __init__(self, logger=None, cache_enabled=True, global_loader=None, **kwargs):
+    def __init__(self, logger=None, cache_enabled=True, **kwargs):
         super(DiscountPromptByProviderItemLoader, self).__init__(
             logger=logger, cache_enabled=cache_enabled, **kwargs
         )
-        self.global_loader = global_loader
         if self.cache_enabled:
             self.cache = HybridCacheEngine(
                 Config.get_cache_name("models", "discount_prompt")
@@ -337,7 +293,9 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
                 )
 
     def generate_cache_key(self, key: Key) -> str:
-        key_data = ":".join([str(k) for k in key] + [str({})])
+        if not isinstance(key, tuple):
+            key = (key,)
+        key_data = ":".join([str(key)] + [str({})])
         return self.cache._generate_key(self.cache_func_prefix, key_data)
 
     def get_cache_data(self, key: Key) -> List[Dict[str, Any]] | None:
@@ -374,46 +332,24 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        # Collect unique endpoint_ids to batch load GLOBAL prompts
-        unique_endpoint_ids = list(set(endpoint_id for endpoint_id, _, _ in uncached_keys))
+        
+        for endpoint_id, item_uuid, provider_item_uuid in uncached_keys:
+            try:
+                # Load PROVIDER_ITEM-specific prompts
+                provider_item_prompts = get_discount_prompts_by_provider_item(
+                    endpoint_id, provider_item_uuid
+                )
 
-        # Use the global loader passed via constructor
-        global_loader = self.global_loader
+                # Combine GLOBAL + PROVIDER_ITEM prompts
+                normalized = [normalize_model(p) for p in provider_item_prompts]
+                # if self.cache_enabled:
+                #     self.set_cache_data(
+                #         (endpoint_id, item_uuid, provider_item_uuid), normalized
+                #     )
+                key_map[(endpoint_id, item_uuid, provider_item_uuid)] = normalized
+            except Exception as exc:  # pragma: no cover - defensive
+                if self.logger:
+                    self.logger.exception(exc)
+                key_map[(endpoint_id, item_uuid, provider_item_uuid)] = []
 
-        def process_with_globals(global_prompts_by_endpoint):
-            """Process provider item prompts after GLOBAL prompts are loaded."""
-            for endpoint_id, item_uuid, provider_item_uuid in uncached_keys:
-                try:
-                    # Get GLOBAL prompts for this endpoint
-                    global_prompts = global_prompts_by_endpoint.get(endpoint_id, [])
-
-                    # Load PROVIDER_ITEM-specific prompts
-                    provider_item_prompts = get_discount_prompts_by_provider_item(
-                        endpoint_id, provider_item_uuid
-                    )
-
-                    # Combine GLOBAL + PROVIDER_ITEM prompts
-                    all_prompts = global_prompts + [normalize_model(p) for p in provider_item_prompts]
-
-                    if self.cache_enabled:
-                        self.set_cache_data(
-                            (endpoint_id, item_uuid, provider_item_uuid), all_prompts
-                        )
-                    key_map[(endpoint_id, item_uuid, provider_item_uuid)] = all_prompts
-                except Exception as exc:  # pragma: no cover - defensive
-                    if self.logger:
-                        self.logger.exception(exc)
-                    key_map[(endpoint_id, item_uuid, provider_item_uuid)] = []
-
-            return [key_map.get(key, []) for key in keys]
-
-        if global_loader and unique_endpoint_ids:
-            # Load GLOBAL prompts for all unique endpoints in parallel
-            return Promise.all([
-                global_loader.load(endpoint_id) for endpoint_id in unique_endpoint_ids
-            ]).then(lambda global_results: process_with_globals(
-                dict(zip(unique_endpoint_ids, global_results))
-            ))
-        else:
-            # Fallback: no global prompts
-            return Promise.resolve(process_with_globals({}))
+        return Promise.resolve([key_map.get(key, []) for key in keys])

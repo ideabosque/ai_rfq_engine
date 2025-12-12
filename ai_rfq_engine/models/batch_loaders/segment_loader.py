@@ -30,6 +30,8 @@ class SegmentLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), cache_meta.get("getter")])
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
