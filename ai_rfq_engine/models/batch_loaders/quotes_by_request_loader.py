@@ -31,6 +31,8 @@ class QuotesByRequestLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_quotes_by_request"])
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
@@ -60,7 +62,7 @@ class QuotesByRequestLoader(SafeDataLoader):
 
         if self.cache_enabled:
             for key in unique_keys:
-                cached_items = self.get_cache_data((key))
+                cached_items = self.get_cache_data(key)
                 if cached_items is not None:
                     key_map[key] = cached_items
                 else:
@@ -71,8 +73,8 @@ class QuotesByRequestLoader(SafeDataLoader):
         for request_uuid in uncached_keys:
             try:
                 quotes = get_quotes_by_request(request_uuid)
-                if self.cache_enabled:
-                    self.set_cache_data((request_uuid), quotes)
+                # if self.cache_enabled:
+                #     self.set_cache_data((request_uuid), quotes)
                 normalized = [normalize_model(quote) for quote in quotes]
                 key_map[request_uuid] = normalized
 

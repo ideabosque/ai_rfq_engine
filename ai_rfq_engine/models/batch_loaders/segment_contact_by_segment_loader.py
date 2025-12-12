@@ -30,6 +30,8 @@ class SegmentContactBySegmentLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_segment_contacts_by_segment"])
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
@@ -68,9 +70,9 @@ class SegmentContactBySegmentLoader(SafeDataLoader):
 
         for endpoint_id, segment_uuid in uncached_keys:
             try:
-                contacts = get_segment_contacts_by_segment(endpoint_id=endpoint_id, segment_uuid=segment_uuid)
-                if self.cache_enabled:
-                    self.set_cache_data((endpoint_id, segment_uuid), contacts)
+                contacts = get_segment_contacts_by_segment(endpoint_id, segment_uuid)
+                # if self.cache_enabled:
+                #     self.set_cache_data((endpoint_id, segment_uuid), contacts)
                 normalized = [normalize_model(contact) for contact in contacts]
                 key_map[(endpoint_id, segment_uuid)] = normalized
                 
