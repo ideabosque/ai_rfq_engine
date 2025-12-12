@@ -43,8 +43,11 @@ class ItemPriceTierByProviderItemLoader(SafeDataLoader):
     def generate_cache_key(self, key: Key) -> str:
         # Key is (item_uuid, provider_item_uuid, segment_uuid)
         # Convert None to empty string for cache key
-        key_parts = [str(k) if k is not None else "" for k in key]
-        key_data = ":".join([":".join(key_parts), str({})])
+        # key_parts = [str(k) if k is not None else "" for k in key]
+        # key_data = ":".join([":".join(key_parts), str({})])
+        if not isinstance(key, tuple):
+            key = (key,)
+        key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
             key_data
@@ -92,12 +95,12 @@ class ItemPriceTierByProviderItemLoader(SafeDataLoader):
 
             try:
                 tiers = get_item_price_tiers_by_provider_item(
-                    item_uuid=item_uuid,
-                    provider_item_uuid=provider_item_uuid,
-                    segment_uuid=segment_uuid
+                    item_uuid,
+                    provider_item_uuid,
+                    segment_uuid
                 )
-                if self.cache_enabled:
-                    self.set_cache_data(key, tiers)
+                # if self.cache_enabled:
+                #     self.set_cache_data(key, tiers)
                 normalized = [normalize_model(tier) for tier in tiers]
                 key_map[key] = normalized
             except Exception as exc:  # pragma: no cover - defensive
