@@ -40,7 +40,9 @@ def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, A
         "endpoint_id": provider_item.endpoint_id,
         "provider_item_uuid": provider_item.provider_item_uuid,
         "provider_corp_external_id": provider_item.provider_corp_external_id,
-        "provider_item_external_id": getattr(provider_item, "provider_item_external_id", None),
+        "provider_item_external_id": getattr(
+            provider_item, "provider_item_external_id", None
+        ),
         "base_price_per_uom": provider_item.base_price_per_uom,
         "item_uuid": provider_item.item_uuid,
     }
@@ -136,19 +138,32 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for item_price_tiers
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("item_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["item_uuid"] = getattr(entity, "item_uuid", None)
+                    entity_keys["item_price_tier_uuid"] = getattr(
+                        entity, "item_price_tier_uuid", None
+                    )
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("item_uuid"):
                     entity_keys["item_uuid"] = kwargs.get("item_uuid")
-                if kwargs.get("item_price_tier_uuid"):
+                if not entity_keys.get("item_price_tier_uuid"):
                     entity_keys["item_price_tier_uuid"] = kwargs.get(
                         "item_price_tier_uuid"
                     )
 
-                result = purge_entity_cascading_cache(
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="item_price_tier",
                     context_keys=context_keys,
@@ -157,27 +172,36 @@ def purge_cache():
                 )
 
                 if kwargs.get("item_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="item_price_tier",
                         context_keys=context_keys,
                         entity_keys={"item_uuid": kwargs.get("item_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_item_price_tiers_by_item", "custom_cache_keys": ["key:item_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_item_price_tiers_by_item",
+                            "custom_cache_keys": ["key:item_uuid"],
+                        },
                     )
 
                 if kwargs.get("item_uuid") and kwargs.get("item_price_tier_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="item_price_tier",
                         context_keys=context_keys,
-                        entity_keys={"item_uuid": kwargs.get("item_uuid"), "item_price_tier_uuid": kwargs.get("item_price_tier_uuid")},
+                        entity_keys={
+                            "item_uuid": kwargs.get("item_uuid"),
+                            "item_price_tier_uuid": kwargs.get("item_price_tier_uuid"),
+                        },
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_item_price_tiers_by_provider_item", "custom_cache_keys": ["key:item_uuid", "key:item_price_tier_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_item_price_tiers_by_provider_item",
+                            "custom_cache_keys": [
+                                "key:item_uuid",
+                                "key:item_price_tier_uuid",
+                            ],
+                        },
                     )
-                   
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -458,7 +482,6 @@ def _update_previous_tier(
     )
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "item_uuid",
@@ -468,6 +491,7 @@ def _update_previous_tier(
     count_funct=get_item_price_tier_count,
     type_funct=get_item_price_tier_type,
 )
+@purge_cache()
 def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     item_uuid = kwargs.get("item_uuid")
     item_price_tier_uuid = kwargs.get("item_price_tier_uuid")
@@ -539,7 +563,6 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "item_uuid",
@@ -547,9 +570,11 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     },
     model_funct=get_item_price_tier,
 )
+@purge_cache()
 def delete_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,
@@ -560,10 +585,9 @@ def delete_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "item_price_tier"),
 )
-def get_item_price_tiers_by_item(
-    item_uuid: str
-) -> Any:
+def get_item_price_tiers_by_item(item_uuid: str) -> Any:
     return ItemPriceTierModel.query(item_uuid)
+
 
 @retry(
     reraise=True,

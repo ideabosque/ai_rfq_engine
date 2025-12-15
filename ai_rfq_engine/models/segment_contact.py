@@ -94,17 +94,31 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for segment_contacts
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("segment_uuid"):
-                    entity_keys["segment_uuid"] = kwargs.get("segment_uuid")
-                if kwargs.get("email"):
-                    entity_keys["email"] = kwargs.get("email")
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["segment_uuid"] = getattr(entity, "segment_uuid", None)
+                    entity_keys["email"] = getattr(entity, "email", None)
+                    entity_keys["endpoint_id"] = getattr(entity, "endpoint_id", None)
 
-                result = purge_entity_cascading_cache(
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("segment_uuid"):
+                    entity_keys["segment_uuid"] = kwargs.get("segment_uuid")
+                if not entity_keys.get("email"):
+                    entity_keys["email"] = kwargs.get("email")
+                if not entity_keys.get("endpoint_id"):
+                    entity_keys["endpoint_id"] = kwargs.get("endpoint_id")
+
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="segment_contact",
                     context_keys=context_keys,
@@ -116,17 +130,20 @@ def purge_cache():
                     "endpoint_id"
                 )
                 if kwargs.get("segment_uuid") and endpoint_id:
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="segment_contact",
                         context_keys={"endpoint_id": endpoint_id},
                         entity_keys={"segment_uuid": kwargs.get("segment_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_segment_contacts_by_segment", "custom_cache_keys": ["context:endpoint_id", "key:segment_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_segment_contacts_by_segment",
+                            "custom_cache_keys": [
+                                "context:endpoint_id",
+                                "key:segment_uuid",
+                            ],
+                        },
                     )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -276,7 +293,6 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "endpoint_id",
@@ -287,6 +303,7 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     count_funct=get_segment_contact_count,
     type_funct=get_segment_contact_type,
 )
+@purge_cache()
 def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     endpoint_id = kwargs.get("endpoint_id") or info.context.get("endpoint_id")
     email = kwargs.get("email")
@@ -329,7 +346,6 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "endpoint_id",
@@ -337,9 +353,11 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     },
     model_funct=get_segment_contact,
 )
+@purge_cache()
 def delete_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,

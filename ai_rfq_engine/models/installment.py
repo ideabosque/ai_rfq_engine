@@ -69,17 +69,30 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for installments
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("quote_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["quote_uuid"] = getattr(entity, "quote_uuid", None)
+                    entity_keys["installment_uuid"] = getattr(
+                        entity, "installment_uuid", None
+                    )
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("quote_uuid"):
                     entity_keys["quote_uuid"] = kwargs.get("quote_uuid")
-                if kwargs.get("installment_uuid"):
+                if not entity_keys.get("installment_uuid"):
                     entity_keys["installment_uuid"] = kwargs.get("installment_uuid")
 
-                result = purge_entity_cascading_cache(
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="installment",
                     context_keys=context_keys,
@@ -88,17 +101,17 @@ def purge_cache():
                 )
 
                 if kwargs.get("quote_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="installment",
                         context_keys=context_keys,
                         entity_keys={"quote_uuid": kwargs.get("quote_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_installments_by_quote", "custom_cache_keys": ["key:quote_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_installments_by_quote",
+                            "custom_cache_keys": ["key:quote_uuid"],
+                        },
                     )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -283,7 +296,6 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -293,6 +305,7 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
     count_funct=get_installment_count,
     type_funct=get_installment_type,
 )
+@purge_cache()
 def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     quote_uuid = kwargs.get("quote_uuid")
     installment_uuid = kwargs.get("installment_uuid")
@@ -366,7 +379,6 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -374,9 +386,11 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
     },
     model_funct=get_installment,
 )
+@purge_cache()
 def delete_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,

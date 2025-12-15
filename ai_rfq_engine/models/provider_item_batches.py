@@ -95,17 +95,30 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for provider_item_batchs
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("provider_item_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["provider_item_uuid"] = getattr(
+                        entity, "provider_item_uuid", None
+                    )
+                    entity_keys["batch_no"] = getattr(entity, "batch_no", None)
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("provider_item_uuid"):
                     entity_keys["provider_item_uuid"] = kwargs.get("provider_item_uuid")
-                if kwargs.get("batch_no"):
+                if not entity_keys.get("batch_no"):
                     entity_keys["batch_no"] = kwargs.get("batch_no")
 
-                result = purge_entity_cascading_cache(
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="provider_item_batch",
                     context_keys=context_keys,
@@ -114,17 +127,19 @@ def purge_cache():
                 )
 
                 if kwargs.get("provider_item_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="provider_item_batch",
                         context_keys=context_keys,
-                        entity_keys={"provider_item_uuid": kwargs.get("provider_item_uuid")},
+                        entity_keys={
+                            "provider_item_uuid": kwargs.get("provider_item_uuid")
+                        },
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_provider_item_batches_by_provider_item", "custom_cache_keys": ["key:provider_item_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_provider_item_batches_by_provider_item",
+                            "custom_cache_keys": ["key:provider_item_uuid"],
+                        },
                     )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -303,7 +318,6 @@ def resolve_provider_item_batch_list(
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "provider_item_uuid",
@@ -314,6 +328,7 @@ def resolve_provider_item_batch_list(
     count_funct=get_provider_item_batch_count,
     type_funct=get_provider_item_batch_type,
 )
+@purge_cache()
 def insert_update_provider_item_batch(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> None:
@@ -408,7 +423,6 @@ def insert_update_provider_item_batch(
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "provider_item_uuid",
@@ -416,9 +430,11 @@ def insert_update_provider_item_batch(
     },
     model_funct=get_provider_item_batch,
 )
+@purge_cache()
 def delete_provider_item_batch(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,
@@ -429,9 +445,7 @@ def delete_provider_item_batch(info: ResolveInfo, **kwargs: Dict[str, Any]) -> b
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "provider_item_batch"),
 )
-def get_provider_item_batches_by_provider_item(
-    provider_item_uuid: str
-) -> Any:
+def get_provider_item_batches_by_provider_item(provider_item_uuid: str) -> Any:
     provider_item_batches = []
     for provider_item_batch in ProviderItemBatchModel.query(provider_item_uuid):
         provider_item_batches.append(provider_item_batch)

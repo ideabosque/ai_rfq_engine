@@ -19,8 +19,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -29,6 +27,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import Utility, method_cache
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.discount_prompt import DiscountPromptListType, DiscountPromptType
@@ -208,31 +207,41 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for discount_prompts
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                endpoint_id = args[0].context.get("endpoint_id") or kwargs.get(
-                    "endpoint_id"
-                )
-                context_keys = {"endpoint_id": endpoint_id} if endpoint_id else None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("endpoint_id"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["endpoint_id"] = getattr(entity, "endpoint_id", None)
+                    entity_keys["discount_prompt_uuid"] = getattr(
+                        entity, "discount_prompt_uuid", None
+                    )
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("endpoint_id"):
                     entity_keys["endpoint_id"] = kwargs.get("endpoint_id")
-                if kwargs.get("discount_prompt_uuid"):
+                if not entity_keys.get("discount_prompt_uuid"):
                     entity_keys["discount_prompt_uuid"] = kwargs.get(
                         "discount_prompt_uuid"
                     )
 
-                result = purge_entity_cascading_cache(
+                endpoint_id = args[0].context.get("endpoint_id") or entity_keys.get(
+                    "endpoint_id"
+                )
+                context_keys = {"endpoint_id": endpoint_id} if endpoint_id else None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="discount_prompt",
                     context_keys=context_keys,
                     entity_keys=entity_keys if entity_keys else None,
                     cascade_depth=3,
                 )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -447,7 +456,6 @@ def resolve_discount_prompt_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "endpoint_id",
@@ -457,6 +465,7 @@ def resolve_discount_prompt_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     count_funct=get_discount_prompt_count,
     type_funct=get_discount_prompt_type,
 )
+@purge_cache()
 def insert_update_discount_prompt(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     endpoint_id = kwargs.get("endpoint_id")
     discount_prompt_uuid = kwargs.get("discount_prompt_uuid")
@@ -547,7 +556,6 @@ def insert_update_discount_prompt(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "endpoint_id",
@@ -555,6 +563,7 @@ def insert_update_discount_prompt(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     },
     model_funct=get_discount_prompt,
 )
+@purge_cache()
 def delete_discount_prompt(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True

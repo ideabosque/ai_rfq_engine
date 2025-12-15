@@ -188,17 +188,30 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for quotes
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("quote_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["quote_uuid"] = getattr(entity, "quote_uuid", None)
+                    entity_keys["quote_item_uuid"] = getattr(
+                        entity, "quote_item_uuid", None
+                    )
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("quote_uuid"):
                     entity_keys["quote_uuid"] = kwargs.get("quote_uuid")
-                if kwargs.get("quote_item_uuid"):
+                if not entity_keys.get("quote_item_uuid"):
                     entity_keys["quote_item_uuid"] = kwargs.get("quote_item_uuid")
 
-                result = purge_entity_cascading_cache(
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="quote",
                     context_keys=context_keys,
@@ -207,17 +220,17 @@ def purge_cache():
                 )
 
                 if kwargs.get("quote_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="provider_item",
                         context_keys=context_keys,
                         entity_keys={"quote_uuid": kwargs.get("quote_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_quote_items_by_quote", "custom_cache_keys": ["key:quote_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_quote_items_by_quote",
+                            "custom_cache_keys": ["key:quote_uuid"],
+                        },
                     )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -429,8 +442,6 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -440,6 +451,7 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     count_funct=get_quote_item_count,
     type_funct=get_quote_item_type,
 )
+@purge_cache()
 def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     quote_uuid = kwargs.get("quote_uuid")
     quote_item_uuid = kwargs.get("quote_item_uuid")
@@ -560,8 +572,6 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
     return
 
 
-@purge_cache()
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -569,6 +579,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
     },
     model_funct=get_quote_item,
 )
+@purge_cache()
 def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     installment_list = resolve_installment_list(
         info,
@@ -592,6 +603,7 @@ def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     update_quote_totals(info, request_uuid, quote_uuid)
 
     return True
+
 
 @retry(
     reraise=True,

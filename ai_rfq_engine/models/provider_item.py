@@ -119,17 +119,33 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for provider_items
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("item_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["endpoint_id"] = getattr(entity, "endpoint_id", None)
+                    entity_keys["item_uuid"] = getattr(entity, "item_uuid", None)
+                    entity_keys["provider_item_uuid"] = getattr(
+                        entity, "provider_item_uuid", None
+                    )
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("endpoint_id"):
+                    entity_keys["endpoint_id"] = kwargs.get("endpoint_id")
+                if not entity_keys.get("item_uuid"):
                     entity_keys["item_uuid"] = kwargs.get("item_uuid")
-                if kwargs.get("provider_item_uuid"):
+                if not entity_keys.get("provider_item_uuid"):
                     entity_keys["provider_item_uuid"] = kwargs.get("provider_item_uuid")
 
-                result = purge_entity_cascading_cache(
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="provider_item",
                     context_keys=context_keys,
@@ -141,7 +157,7 @@ def purge_cache():
                     "endpoint_id"
                 )
                 if kwargs.get("item_uuid") and endpoint_id:
-                    result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="provider_item",
                         context_keys={"endpoint_id": endpoint_id},
@@ -157,9 +173,6 @@ def purge_cache():
                             ],
                         },
                     )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -351,7 +364,6 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "endpoint_id",
@@ -361,6 +373,7 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     count_funct=get_provider_item_count,
     type_funct=get_provider_item_type,
 )
+@purge_cache()
 def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     endpoint_id = kwargs.get("endpoint_id")
     provider_item_uuid = kwargs.get("provider_item_uuid")
@@ -412,7 +425,6 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "endpoint_id",
@@ -420,6 +432,7 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
     },
     model_funct=get_provider_item,
 )
+@purge_cache()
 def delete_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     from .provider_item_batches import resolve_provider_item_batch_list
 

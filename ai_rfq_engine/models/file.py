@@ -77,17 +77,29 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for files
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("request_uuid"):
-                    entity_keys["request_uuid"] = kwargs.get("request_uuid")
-                if kwargs.get("file_uuid"):
-                    entity_keys["file_uuid"] = kwargs.get("file_uuid")
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["request_uuid"] = getattr(entity, "request_uuid", None)
+                    entity_keys["file_name"] = getattr(entity, "file_name", None)
 
-                result = purge_entity_cascading_cache(
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("request_uuid"):
+                    entity_keys["request_uuid"] = kwargs.get("request_uuid")
+                if not entity_keys.get("file_name"):
+                    entity_keys["file_name"] = kwargs.get("file_name")
+
+                # Note: file_uuid doesn't exist in FileModel, using file_name instead
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="file",
                     context_keys=context_keys,
@@ -96,17 +108,17 @@ def purge_cache():
                 )
 
                 if kwargs.get("request_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="file",
                         context_keys=context_keys,
                         entity_keys={"request_uuid": kwargs.get("request_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_files_by_request", "custom_cache_keys": ["key:request_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_files_by_request",
+                            "custom_cache_keys": ["key:request_uuid"],
+                        },
                     )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -214,7 +226,6 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "request_uuid",
@@ -225,6 +236,7 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     count_funct=get_file_count,
     type_funct=get_file_type,
 )
+@purge_cache()
 def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     request_uuid = kwargs.get("request_uuid")
     file_name = kwargs.get("file_name")
@@ -266,7 +278,6 @@ def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "request_uuid",
@@ -274,9 +285,11 @@ def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     },
     model_funct=get_file,
 )
+@purge_cache()
 def delete_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,
