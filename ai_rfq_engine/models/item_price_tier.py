@@ -199,6 +199,7 @@ def purge_cache():
                             "custom_cache_keys": [
                                 "key:item_uuid",
                                 "key:item_price_tier_uuid",
+                                "key:segment_uuid",
                             ],
                         },
                     )

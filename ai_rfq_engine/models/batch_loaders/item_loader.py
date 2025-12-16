@@ -28,6 +28,8 @@ class ItemLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), cache_meta.get("getter")])
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
@@ -58,8 +60,6 @@ class ItemLoader(SafeDataLoader):
         if self.cache_enabled:
             for key in unique_keys:
                 cached_item = self.get_cache_data(key)
-                # cache_key = f"{key[0]}:{key[1]}"  # endpoint_id:item_uuid
-                # cached_item = self.cache.get(cache_key)
                 if cached_item:
                     key_map[key] = cached_item
                 else:

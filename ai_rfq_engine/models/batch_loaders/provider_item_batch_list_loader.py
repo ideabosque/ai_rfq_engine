@@ -30,6 +30,8 @@ class ProviderItemBatchListLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_provider_item_batches_by_provider_item"])
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
@@ -59,7 +61,7 @@ class ProviderItemBatchListLoader(SafeDataLoader):
 
         if self.cache_enabled:
             for key in unique_keys:
-                cached_batches = self.get_cache_data((key))
+                cached_batches = self.get_cache_data(key)
                 if cached_batches is not None:
                     key_map[key] = cached_batches
                 else:
@@ -70,8 +72,8 @@ class ProviderItemBatchListLoader(SafeDataLoader):
         for provider_item_uuid in uncached_keys:
             try:
                 batches = get_provider_item_batches_by_provider_item(provider_item_uuid)
-                if self.cache_enabled:
-                    self.set_cache_data((provider_item_uuid), batches)
+                # if self.cache_enabled:
+                #     self.set_cache_data((provider_item_uuid), batches)
                 normalized = [normalize_model(batch) for batch in batches]
                 key_map[provider_item_uuid] = normalized
 

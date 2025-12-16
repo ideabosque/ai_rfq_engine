@@ -263,6 +263,15 @@ def create_discount_prompt_table(logger: logging.Logger) -> bool:
     return True
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "discount_prompt"),
+)
 def get_discount_prompts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
     """
     Get all ACTIVE discount prompts with scope='segment' for a segment.
@@ -283,6 +292,15 @@ def get_discount_prompts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
     return prompts
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "discount_prompt"),
+)
 def get_discount_prompts_by_item(endpoint_id: str, item_uuid: str) -> Any:
     """
     Get all ACTIVE discount prompts with scope='item' for an item.
@@ -303,6 +321,15 @@ def get_discount_prompts_by_item(endpoint_id: str, item_uuid: str) -> Any:
     return prompts
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "discount_prompt"),
+)
 def get_discount_prompts_by_provider_item(
     endpoint_id: str, provider_item_uuid: str
 ) -> Any:
@@ -325,6 +352,15 @@ def get_discount_prompts_by_provider_item(
     return prompts
 
 
+@retry(
+    reraise=True,
+    wait=wait_exponential(multiplier=1, max=60),
+    stop=stop_after_attempt(5),
+)
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "discount_prompt"),
+)
 def get_global_discount_prompts(endpoint_id: str) -> Any:
     """Get all ACTIVE global discount prompts for an endpoint."""
     prompts = []

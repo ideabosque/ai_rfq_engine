@@ -30,6 +30,8 @@ class ItemPriceTierByItemLoader(SafeDataLoader):
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_item_price_tiers_by_item"])
 
     def generate_cache_key(self, key: Key) -> str:
+        if not isinstance(key, tuple):
+            key = (key,)
         key_data = ":".join([str(key), str({})])
         return self.cache._generate_key(
             self.cache_func_prefix,
@@ -59,7 +61,7 @@ class ItemPriceTierByItemLoader(SafeDataLoader):
 
         if self.cache_enabled:
             for key in unique_keys:
-                cached = self.get_cache_data((key))
+                cached = self.get_cache_data(key)
                 if cached is not None:
                     key_map[key] = cached
                 else:
@@ -70,8 +72,8 @@ class ItemPriceTierByItemLoader(SafeDataLoader):
         for item_uuid in uncached_keys:
             try:
                 tiers = get_item_price_tiers_by_item(item_uuid)
-                if self.cache_enabled:
-                    self.set_cache_data((item_uuid), tiers)
+                # if self.cache_enabled:
+                #     self.set_cache_data((item_uuid), tiers)
                 normalized = [normalize_model(tier) for tier in tiers]
                 key_map[item_uuid] = normalized
 
