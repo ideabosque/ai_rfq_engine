@@ -119,7 +119,7 @@ class ItemPriceTierModel(BaseModel):
     item_price_tier_uuid = UnicodeAttribute(range_key=True)
     provider_item_uuid = UnicodeAttribute()
     segment_uuid = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     quantity_greater_then = NumberAttribute()
     quantity_less_then = NumberAttribute(null=True)
     margin_per_uom = NumberAttribute(null=True)

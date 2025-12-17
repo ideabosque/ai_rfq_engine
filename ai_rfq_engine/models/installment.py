@@ -49,7 +49,7 @@ class InstallmentModel(BaseModel):
 
     quote_uuid = UnicodeAttribute(hash_key=True)
     installment_uuid = UnicodeAttribute(range_key=True)
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     request_uuid = UnicodeAttribute()
     priority = NumberAttribute(default=0)
     salesorder_no = UnicodeAttribute(null=True)

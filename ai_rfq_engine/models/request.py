@@ -73,9 +73,11 @@ class RequestModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-requests"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     request_uuid = UnicodeAttribute(range_key=True)
     email = UnicodeAttribute()
+    endpoint_id = UnicodeAttribute()
+    part_id = UnicodeAttribute()
     request_title = UnicodeAttribute()
     request_description = UnicodeAttribute(null=True)
     billing_address = MapAttribute(null=True)

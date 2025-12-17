@@ -80,7 +80,7 @@ class QuoteModel(BaseModel):
     quote_uuid = UnicodeAttribute(range_key=True)
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
     sales_rep_email = UnicodeAttribute(null=True)
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     shipping_method = UnicodeAttribute(null=True)
     shipping_amount = NumberAttribute(default=0)
     total_quote_amount = NumberAttribute(default=0)
@@ -136,7 +136,10 @@ def purge_cache():
                         context_keys=None,
                         entity_keys={"request_uuid": kwargs.get("request_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_quotes_by_request", "custom_cache_keys": ["key:request_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_quotes_by_request",
+                            "custom_cache_keys": ["key:request_uuid"],
+                        },
                     )
 
                 return result
@@ -515,6 +518,7 @@ def delete_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,

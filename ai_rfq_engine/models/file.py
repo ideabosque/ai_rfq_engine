@@ -64,7 +64,7 @@ class FileModel(BaseModel):
     request_uuid = UnicodeAttribute(hash_key=True)
     file_name = UnicodeAttribute(range_key=True)
     email = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()

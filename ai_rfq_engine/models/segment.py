@@ -62,9 +62,11 @@ class SegmentModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-segments"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     segment_uuid = UnicodeAttribute(range_key=True)
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
+    endpoint_id = UnicodeAttribute()
+    part_id = UnicodeAttribute()
     segment_name = UnicodeAttribute()
     segment_description = UnicodeAttribute(null=True)
     created_at = UTCDateTimeAttribute()

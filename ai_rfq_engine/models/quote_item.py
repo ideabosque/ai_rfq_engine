@@ -167,7 +167,7 @@ class QuoteItemModel(BaseModel):
     item_uuid = UnicodeAttribute()
     batch_no = UnicodeAttribute(null=True)
     request_uuid = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     request_data = MapAttribute(null=True)
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()

@@ -62,8 +62,10 @@ class ItemModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-items"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     item_uuid = UnicodeAttribute(range_key=True)
+    endpoint_id = UnicodeAttribute()
+    part_id = UnicodeAttribute()
     item_type = UnicodeAttribute()
     item_name = UnicodeAttribute()
     item_description = UnicodeAttribute(null=True)

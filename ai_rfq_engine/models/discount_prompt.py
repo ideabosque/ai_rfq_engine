@@ -186,7 +186,7 @@ class DiscountPromptModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-discount_prompts"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     discount_prompt_uuid = UnicodeAttribute(range_key=True)
     scope = UnicodeAttribute()
     tags = ListAttribute()

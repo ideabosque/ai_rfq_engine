@@ -72,7 +72,7 @@ class ProviderItemBatchModel(BaseModel):
     provider_item_uuid = UnicodeAttribute(hash_key=True)
     batch_no = UnicodeAttribute(range_key=True)
     item_uuid = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     expired_at = UTCDateTimeAttribute()
     produced_at = UTCDateTimeAttribute()
     cost_per_uom = NumberAttribute()

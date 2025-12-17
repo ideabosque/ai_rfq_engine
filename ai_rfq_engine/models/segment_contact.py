@@ -76,7 +76,7 @@ class SegmentContactModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-segment_contacts"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     email = UnicodeAttribute(range_key=True)
     segment_uuid = UnicodeAttribute()
     contact_uuid = UnicodeAttribute(null=True)
