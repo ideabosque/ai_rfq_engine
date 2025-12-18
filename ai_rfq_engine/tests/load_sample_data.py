@@ -102,13 +102,21 @@ def run_graphql_mutation(engine, query, variables):
         print(f"GraphQL execution failed: {exc}")
         return None
 
+    # Handle Lambda-style response format with body field
+    if "body" in parsed and isinstance(parsed["body"], str):
+        try:
+            body_data = Serializer.json_loads(parsed["body"])
+            parsed = body_data
+        except Exception:
+            pass
+
     if parsed.get("errors"):
         print("GraphQL Error:", Serializer.json_dumps(parsed["errors"]))
         return None
 
-    data = parsed.get("data")
+    data = parsed
     if not data:
-        print("GraphQL Error: No data returned.")
+        print(f"GraphQL Error: No data returned.")
         return None
 
     print(f"  -> Success: {query.strip().splitlines()[0]} ...")
