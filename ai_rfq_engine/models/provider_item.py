@@ -45,7 +45,7 @@ class ItemUuidIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "item_uuid-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     item_uuid = UnicodeAttribute(range_key=True)
 
 
@@ -60,7 +60,7 @@ class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "provider_corp_external_id-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     provider_corp_external_id = UnicodeAttribute(range_key=True)
 
 
@@ -75,7 +75,7 @@ class ProviderItemExternalIdIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "provider_item_external_id-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     provider_item_external_id = UnicodeAttribute(range_key=True)
 
 
@@ -90,7 +90,7 @@ class UpdateAtIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "updated_at-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     updated_at = UnicodeAttribute(range_key=True)
 
 
@@ -203,8 +203,8 @@ def create_provider_item_table(logger: logging.Logger) -> bool:
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "provider_item"),
 )
-def get_provider_item(endpoint_id: str, provider_item_uuid: str) -> ProviderItemModel:
-    return ProviderItemModel.get(endpoint_id, provider_item_uuid)
+def get_provider_item(partition_key: str, provider_item_uuid: str) -> ProviderItemModel:
+    return ProviderItemModel.get(partition_key, provider_item_uuid)
 
 
 @retry(
@@ -212,13 +212,15 @@ def get_provider_item(endpoint_id: str, provider_item_uuid: str) -> ProviderItem
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> ProviderItemModel:
-    return ProviderItemModel.get(endpoint_id, provider_item_uuid)
+def _get_provider_item(
+    partition_key: str, provider_item_uuid: str
+) -> ProviderItemModel:
+    return ProviderItemModel.get(partition_key, provider_item_uuid)
 
 
-def get_provider_item_count(endpoint_id: str, provider_item_uuid: str) -> int:
+def get_provider_item_count(partition_key: str, provider_item_uuid: str) -> int:
     return ProviderItemModel.count(
-        endpoint_id, ProviderItemModel.provider_item_uuid == provider_item_uuid
+        partition_key, ProviderItemModel.provider_item_uuid == provider_item_uuid
     )
 
 
@@ -243,9 +245,11 @@ def get_provider_item_type(
 def resolve_provider_item(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> ProviderItemType | None:
+    partition_key = info.context.get("partition_key")
+
     if "provider_item_external_id" in kwargs:
         results = ProviderItemModel.query(
-            info.context["endpoint_id"],
+            partition_key,
             None,
             ProviderItemModel.provider_item_external_id
             == kwargs["provider_item_external_id"],
@@ -260,22 +264,20 @@ def resolve_provider_item(
     if "provider_item_uuid" not in kwargs:
         return None
 
-    count = get_provider_item_count(
-        info.context["endpoint_id"], kwargs["provider_item_uuid"]
-    )
+    count = get_provider_item_count(partition_key, kwargs["provider_item_uuid"])
     if count == 0:
         return None
 
     return get_provider_item_type(
         info,
-        get_provider_item(info.context["endpoint_id"], kwargs["provider_item_uuid"]),
+        get_provider_item(partition_key, kwargs["provider_item_uuid"]),
     )
 
 
 @monitor_decorator
 @resolve_list_decorator(
     attributes_to_get=[
-        "endpoint_id",
+        "partition_key",
         "provider_item_uuid",
         "item_uuid",
         "provider_corp_external_id",
@@ -286,7 +288,7 @@ def resolve_provider_item(
     type_funct=get_provider_item_type,
 )
 def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
-    endpoint_id = info.context["endpoint_id"]
+    partition_key = info.context.get("partition_key")
     item_uuid = kwargs.get("item_uuid")
     provider_corp_external_id = kwargs.get("provider_corp_external_id")
     provider_item_external_id = kwargs.get("provider_item_external_id")
@@ -298,7 +300,7 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
     args = []
     inquiry_funct = ProviderItemModel.scan
     count_funct = ProviderItemModel.count
-    if endpoint_id:
+    if partition_key:
         range_key_condition = None
 
         # Build range key condition for updated_at when using updated_at_index
@@ -311,7 +313,7 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
         elif updated_at_lt is not None:
             range_key_condition = ProviderItemModel.updated_at < updated_at_lt
 
-        args = [endpoint_id, range_key_condition]
+        args = [partition_key, range_key_condition]
         inquiry_funct = ProviderItemModel.updated_at_index.query
         count_funct = ProviderItemModel.updated_at_index.count
         if item_uuid and args[1] is None:
@@ -366,7 +368,7 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
 
 @insert_update_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "provider_item_uuid",
     },
     model_funct=_get_provider_item,
@@ -375,10 +377,12 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
 )
 @purge_cache()
 def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    endpoint_id = kwargs.get("endpoint_id")
+    partition_key = kwargs.get("partition_key")
     provider_item_uuid = kwargs.get("provider_item_uuid")
     if kwargs.get("entity") is None:
         cols = {
+            "endpoint_id": info.context.get("endpoint_id"),
+            "part_id": info.context.get("part_id"),
             "item_spec": {},
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
@@ -394,7 +398,7 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
             if key in kwargs:
                 cols[key] = kwargs[key]
         ProviderItemModel(
-            endpoint_id,
+            partition_key,
             provider_item_uuid,
             **cols,
         ).save()
@@ -427,7 +431,7 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
 
 @delete_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "provider_item_uuid",
     },
     model_funct=get_provider_item,
@@ -478,10 +482,10 @@ def delete_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "provider_item"),
 )
-def get_provider_items_by_item(endpoint_id: str, item_uuid: str) -> Any:
+def get_provider_items_by_item(partition_key: str, item_uuid: str) -> Any:
     provider_items = []
     for provider_item in ProviderItemModel.item_uuid_index.query(
-        endpoint_id, ProviderItemModel.item_uuid == item_uuid
+        partition_key, ProviderItemModel.item_uuid == item_uuid
     ):
         provider_items.append(provider_item)
     return provider_items

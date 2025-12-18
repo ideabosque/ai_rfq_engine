@@ -163,7 +163,7 @@ class ScopeIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "segment_uuid-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     scope = UnicodeAttribute(range_key=True)
 
 
@@ -178,7 +178,7 @@ class UpdateAtIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "updated_at-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     updated_at = UnicodeAttribute(range_key=True)
 
 
@@ -272,7 +272,7 @@ def create_discount_prompt_table(logger: logging.Logger) -> bool:
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "discount_prompt"),
 )
-def get_discount_prompts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
+def get_discount_prompts_by_segment(partition_key: str, segment_uuid: str) -> Any:
     """
     Get all ACTIVE discount prompts with scope='segment' for a segment.
 
@@ -281,7 +281,7 @@ def get_discount_prompts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
     """
     prompts = []
     for prompt in DiscountPromptModel.scope_index.query(
-        endpoint_id,
+        partition_key,
         DiscountPromptModel.scope == DiscountPromptScope.SEGMENT,
         filter_condition=(
             (DiscountPromptModel.status == DiscountPromptStatus.ACTIVE)
@@ -301,7 +301,7 @@ def get_discount_prompts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "discount_prompt"),
 )
-def get_discount_prompts_by_item(endpoint_id: str, item_uuid: str) -> Any:
+def get_discount_prompts_by_item(partition_key: str, item_uuid: str) -> Any:
     """
     Get all ACTIVE discount prompts with scope='item' for an item.
 
@@ -310,7 +310,7 @@ def get_discount_prompts_by_item(endpoint_id: str, item_uuid: str) -> Any:
     """
     prompts = []
     for prompt in DiscountPromptModel.scope_index.query(
-        endpoint_id,
+        partition_key,
         DiscountPromptModel.scope == DiscountPromptScope.ITEM,
         filter_condition=(
             (DiscountPromptModel.status == DiscountPromptStatus.ACTIVE)
@@ -331,7 +331,7 @@ def get_discount_prompts_by_item(endpoint_id: str, item_uuid: str) -> Any:
     cache_name=Config.get_cache_name("models", "discount_prompt"),
 )
 def get_discount_prompts_by_provider_item(
-    endpoint_id: str, provider_item_uuid: str
+    partition_key: str, provider_item_uuid: str
 ) -> Any:
     """
     Get all ACTIVE discount prompts with scope='provider_item'.
@@ -341,7 +341,7 @@ def get_discount_prompts_by_provider_item(
     """
     prompts = []
     for prompt in DiscountPromptModel.scope_index.query(
-        endpoint_id,
+        partition_key,
         DiscountPromptModel.scope == DiscountPromptScope.PROVIDER_ITEM,
         filter_condition=(
             (DiscountPromptModel.status == DiscountPromptStatus.ACTIVE)
@@ -361,11 +361,11 @@ def get_discount_prompts_by_provider_item(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "discount_prompt"),
 )
-def get_global_discount_prompts(endpoint_id: str) -> Any:
-    """Get all ACTIVE global discount prompts for an endpoint."""
+def get_global_discount_prompts(partition_key: str) -> Any:
+    """Get all ACTIVE global discount prompts for a partition."""
     prompts = []
     for prompt in DiscountPromptModel.scope_index.query(
-        endpoint_id,
+        partition_key,
         DiscountPromptModel.scope == DiscountPromptScope.GLOBAL,
         filter_condition=(DiscountPromptModel.status == DiscountPromptStatus.ACTIVE),
     ):
@@ -383,14 +383,14 @@ def get_global_discount_prompts(endpoint_id: str) -> Any:
     cache_name=Config.get_cache_name("models", "discount_prompt"),
 )
 def get_discount_prompt(
-    endpoint_id: str, discount_prompt_uuid: str
+    partition_key: str, discount_prompt_uuid: str
 ) -> DiscountPromptModel:
-    return DiscountPromptModel.get(endpoint_id, discount_prompt_uuid)
+    return DiscountPromptModel.get(partition_key, discount_prompt_uuid)
 
 
-def get_discount_prompt_count(endpoint_id: str, discount_prompt_uuid: str) -> int:
+def get_discount_prompt_count(partition_key: str, discount_prompt_uuid: str) -> int:
     return DiscountPromptModel.count(
-        endpoint_id, DiscountPromptModel.discount_prompt_uuid == discount_prompt_uuid
+        partition_key, DiscountPromptModel.discount_prompt_uuid == discount_prompt_uuid
     )
 
 
@@ -413,24 +413,21 @@ def get_discount_prompt_type(
 def resolve_discount_prompt(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> DiscountPromptType | None:
-    count = get_discount_prompt_count(
-        info.context["endpoint_id"], kwargs["discount_prompt_uuid"]
-    )
+    partition_key = info.context.get("partition_key")
+    count = get_discount_prompt_count(partition_key, kwargs["discount_prompt_uuid"])
     if count == 0:
         return None
 
     return get_discount_prompt_type(
         info,
-        get_discount_prompt(
-            info.context["endpoint_id"], kwargs["discount_prompt_uuid"]
-        ),
+        get_discount_prompt(partition_key, kwargs["discount_prompt_uuid"]),
     )
 
 
 @monitor_decorator
 @resolve_list_decorator(
     attributes_to_get=[
-        "endpoint_id",
+        "partition_key",
         "discount_prompt_uuid",
         "scope",
         "updated_at",
@@ -439,7 +436,7 @@ def resolve_discount_prompt(
     type_funct=get_discount_prompt_type,
 )
 def resolve_discount_prompt_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
-    endpoint_id = info.context["endpoint_id"]
+    partition_key = info.context.get("partition_key")
     scope = kwargs.get("scope")
     tags = kwargs.get("tags")
     status = kwargs.get("status")
@@ -451,7 +448,7 @@ def resolve_discount_prompt_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     count_funct = DiscountPromptModel.count
     range_key_condition = None
 
-    if endpoint_id:
+    if partition_key:
         # Build range key condition for updated_at when using updated_at_index
         if updated_at_gt is not None and updated_at_lt is not None:
             range_key_condition = DiscountPromptModel.updated_at.between(
@@ -462,7 +459,7 @@ def resolve_discount_prompt_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
         elif updated_at_lt is not None:
             range_key_condition = DiscountPromptModel.updated_at < updated_at_lt
 
-        args = [endpoint_id, range_key_condition]
+        args = [partition_key, range_key_condition]
         inquiry_funct = DiscountPromptModel.updated_at_index.query
         count_funct = DiscountPromptModel.updated_at_index.count
 
@@ -494,7 +491,7 @@ def resolve_discount_prompt_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 
 @insert_update_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "discount_prompt_uuid",
     },
     model_funct=get_discount_prompt,
@@ -503,7 +500,7 @@ def resolve_discount_prompt_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 )
 @purge_cache()
 def insert_update_discount_prompt(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    endpoint_id = kwargs.get("endpoint_id")
+    partition_key = kwargs.get("partition_key")
     discount_prompt_uuid = kwargs.get("discount_prompt_uuid")
 
     if kwargs.get("entity") is None:
@@ -532,7 +529,7 @@ def insert_update_discount_prompt(info: ResolveInfo, **kwargs: Dict[str, Any]) -
                     cols[key] = kwargs[key]
 
         DiscountPromptModel(
-            endpoint_id,
+            partition_key,
             discount_prompt_uuid,
             **cols,
         ).save()
@@ -594,7 +591,7 @@ def insert_update_discount_prompt(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 
 @delete_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "discount_prompt_uuid",
     },
     model_funct=get_discount_prompt,

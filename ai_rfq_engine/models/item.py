@@ -39,7 +39,7 @@ class ItemTypeIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "item_type-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     item_type = UnicodeAttribute(range_key=True)
 
 
@@ -54,7 +54,7 @@ class UpdateAtIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "updated_at-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     updated_at = UnicodeAttribute(range_key=True)
 
 
@@ -143,8 +143,8 @@ def create_item_table(logger: logging.Logger) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "item")
 )
-def get_item(endpoint_id: str, item_uuid: str) -> ItemModel:
-    return ItemModel.get(endpoint_id, item_uuid)
+def get_item(partition_key: str, item_uuid: str) -> ItemModel:
+    return ItemModel.get(partition_key, item_uuid)
 
 
 @retry(
@@ -152,12 +152,12 @@ def get_item(endpoint_id: str, item_uuid: str) -> ItemModel:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-def _get_item(endpoint_id: str, item_uuid: str) -> ItemModel:
-    return ItemModel.get(endpoint_id, item_uuid)
+def _get_item(partition_key: str, item_uuid: str) -> ItemModel:
+    return ItemModel.get(partition_key, item_uuid)
 
 
-def get_item_count(endpoint_id: str, item_uuid: str) -> int:
-    return ItemModel.count(endpoint_id, ItemModel.item_uuid == item_uuid)
+def get_item_count(partition_key: str, item_uuid: str) -> int:
+    return ItemModel.count(partition_key, ItemModel.item_uuid == item_uuid)
 
 
 def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
@@ -171,10 +171,12 @@ def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
 
 
 def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType | None:
+    partition_key = info.context.get("partition_key")
+
     if "item_external_id" in kwargs:
         # Get item by external id
         results = ItemModel.query(
-            info.context["endpoint_id"],
+            partition_key,
             None,
             ItemModel.item_external_id == kwargs["item_external_id"],
         )
@@ -188,24 +190,24 @@ def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType | None
     if "item_uuid" not in kwargs:
         return None
 
-    count = get_item_count(info.context["endpoint_id"], kwargs["item_uuid"])
+    count = get_item_count(partition_key, kwargs["item_uuid"])
     if count == 0:
         return None
 
     return get_item_type(
         info,
-        get_item(info.context["endpoint_id"], kwargs["item_uuid"]),
+        get_item(partition_key, kwargs["item_uuid"]),
     )
 
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["endpoint_id", "item_uuid", "item_type", "updated_at"],
+    attributes_to_get=["partition_key", "item_uuid", "item_type", "updated_at"],
     list_type_class=ItemListType,
     type_funct=get_item_type,
 )
 def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
-    endpoint_id = info.context["endpoint_id"]
+    partition_key = info.context.get("partition_key")
     item_type = kwargs.get("item_type")
     item_name = kwargs.get("item_name")
     item_description = kwargs.get("item_description")
@@ -214,8 +216,8 @@ def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     args = []
     inquiry_funct = ItemModel.scan
     count_funct = ItemModel.count
-    if endpoint_id:
-        args = [endpoint_id, None]
+    if partition_key:
+        args = [partition_key, None]
         inquiry_funct = ItemModel.updated_at_index.query
         count_funct = ItemModel.updated_at_index.count
         if item_type:
@@ -238,7 +240,7 @@ def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
 
 @insert_update_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "item_uuid",
     },
     model_funct=_get_item,
@@ -247,10 +249,12 @@ def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
 )
 @purge_cache()
 def insert_update_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    endpoint_id = kwargs.get("endpoint_id")
+    partition_key = kwargs.get("partition_key")
     item_uuid = kwargs.get("item_uuid")
     if kwargs.get("entity") is None:
         cols = {
+            "endpoint_id": info.context.get("endpoint_id"),
+            "part_id": info.context.get("part_id"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
@@ -265,7 +269,7 @@ def insert_update_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             if key in kwargs:
                 cols[key] = kwargs[key]
         ItemModel(
-            endpoint_id,
+            partition_key,
             item_uuid,
             **cols,
         ).save()
@@ -298,7 +302,7 @@ def insert_update_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
 
 @delete_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "item_uuid",
     },
     model_funct=get_item,
@@ -308,7 +312,6 @@ def delete_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     provider_item_list = resolve_provider_item_list(
         info,
         **{
-            "endpoint_id": kwargs.get("entity").endpoint_id,
             "item_uuid": kwargs.get("entity").item_uuid,
         },
     )
