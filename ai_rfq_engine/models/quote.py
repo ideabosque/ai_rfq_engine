@@ -296,7 +296,7 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
         ]
 
         quote_dict["quote_items"] = quote_items
-        # quote_dict.pop("endpoint_id")
+        # quote_dict.pop("partition_key")
         # quote_dict.pop("request_uuid")
     except Exception as e:
         log = traceback.format_exc()
@@ -432,7 +432,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         )
 
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),

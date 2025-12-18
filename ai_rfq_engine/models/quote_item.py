@@ -307,7 +307,7 @@ def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteI
 
             try:
                 provider_item = get_provider_item(
-                    quote_item_dict["endpoint_id"],
+                    quote_item_dict["partition_key"],
                     quote_item_dict["provider_item_uuid"],
                 )
                 guardrail_price_per_uom = provider_item.base_price_per_uom
@@ -463,7 +463,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
 
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),

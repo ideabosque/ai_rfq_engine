@@ -91,24 +91,23 @@ def purge_cache():
                 entity_keys = {}
                 entity = kwargs.get("entity")
                 if entity:
-                    entity_keys["endpoint_id"] = getattr(entity, "endpoint_id", None)
                     entity_keys["segment_uuid"] = getattr(entity, "segment_uuid", None)
 
                 # Fallback to kwargs (for creates/deletes)
-                if not entity_keys.get("endpoint_id"):
-                    entity_keys["endpoint_id"] = kwargs.get("endpoint_id")
                 if not entity_keys.get("segment_uuid"):
                     entity_keys["segment_uuid"] = kwargs.get("segment_uuid")
 
-                endpoint_id = args[0].context.get("endpoint_id") or entity_keys.get(
-                    "endpoint_id"
+                # Get partition_key from context or kwargs
+                partition_key = args[0].context.get("partition_key") or kwargs.get(
+                    "partition_key"
                 )
-                context_keys = {"endpoint_id": endpoint_id} if endpoint_id else None
 
                 purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="segment",
-                    context_keys=context_keys,
+                    context_keys=(
+                        {"partition_key": partition_key} if partition_key else None
+                    ),
                     entity_keys=entity_keys if entity_keys else None,
                     cascade_depth=3,
                 )

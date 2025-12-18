@@ -201,7 +201,7 @@ def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType | None
 def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     request_uuid = kwargs.get("request_uuid")
     email = kwargs.get("email")
-    endpoint_id = info.context.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
 
     args = []
     inquiry_funct = FileModel.scan
@@ -218,8 +218,8 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     the_filters = None
     if email and not request_uuid:
         the_filters &= FileModel.email == email
-    if endpoint_id:
-        the_filters &= FileModel.endpoint_id == endpoint_id
+    if partition_key:
+        the_filters &= FileModel.partition_key == partition_key
     if the_filters is not None:
         args.append(the_filters)
 
@@ -242,7 +242,7 @@ def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     file_name = kwargs.get("file_name")
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),

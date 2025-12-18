@@ -27,17 +27,17 @@ from ..handlers.config import Config
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
 
 
-def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, Any]:
+def _get_provider_item(partition_key: str, provider_item_uuid: str) -> Dict[str, Any]:
     """Helper to get provider_item data for eager loading."""
     from .provider_item import get_provider_item, get_provider_item_count
 
-    count = get_provider_item_count(endpoint_id, provider_item_uuid)
+    count = get_provider_item_count(partition_key, provider_item_uuid)
     if count == 0:
         return {}
 
-    provider_item = get_provider_item(endpoint_id, provider_item_uuid)
+    provider_item = get_provider_item(partition_key, provider_item_uuid)
     return {
-        "endpoint_id": provider_item.endpoint_id,
+        "partition_key": provider_item.partition_key,
         "provider_item_uuid": provider_item.provider_item_uuid,
         "provider_corp_external_id": provider_item.provider_corp_external_id,
         "provider_item_external_id": getattr(
@@ -48,17 +48,17 @@ def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, A
     }
 
 
-def _get_segment(endpoint_id: str, segment_uuid: str) -> Dict[str, Any]:
+def _get_segment(partition_key: str, segment_uuid: str) -> Dict[str, Any]:
     """Helper to get segment data for eager loading."""
     from .segment import get_segment, get_segment_count
 
-    count = get_segment_count(endpoint_id, segment_uuid)
+    count = get_segment_count(partition_key, segment_uuid)
     if count == 0:
         return {}
 
-    segment = get_segment(endpoint_id, segment_uuid)
+    segment = get_segment(partition_key, segment_uuid)
     return {
-        "endpoint_id": segment.endpoint_id,
+        "partition_key": segment.partition_key,
         "segment_uuid": segment.segment_uuid,
         "provider_corp_external_id": segment.provider_corp_external_id,
         "segment_name": segment.segment_name,
@@ -308,7 +308,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     item_uuid = kwargs.get("item_uuid")
     provider_item_uuid = kwargs.get("provider_item_uuid")
     segment_uuid = kwargs.get("segment_uuid")
-    endpoint_id = info.context["endpoint_id"]
+    partition_key = info.context["partition_key"]
     quantity_value = kwargs.get("quantity_value")
     max_price = kwargs.get("max_price")
     min_price = kwargs.get("min_price")
@@ -346,8 +346,8 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
             inquiry_funct = ItemPriceTierModel.segment_uuid_index.query
 
     the_filters = None  # We can add filters for the query
-    if endpoint_id:
-        the_filters &= ItemPriceTierModel.endpoint_id == endpoint_id
+    if partition_key:
+        the_filters &= ItemPriceTierModel.partition_key == partition_key
     if (
         provider_item_uuid
         and args[1] is not None
@@ -501,7 +501,7 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
         previous_tier = _get_previous_tier(info, **kwargs)
 
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
