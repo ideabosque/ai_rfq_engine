@@ -102,11 +102,11 @@ class RequestLoaders:
             return
 
         if entity_type == "item" and "item_uuid" in entity_keys:
-            cache_key = self.item_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['item_uuid']))
+            cache_key = self.item_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['item_uuid']))
             if hasattr(self.item_loader, "cache"):
                 self.item_loader.cache.delete(cache_key)
         elif entity_type == "provider_item" and "provider_item_uuid" in entity_keys:
-            cache_key = self.provider_item_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['provider_item_uuid']))
+            cache_key = self.provider_item_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['provider_item_uuid']))
             if hasattr(self.provider_item_loader, "cache"):
                 self.provider_item_loader.cache.delete(cache_key)
             if (
@@ -114,14 +114,14 @@ class RequestLoaders:
                 and hasattr(self.provider_items_by_item_loader, "cache")
                 and "item_uuid" in entity_keys
             ):
-                list_cache_key = self.provider_items_by_item_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['item_uuid']))
+                list_cache_key = self.provider_items_by_item_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['item_uuid']))
                 self.provider_items_by_item_loader.cache.delete(list_cache_key)
         elif entity_type == "segment" and "segment_uuid" in entity_keys:
-            cache_key = self.segment_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['segment_uuid']))
+            cache_key = self.segment_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['segment_uuid']))
             if hasattr(self.segment_loader, "cache"):
                 self.segment_loader.cache.delete(cache_key)
         elif entity_type == "request" and "request_uuid" in entity_keys:
-            cache_key = self.request_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['request_uuid']))
+            cache_key = self.request_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['request_uuid']))
             if hasattr(self.request_loader, "cache"):
                 self.request_loader.cache.delete(cache_key)
         elif entity_type == "quote" and "quote_uuid" in entity_keys:

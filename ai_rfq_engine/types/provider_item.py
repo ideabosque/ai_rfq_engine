@@ -13,7 +13,7 @@ from ..models.batch_loaders import get_loaders
 
 
 class ProviderItemType(ObjectType):
-    endpoint_id = String()
+    partition_key = String()
     provider_item_uuid = String()
     provider_corp_external_id = String()
     provider_item_external_id = String()
@@ -40,13 +40,13 @@ class ProviderItemType(ObjectType):
             return existing
 
         # Case 1: need to fetch using DataLoader
-        endpoint_id = info.context.get("endpoint_id")
+        partition_key = info.context.get("partition_key")
         item_uuid = getattr(parent, "item_uuid", None)
-        if not endpoint_id or not item_uuid:
+        if not partition_key or not item_uuid:
             return None
 
         loaders = get_loaders(info.context)
-        return loaders.item_loader.load((endpoint_id, item_uuid)).then(
+        return loaders.item_loader.load((partition_key, item_uuid)).then(
             lambda item_dict: ItemType(**item_dict) if item_dict else None
         )
 

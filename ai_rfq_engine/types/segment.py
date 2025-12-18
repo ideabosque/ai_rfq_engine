@@ -15,7 +15,9 @@ from ..utils.normalization import normalize_to_json
 
 
 class SegmentType(ObjectType):
+    partition_key = String()
     endpoint_id = String()
+    part_id = String()
     segment_uuid = String()
     provider_corp_external_id = String()
     segment_name = String()
@@ -37,14 +39,14 @@ class SegmentType(ObjectType):
             return [normalize_to_json(contact) for contact in existing]
 
         # Fetch contacts for this segment
-        endpoint_id = getattr(parent, "endpoint_id", None)
+        partition_key = getattr(parent, "partition_key", None)
         segment_uuid = getattr(parent, "segment_uuid", None)
-        if not endpoint_id or not segment_uuid:
+        if not partition_key or not segment_uuid:
             return []
 
         loaders = get_loaders(info.context)
         return loaders.segment_contact_by_segment_loader.load(
-            (endpoint_id, segment_uuid)
+            (partition_key, segment_uuid)
         ).then(
             lambda contacts: [
                 normalize_to_json(contact) for contact in (contacts or [])

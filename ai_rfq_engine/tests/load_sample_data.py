@@ -43,6 +43,7 @@ logger = logging.getLogger("load_sample_data")
 
 # --- CONFIGURATION ---
 endpoint_id = os.getenv("endpoint_id")
+part_id = os.getenv("part_id", "")
 UPDATED_BY = "data_loader_script"
 TEST_DATA_FILE = os.path.join(os.path.dirname(__file__), "test_data.json")
 
@@ -57,6 +58,7 @@ SETTING = {
         },
     },
     "endpoint_id": endpoint_id,
+    "part_id": part_id,
     "execute_mode": os.getenv("execute_mode", "local"),
 }
 
@@ -89,6 +91,7 @@ def run_graphql_mutation(engine, query, variables):
             query=query,
             variables=variables,
             endpoint_id=endpoint_id,
+            part_id=part_id,
         )
         parsed = (
             Utility.json_loads(response)

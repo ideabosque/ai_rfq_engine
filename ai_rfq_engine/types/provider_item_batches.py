@@ -45,13 +45,13 @@ class ProviderItemBatchType(ObjectType):
             return existing
 
         # Case 1: need to fetch using DataLoader
-        endpoint_id = info.context.get("endpoint_id")
+        partition_key = info.context.get("partition_key")
         item_uuid = getattr(parent, "item_uuid", None)
-        if not endpoint_id or not item_uuid:
+        if not partition_key or not item_uuid:
             return None
 
         loaders = get_loaders(info.context)
-        return loaders.item_loader.load((endpoint_id, item_uuid)).then(
+        return loaders.item_loader.load((partition_key, item_uuid)).then(
             lambda item_dict: ItemType(**item_dict) if item_dict else None
         )
 
@@ -65,14 +65,14 @@ class ProviderItemBatchType(ObjectType):
             return existing
 
         # Case 1: need to fetch using DataLoader
-        endpoint_id = info.context.get("endpoint_id")
+        partition_key = info.context.get("partition_key")
         provider_item_uuid = getattr(parent, "provider_item_uuid", None)
-        if not endpoint_id or not provider_item_uuid:
+        if not partition_key or not provider_item_uuid:
             return None
 
         loaders = get_loaders(info.context)
         return loaders.provider_item_loader.load(
-            (endpoint_id, provider_item_uuid)
+            (partition_key, provider_item_uuid)
         ).then(lambda pi_dict: ProviderItemType(**pi_dict) if pi_dict else None)
 
 

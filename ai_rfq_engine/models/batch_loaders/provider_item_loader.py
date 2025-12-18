@@ -13,7 +13,7 @@ from .base import Key, SafeDataLoader, normalize_model
 
 
 class ProviderItemLoader(SafeDataLoader):
-    """Batch loader for ProviderItemModel keyed by (endpoint_id, provider_item_uuid)."""
+    """Batch loader for ProviderItemModel keyed by (partition_key, provider_item_uuid)."""
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
         super(ProviderItemLoader, self).__init__(
@@ -71,7 +71,7 @@ class ProviderItemLoader(SafeDataLoader):
         if uncached_keys:
             try:
                 for pi in ProviderItemModel.batch_get(uncached_keys):
-                    key = (pi.endpoint_id, pi.provider_item_uuid)
+                    key = (pi.partition_key, pi.provider_item_uuid)
                     
                     if self.cache_enabled:
                         self.set_cache_data(key, pi)

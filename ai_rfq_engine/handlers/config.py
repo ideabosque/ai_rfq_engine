@@ -7,7 +7,6 @@ import logging
 from typing import Any, Dict, List
 
 import boto3
-
 from silvaengine_utility import Utility
 
 from ..models import utils
@@ -42,7 +41,7 @@ class Config:
             "model_class": "RequestModel",
             "getter": "get_request",
             "list_resolver": "ai_rfq_engine.queries.request.resolve_request_list",
-            "cache_keys": ["context:endpoint_id", "key:request_uuid"],
+            "cache_keys": ["context:partition_key", "key:request_uuid"],
         },
         "quote": {
             "module": "ai_rfq_engine.models.quote",
@@ -63,7 +62,7 @@ class Config:
             "model_class": "SegmentModel",
             "getter": "get_segment",
             "list_resolver": "ai_rfq_engine.queries.segment.resolve_segment_list",
-            "cache_keys": ["context:endpoint_id", "key:segment_uuid"],
+            "cache_keys": ["context:partition_key", "key:segment_uuid"],
         },
         "segment_contact": {
             "module": "ai_rfq_engine.models.segment_contact",
@@ -77,7 +76,7 @@ class Config:
             "model_class": "ItemModel",
             "getter": "get_item",
             "list_resolver": "ai_rfq_engine.queries.item.resolve_item_list",
-            "cache_keys": ["context:endpoint_id", "key:item_uuid"],
+            "cache_keys": ["context:partition_key", "key:item_uuid"],
         },
         "provider_item": {
             "module": "ai_rfq_engine.models.provider_item",
@@ -119,7 +118,7 @@ class Config:
             "model_class": "DiscountPromptModel",
             "getter": "get_discount_prompt",
             "list_resolver": "ai_rfq_engine.queries.discount_prompt.resolve_discount_prompt_list",
-            "cache_keys": ["context:endpoint_id", "key:discount_prompt_uuid"],
+            "cache_keys": ["context:partition_key", "key:discount_prompt_uuid"],
         },
     }
 
@@ -239,38 +238,6 @@ class Config:
             logger.exception("Failed to initialize configuration.")
             raise e
 
-    @classmethod
-    def fetch_graphql_schema(
-        cls,
-        logger: logging.Logger,
-        endpoint_id: str,
-        function_name: str,
-        setting: Dict[str, Any] = {},
-    ) -> Dict[str, Any]:
-        """
-        Fetches and caches a GraphQL schema for a given function.
-
-        Args:
-            logger: Logger instance for error reporting
-            endpoint_id: ID of the endpoint to fetch schema from
-            function_name: Name of function to get schema for
-            setting: Optional settings dictionary
-
-        Returns:
-            Dict containing the GraphQL schema
-        """
-        # Check if schema exists in cache, if not fetch and store it
-        if Config.schemas.get(function_name) is None:
-            Config.schemas[function_name] = Utility.fetch_graphql_schema(
-                logger,
-                endpoint_id,
-                function_name,
-                setting=setting,
-                aws_lambda=Config.aws_lambda,
-                test_mode=setting.get("test_mode"),
-            )
-        return Config.schemas[function_name]
-
     # Private methods
     @classmethod
     def _set_parameters(cls, setting: Dict[str, Any]) -> None:
@@ -328,9 +295,7 @@ class Config:
         Returns:
             Standardized cache name string
         """
-        base_name = cls.CACHE_NAMES.get(
-            module_type, f"ai_rfq_engine.{module_type}"
-        )
+        base_name = cls.CACHE_NAMES.get(module_type, f"ai_rfq_engine.{module_type}")
         return f"{base_name}.{model_name}"
 
     @classmethod

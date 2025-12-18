@@ -15,7 +15,9 @@ from ..utils.normalization import normalize_to_json
 
 
 class RequestType(ObjectType):
+    partition_key = String()
     endpoint_id = String()
+    part_id = String()
     request_uuid = String()
     email = String()
     request_title = String()

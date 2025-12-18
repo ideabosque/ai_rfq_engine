@@ -32,7 +32,8 @@ import os
 import sys
 
 import pytest
-from silvaengine_utility import Utility
+from silvaengine_utility.graphql import Graphql
+from silvaengine_utility.serializer import Serializer
 from test_helpers import call_method, log_test_result
 
 logger = logging.getLogger("test_ai_rfq_engine")
@@ -137,7 +138,7 @@ def test_initialization_with_valid_params_py(ai_rfq_engine):
 @log_test_result
 def test_graphql_ping_py(ai_rfq_engine, schema):
     """Test GraphQL ping operation."""
-    query = Utility.generate_graphql_operation("ping", "Query", schema)
+    query = Graphql.generate_graphql_operation("ping", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -157,7 +158,7 @@ def test_graphql_ping_py(ai_rfq_engine, schema):
 @log_test_result
 def test_graphql_insert_update_item_py(ai_rfq_engine, schema, test_data):
     """Test item insert/update operation."""
-    query = Utility.generate_graphql_operation("insertUpdateItem", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("insertUpdateItem", "Mutation", schema)
 
     for item_data in test_data.get("item_test_data", []):
         result, error = call_method(
@@ -179,7 +180,7 @@ def test_graphql_insert_update_item_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_get_item_py(ai_rfq_engine, schema, test_data):
     """Test get item operation."""
-    query = Utility.generate_graphql_operation("item", "Query", schema)
+    query = Graphql.generate_graphql_operation("item", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -200,7 +201,7 @@ def test_graphql_get_item_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_list_items_py(ai_rfq_engine, schema, test_data):
     """Test list items operation."""
-    query = Utility.generate_graphql_operation("itemList", "Query", schema)
+    query = Graphql.generate_graphql_operation("itemList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -221,7 +222,7 @@ def test_graphql_list_items_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_item_py(ai_rfq_engine, schema, test_data):
     """Test delete item operation."""
-    query = Utility.generate_graphql_operation("deleteItem", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("deleteItem", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -245,7 +246,7 @@ def test_graphql_delete_item_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_segment_py(ai_rfq_engine, schema, test_data):
     """Test segment insert/update operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "insertUpdateSegment", "Mutation", schema
     )
     result, error = call_method(
@@ -267,7 +268,7 @@ def test_graphql_insert_update_segment_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_get_segment_py(ai_rfq_engine, schema, test_data):
     """Test get segment operation."""
-    query = Utility.generate_graphql_operation("segment", "Query", schema)
+    query = Graphql.generate_graphql_operation("segment", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -288,7 +289,7 @@ def test_graphql_get_segment_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_list_segments_py(ai_rfq_engine, schema, test_data):
     """Test list segments operation."""
-    query = Utility.generate_graphql_operation("segmentList", "Query", schema)
+    query = Graphql.generate_graphql_operation("segmentList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -309,7 +310,7 @@ def test_graphql_list_segments_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_segment_py(ai_rfq_engine, schema, test_data):
     """Test delete segment operation."""
-    query = Utility.generate_graphql_operation("deleteSegment", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("deleteSegment", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -333,7 +334,7 @@ def test_graphql_delete_segment_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_segment_contact_py(ai_rfq_engine, schema, test_data):
     """Test segment contact insert/update operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "insertUpdateSegmentContact", "Mutation", schema
     )
     result, error = call_method(
@@ -355,7 +356,7 @@ def test_graphql_insert_update_segment_contact_py(ai_rfq_engine, schema, test_da
 @log_test_result
 def test_graphql_get_segment_contact_py(ai_rfq_engine, schema, test_data):
     """Test get segment contact operation."""
-    query = Utility.generate_graphql_operation("segmentContact", "Query", schema)
+    query = Graphql.generate_graphql_operation("segmentContact", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -376,7 +377,7 @@ def test_graphql_get_segment_contact_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_list_segment_contacts_py(ai_rfq_engine, schema, test_data):
     """Test list segment contacts operation."""
-    query = Utility.generate_graphql_operation("segmentContactList", "Query", schema)
+    query = Graphql.generate_graphql_operation("segmentContactList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -397,7 +398,7 @@ def test_graphql_list_segment_contacts_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_segment_contact_py(ai_rfq_engine, schema, test_data):
     """Test delete segment contact operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "deleteSegmentContact", "Mutation", schema
     )
     result, error = call_method(
@@ -422,7 +423,7 @@ def test_graphql_delete_segment_contact_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_provider_item_py(ai_rfq_engine, schema, test_data):
     """Test provider item insert/update operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "insertUpdateProviderItem", "Mutation", schema
     )
     result, error = call_method(
@@ -444,7 +445,7 @@ def test_graphql_insert_update_provider_item_py(ai_rfq_engine, schema, test_data
 @log_test_result
 def test_graphql_get_provider_item_py(ai_rfq_engine, schema, test_data):
     """Test get provider item operation."""
-    query = Utility.generate_graphql_operation("providerItem", "Query", schema)
+    query = Graphql.generate_graphql_operation("providerItem", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -465,7 +466,7 @@ def test_graphql_get_provider_item_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_provider_item_list_py(ai_rfq_engine, schema, test_data):
     """Test list provider items operation."""
-    query = Utility.generate_graphql_operation("providerItemList", "Query", schema)
+    query = Graphql.generate_graphql_operation("providerItemList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -486,7 +487,7 @@ def test_graphql_provider_item_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_provider_item_py(ai_rfq_engine, schema, test_data):
     """Test delete provider item operation."""
-    query = Utility.generate_graphql_operation("deleteProviderItem", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("deleteProviderItem", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -510,7 +511,7 @@ def test_graphql_delete_provider_item_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_provider_item_batch_py(ai_rfq_engine, schema, test_data):
     """Test provider item batch insert/update operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "insertUpdateProviderItemBatch", "Mutation", schema
     )
     result, error = call_method(
@@ -532,7 +533,7 @@ def test_graphql_insert_update_provider_item_batch_py(ai_rfq_engine, schema, tes
 @log_test_result
 def test_graphql_get_provider_item_batch_py(ai_rfq_engine, schema, test_data):
     """Test get provider item batch operation."""
-    query = Utility.generate_graphql_operation("providerItemBatch", "Query", schema)
+    query = Graphql.generate_graphql_operation("providerItemBatch", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -553,7 +554,7 @@ def test_graphql_get_provider_item_batch_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_provider_item_batch_list_py(ai_rfq_engine, schema, test_data):
     """Test list provider item batches operation."""
-    query = Utility.generate_graphql_operation("providerItemBatchList", "Query", schema)
+    query = Graphql.generate_graphql_operation("providerItemBatchList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -574,7 +575,7 @@ def test_graphql_provider_item_batch_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_provider_item_batch_py(ai_rfq_engine, schema, test_data):
     """Test delete provider item batch operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "deleteProviderItemBatch", "Mutation", schema
     )
     result, error = call_method(
@@ -599,11 +600,11 @@ def test_graphql_delete_provider_item_batch_py(ai_rfq_engine, schema, test_data)
 @log_test_result
 def test_graphql_insert_update_item_price_tier_py(ai_rfq_engine, schema, test_data):
     """Test item price tier insert/update operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "insertUpdateItemPriceTier", "Mutation", schema
     )
     logger.info(
-        f"Test data: {Utility.json_dumps(test_data.pop("itemPriceTierUuid", None))}"
+        f"Test data: {Serializer.json_dumps(test_data.pop("itemPriceTierUuid", None))}"
     )
 
     result, error = call_method(
@@ -625,7 +626,7 @@ def test_graphql_insert_update_item_price_tier_py(ai_rfq_engine, schema, test_da
 @log_test_result
 def test_graphql_get_item_price_tier_py(ai_rfq_engine, schema, test_data):
     """Test get item price tier operation."""
-    query = Utility.generate_graphql_operation("itemPriceTier", "Query", schema)
+    query = Graphql.generate_graphql_operation("itemPriceTier", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -646,7 +647,7 @@ def test_graphql_get_item_price_tier_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_item_price_tier_list_py(ai_rfq_engine, schema, test_data):
     """Test list item price tiers operation."""
-    query = Utility.generate_graphql_operation("itemPriceTierList", "Query", schema)
+    query = Graphql.generate_graphql_operation("itemPriceTierList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -667,7 +668,7 @@ def test_graphql_item_price_tier_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_item_price_tier_py(ai_rfq_engine, schema, test_data):
     """Test delete item price tier operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "deleteItemPriceTier", "Mutation", schema
     )
     result, error = call_method(
@@ -692,11 +693,11 @@ def test_graphql_delete_item_price_tier_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_discount_prompt_py(ai_rfq_engine, schema, test_data):
     """Test discount prompt insert/update operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "insertUpdateDiscountPrompt", "Mutation", schema
     )
     logger.info(
-        f"Test data: {Utility.json_dumps(test_data.get('discountPromptUuid', None))}"
+        f"Test data: {Serializer.json_dumps(test_data.get('discountPromptUuid', None))}"
     )
 
     result, error = call_method(
@@ -718,7 +719,7 @@ def test_graphql_insert_update_discount_prompt_py(ai_rfq_engine, schema, test_da
 @log_test_result
 def test_graphql_get_discount_prompt_py(ai_rfq_engine, schema, test_data):
     """Test get discount prompt operation."""
-    query = Utility.generate_graphql_operation("discountPrompt", "Query", schema)
+    query = Graphql.generate_graphql_operation("discountPrompt", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -739,7 +740,7 @@ def test_graphql_get_discount_prompt_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_discount_prompt_list_py(ai_rfq_engine, schema, test_data):
     """Test list discount prompts operation."""
-    query = Utility.generate_graphql_operation("discountPromptList", "Query", schema)
+    query = Graphql.generate_graphql_operation("discountPromptList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -760,7 +761,7 @@ def test_graphql_discount_prompt_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_discount_prompt_py(ai_rfq_engine, schema, test_data):
     """Test delete discount prompt operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "deleteDiscountPrompt", "Mutation", schema
     )
 
@@ -786,7 +787,7 @@ def test_graphql_delete_discount_prompt_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_request_py(ai_rfq_engine, schema, test_data):
     """Test request insert/update operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "insertUpdateRequest", "Mutation", schema
     )
     result, error = call_method(
@@ -808,7 +809,7 @@ def test_graphql_insert_update_request_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_get_request_py(ai_rfq_engine, schema, test_data):
     """Test get request operation."""
-    query = Utility.generate_graphql_operation("request", "Query", schema)
+    query = Graphql.generate_graphql_operation("request", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -829,7 +830,7 @@ def test_graphql_get_request_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_request_list_py(ai_rfq_engine, schema, test_data):
     """Test list requests operation."""
-    query = Utility.generate_graphql_operation("requestList", "Query", schema)
+    query = Graphql.generate_graphql_operation("requestList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -850,7 +851,7 @@ def test_graphql_request_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_request_py(ai_rfq_engine, schema, test_data):
     """Test delete request operation."""
-    query = Utility.generate_graphql_operation("deleteRequest", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("deleteRequest", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -874,7 +875,7 @@ def test_graphql_delete_request_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_quote_py(ai_rfq_engine, schema, test_data):
     """Test quote insert/update operation."""
-    query = Utility.generate_graphql_operation("insertUpdateQuote", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("insertUpdateQuote", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -895,7 +896,7 @@ def test_graphql_insert_update_quote_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_get_quote_py(ai_rfq_engine, schema, test_data):
     """Test get quote operation."""
-    query = Utility.generate_graphql_operation("quote", "Query", schema)
+    query = Graphql.generate_graphql_operation("quote", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -916,7 +917,7 @@ def test_graphql_get_quote_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_quote_list_py(ai_rfq_engine, schema, test_data):
     """Test list quotes operation."""
-    query = Utility.generate_graphql_operation("quoteList", "Query", schema)
+    query = Graphql.generate_graphql_operation("quoteList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -937,7 +938,7 @@ def test_graphql_quote_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_quote_py(ai_rfq_engine, schema, test_data):
     """Test delete quote operation."""
-    query = Utility.generate_graphql_operation("deleteQuote", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("deleteQuote", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -961,7 +962,7 @@ def test_graphql_delete_quote_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_quote_item_py(ai_rfq_engine, schema, test_data):
     """Test quote item insert/update operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "insertUpdateQuoteItem", "Mutation", schema
     )
     result, error = call_method(
@@ -983,7 +984,7 @@ def test_graphql_insert_update_quote_item_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_get_quote_item_py(ai_rfq_engine, schema, test_data):
     """Test get quote item operation."""
-    query = Utility.generate_graphql_operation("quoteItem", "Query", schema)
+    query = Graphql.generate_graphql_operation("quoteItem", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1004,7 +1005,7 @@ def test_graphql_get_quote_item_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_quote_item_list_py(ai_rfq_engine, schema, test_data):
     """Test list quote items operation."""
-    query = Utility.generate_graphql_operation("quoteItemList", "Query", schema)
+    query = Graphql.generate_graphql_operation("quoteItemList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1025,7 +1026,7 @@ def test_graphql_quote_item_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_quote_item_py(ai_rfq_engine, schema, test_data):
     """Test delete quote item operation."""
-    query = Utility.generate_graphql_operation("deleteQuoteItem", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("deleteQuoteItem", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1049,7 +1050,7 @@ def test_graphql_delete_quote_item_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_installment_py(ai_rfq_engine, schema, test_data):
     """Test installment insert/update operation."""
-    query = Utility.generate_graphql_operation(
+    query = Graphql.generate_graphql_operation(
         "insertUpdateInstallment", "Mutation", schema
     )
     result, error = call_method(
@@ -1071,7 +1072,7 @@ def test_graphql_insert_update_installment_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_get_installment_py(ai_rfq_engine, schema, test_data):
     """Test get installment operation."""
-    query = Utility.generate_graphql_operation("installment", "Query", schema)
+    query = Graphql.generate_graphql_operation("installment", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1092,7 +1093,7 @@ def test_graphql_get_installment_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_installment_list_py(ai_rfq_engine, schema, test_data):
     """Test list installments operation."""
-    query = Utility.generate_graphql_operation("installmentList", "Query", schema)
+    query = Graphql.generate_graphql_operation("installmentList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1113,7 +1114,7 @@ def test_graphql_installment_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_installment_py(ai_rfq_engine, schema, test_data):
     """Test delete installment operation."""
-    query = Utility.generate_graphql_operation("deleteInstallment", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("deleteInstallment", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1137,7 +1138,7 @@ def test_graphql_delete_installment_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_insert_update_file_py(ai_rfq_engine, schema, test_data):
     """Test file insert/update operation."""
-    query = Utility.generate_graphql_operation("insertUpdateFile", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("insertUpdateFile", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1158,7 +1159,7 @@ def test_graphql_insert_update_file_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_get_file_py(ai_rfq_engine, schema, test_data):
     """Test get file operation."""
-    query = Utility.generate_graphql_operation("file", "Query", schema)
+    query = Graphql.generate_graphql_operation("file", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1179,7 +1180,7 @@ def test_graphql_get_file_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_file_list_py(ai_rfq_engine, schema, test_data):
     """Test list files operation."""
-    query = Utility.generate_graphql_operation("fileList", "Query", schema)
+    query = Graphql.generate_graphql_operation("fileList", "Query", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1200,7 +1201,7 @@ def test_graphql_file_list_py(ai_rfq_engine, schema, test_data):
 @log_test_result
 def test_graphql_delete_file_py(ai_rfq_engine, schema, test_data):
     """Test delete file operation."""
-    query = Utility.generate_graphql_operation("deleteFile", "Mutation", schema)
+    query = Graphql.generate_graphql_operation("deleteFile", "Mutation", schema)
 
     result, error = call_method(
         ai_rfq_engine,
@@ -1227,7 +1228,7 @@ def test_graphql_delete_file_py(ai_rfq_engine, schema, test_data):
 def test_graphql_item_price_tiers(ai_rfq_engine, schema, test_data):
     """Test itemPriceTiers query with batch loaders."""
     # Build GraphQL query (use camelCase for GraphQL field names and JSON type)
-    # query = Utility.generate_graphql_operation("itemPriceTiers", "Query", schema)
+    # query = Graphql.generate_graphql_operation("itemPriceTiers", "Query", schema)
     query = """
     query GetItemPriceTiers($email: String!, $quote_items: [JSON]) {
         itemPriceTiers(email: $email, quoteItems: $quote_items) {
@@ -1270,7 +1271,7 @@ def test_graphql_item_price_tiers(ai_rfq_engine, schema, test_data):
 def test_graphql_discount_prompts(ai_rfq_engine, schema, test_data):
     """Test discountPrompts query with batch loaders."""
     # Build GraphQL query (use camelCase for GraphQL field names and JSON type)
-    # query = Utility.generate_graphql_operation("discountPrompts", "Query", schema)
+    # query = Graphql.generate_graphql_operation("discountPrompts", "Query", schema)
     query = """
     query GetDiscountPrompts($email: String!, $quote_items: [JSON]) {
         discountPrompts(email: $email, quoteItems: $quote_items) {

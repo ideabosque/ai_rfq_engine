@@ -14,7 +14,7 @@ from .base import Key, SafeDataLoader, normalize_model
 
 
 class SegmentContactBySegmentLoader(SafeDataLoader):
-    """Batch loader returning contacts for a segment keyed by (endpoint_id, segment_uuid)."""
+    """Batch loader returning contacts for a segment keyed by (partition_key, segment_uuid)."""
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
         super(SegmentContactBySegmentLoader, self).__init__(
@@ -68,17 +68,17 @@ class SegmentContactBySegmentLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        for endpoint_id, segment_uuid in uncached_keys:
+        for partition_key, segment_uuid in uncached_keys:
             try:
-                contacts = get_segment_contacts_by_segment(endpoint_id, segment_uuid)
+                contacts = get_segment_contacts_by_segment(partition_key, segment_uuid)
                 # if self.cache_enabled:
-                #     self.set_cache_data((endpoint_id, segment_uuid), contacts)
+                #     self.set_cache_data((partition_key, segment_uuid), contacts)
                 normalized = [normalize_model(contact) for contact in contacts]
-                key_map[(endpoint_id, segment_uuid)] = normalized
-                
+                key_map[(partition_key, segment_uuid)] = normalized
+
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
-                key_map[(endpoint_id, segment_uuid)] = []
+                key_map[(partition_key, segment_uuid)] = []
 
         return Promise.resolve([key_map.get(key, []) for key in keys])
