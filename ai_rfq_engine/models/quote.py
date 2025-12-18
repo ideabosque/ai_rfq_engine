@@ -20,7 +20,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -273,7 +274,7 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
             info, **{"quote_uuid": quote.quote_uuid}
         )
         quote_items = [
-            Utility.json_normalize(
+            Serializer.json_normalize(
                 {
                     k: getattr(item, k, None)
                     for k in [
@@ -302,7 +303,7 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return QuoteType(**Utility.json_normalize(quote_dict))
+    return QuoteType(**Serializer.json_normalize(quote_dict))
 
 
 def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType | None:

@@ -26,7 +26,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -406,7 +407,7 @@ def get_discount_prompt_type(
         info.context.get("logger").exception(log)
         raise
 
-    return DiscountPromptType(**Utility.json_normalize(prompt_dict))
+    return DiscountPromptType(**Serializer.json_normalize(prompt_dict))
 
 
 def resolve_discount_prompt(

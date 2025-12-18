@@ -25,7 +25,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, convert_decimal_to_number, method_cache
+from silvaengine_utility import convert_decimal_to_number, method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -321,7 +322,7 @@ def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteI
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return QuoteItemType(**Utility.json_normalize(quote_item_dict))
+    return QuoteItemType(**Serializer.json_normalize(quote_item_dict))
 
 
 def resolve_quote_item(

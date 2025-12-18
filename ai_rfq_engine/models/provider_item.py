@@ -25,7 +25,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -238,7 +239,7 @@ def get_provider_item_type(
         info.context.get("logger").exception(log)
         raise
 
-    return ProviderItemType(**Utility.json_normalize(pi_dict))
+    return ProviderItemType(**Serializer.json_normalize(pi_dict))
 
 
 def resolve_provider_item(
@@ -376,12 +377,10 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
 )
 @purge_cache()
 def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    partition_key = kwargs.get("partition_key")
+    partition_key = info.context.get("partition_key")
     provider_item_uuid = kwargs.get("provider_item_uuid")
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
-            "part_id": info.context.get("part_id"),
             "item_spec": {},
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),

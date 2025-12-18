@@ -25,7 +25,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -181,7 +182,7 @@ def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return RequestType(**Utility.json_normalize(request))
+    return RequestType(**Serializer.json_normalize(request))
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType | None:

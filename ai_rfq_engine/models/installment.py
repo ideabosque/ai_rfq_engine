@@ -20,7 +20,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -207,7 +208,7 @@ def get_installment_type(
         info.context.get("logger").exception(log)
         raise
 
-    return InstallmentType(**Utility.json_normalize(inst_dict))
+    return InstallmentType(**Serializer.json_normalize(inst_dict))
 
 
 def resolve_installment(

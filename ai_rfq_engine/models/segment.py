@@ -20,7 +20,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -164,7 +165,7 @@ def get_segment_type(info: ResolveInfo, segment: SegmentModel) -> SegmentType:
         log = traceback.format_exc()
         info.context.get("logger").exception(log)
         raise e
-    return SegmentType(**Utility.json_normalize(segment))
+    return SegmentType(**Serializer.json_normalize(segment))
 
 
 def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType | None:

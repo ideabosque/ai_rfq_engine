@@ -25,7 +25,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -211,7 +212,7 @@ def get_provider_item_batch_type(
     batch_dict.pop("partition_key", None)
     valid_fields = ProviderItemBatchType._meta.fields.keys()
     filtered_batch_dict = {k: v for k, v in batch_dict.items() if k in valid_fields}
-    return ProviderItemBatchType(**Utility.json_normalize(filtered_batch_dict))
+    return ProviderItemBatchType(**Serializer.json_normalize(filtered_batch_dict))
 
 
 def resolve_provider_item_batch(

@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, "silvaengine_utility"))
 sys.path.insert(1, os.path.join(BASE_DIR, "silvaengine_dynamodb_base"))
 sys.path.insert(2, os.path.join(BASE_DIR, "ai_rfq_engine"))
 
-from silvaengine_utility import Utility  # noqa: E402
+from silvaengine_utility.serializer import Serializer  # noqa: E402
 
 from ai_rfq_engine import AIRFQEngine  # noqa: E402
 
@@ -43,7 +43,7 @@ logger = logging.getLogger("load_sample_data")
 
 # --- CONFIGURATION ---
 endpoint_id = os.getenv("endpoint_id")
-part_id = os.getenv("part_id", "")
+part_id = os.getenv("part_id")
 UPDATED_BY = "data_loader_script"
 TEST_DATA_FILE = os.path.join(os.path.dirname(__file__), "test_data.json")
 
@@ -94,7 +94,7 @@ def run_graphql_mutation(engine, query, variables):
             part_id=part_id,
         )
         parsed = (
-            Utility.json_loads(response)
+            Serializer.json_loads(response)
             if isinstance(response, (str, bytes))
             else response
         )
@@ -103,7 +103,7 @@ def run_graphql_mutation(engine, query, variables):
         return None
 
     if parsed.get("errors"):
-        print("GraphQL Error:", Utility.json_dumps(parsed["errors"]))
+        print("GraphQL Error:", Serializer.json_dumps(parsed["errors"]))
         return None
 
     data = parsed.get("data")
