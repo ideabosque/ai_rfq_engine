@@ -261,48 +261,12 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
     Nested resolver approach: return minimal quote data.
     - Do NOT embed 'request'.
     'request' is resolved lazily by QuoteType.resolve_request.
-    - 'quote_items' ARE still embedded for now (List(JSON)).
+    - Do NOT embed 'quote_items'.
+    'quote_items' are resolved lazily by QuoteType.resolve_quote_items.
     """
-    try:
-        # Import here to avoid circular dependency
-        from .quote_item import resolve_quote_item_list
-
-        quote_dict: Dict = quote.__dict__["attribute_values"]
-
-        # Get quote items for this quote (still eager for now)
-        quote_item_list = resolve_quote_item_list(
-            info, **{"quote_uuid": quote.quote_uuid}
-        )
-        quote_items = [
-            Serializer.json_normalize(
-                {
-                    k: getattr(item, k, None)
-                    for k in [
-                        "quote_item_uuid",
-                        "provider_item_uuid",
-                        "item_uuid",
-                        "batch_no",
-                        "request_data",
-                        "slow_move_item",
-                        "guardrail_price_per_uom",
-                        "price_per_uom",
-                        "qty",
-                        "subtotal",
-                        "subtotal_discount",
-                        "final_subtotal",
-                    ]
-                }
-            )
-            for item in quote_item_list.quote_item_list
-        ]
-
-        quote_dict["quote_items"] = quote_items
-        # quote_dict.pop("partition_key")
-        # quote_dict.pop("request_uuid")
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
+    _ = info  # Keep for signature compatibility with decorators
+    quote_dict = quote.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
     return QuoteType(**Serializer.json_normalize(quote_dict))
 
 

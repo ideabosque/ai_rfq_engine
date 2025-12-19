@@ -201,13 +201,9 @@ def get_installment_type(
     - Do NOT embed 'quote'.
     'quote' is resolved lazily by InstallmentType.resolve_quote.
     """
-    try:
-        inst_dict = installment.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
+    _ = info  # Keep for signature compatibility with decorators
+    inst_dict = installment.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
     return InstallmentType(**Serializer.json_normalize(inst_dict))
 
 

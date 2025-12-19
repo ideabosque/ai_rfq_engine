@@ -232,13 +232,9 @@ def get_provider_item_type(
     - Do NOT embed 'item' here anymore.
     'item' is resolved lazily by ProviderItemType.resolve_item.
     """
-    try:
-        pi_dict = provider_item.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
+    _ = info  # Keep for signature compatibility with decorators
+    pi_dict = provider_item.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
     return ProviderItemType(**Serializer.json_normalize(pi_dict))
 
 

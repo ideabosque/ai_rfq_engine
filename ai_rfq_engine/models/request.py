@@ -176,13 +176,14 @@ def get_request_count(partition_key: str, request_uuid: str) -> int:
 
 
 def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
-    try:
-        request = request.__dict__["attribute_values"]
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
-    return RequestType(**Serializer.json_normalize(request))
+    """
+    Nested resolver approach: return minimal request data.
+    Those are resolved lazily by RequestType resolvers.
+    """
+    _ = info  # Keep for signature compatibility with decorators
+    request_dict = request.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return RequestType(**Serializer.json_normalize(request_dict))
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType | None:

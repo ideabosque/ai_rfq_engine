@@ -202,17 +202,10 @@ def get_provider_item_batch_type(
     - Do NOT embed 'item' or 'provider_item'.
     Those are resolved lazily by ProviderItemBatchType resolvers.
     """
-    try:
-        batch_dict = provider_item_batch.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
-    batch_dict.pop("partition_key", None)
-    valid_fields = ProviderItemBatchType._meta.fields.keys()
-    filtered_batch_dict = {k: v for k, v in batch_dict.items() if k in valid_fields}
-    return ProviderItemBatchType(**Serializer.json_normalize(filtered_batch_dict))
+    _ = info  # Keep for signature compatibility with decorators
+    batch_dict = provider_item_batch.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return ProviderItemBatchType(**Serializer.json_normalize(batch_dict))
 
 
 def resolve_provider_item_batch(

@@ -202,13 +202,9 @@ def get_segment_contact_type(
     - Do NOT embed 'segment'.
     'segment' is resolved lazily by SegmentContactType.resolve_segment.
     """
-    try:
-        sc_dict = segment_contact.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
+    _ = info  # Keep for signature compatibility with decorators
+    sc_dict = segment_contact.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
     return SegmentContactType(**Serializer.json_normalize(sc_dict))
 
 

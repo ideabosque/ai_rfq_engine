@@ -161,13 +161,14 @@ def get_item_count(partition_key: str, item_uuid: str) -> int:
 
 
 def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
-    try:
-        item = item.__dict__["attribute_values"]
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
-    return ItemType(**Serializer.json_normalize(item))
+    """
+    Nested resolver approach: return minimal item data.
+    Those are resolved lazily by ItemType resolvers.
+    """
+    _ = info  # Keep for signature compatibility with decorators
+    item_dict = item.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return ItemType(**Serializer.json_normalize(item_dict))
 
 
 def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType | None:

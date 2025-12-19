@@ -15,6 +15,7 @@ class ProviderItemBatchType(ObjectType):
     batch_no = String()
     item_uuid = String()  # keep raw id
     partition_key = String()
+    partition_key = String()
     cost_per_uom = String()
     freight_cost_per_uom = String()
     additional_cost_per_uom = String()

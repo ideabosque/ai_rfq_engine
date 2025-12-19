@@ -264,13 +264,9 @@ def get_item_price_tier_type(
     Convert ItemPriceTierModel to ItemPriceTierType.
     Nested relationships are lazily loaded via nested resolvers.
     """
-    try:
-        tier_dict: Dict = item_price_tier.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
+    _ = info  # Keep for signature compatibility with decorators
+    tier_dict = item_price_tier.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
     return ItemPriceTierType(**Serializer.json_normalize(tier_dict))
 
 

@@ -398,16 +398,13 @@ def get_discount_prompt_type(
     info: ResolveInfo, discount_prompt: DiscountPromptModel
 ) -> DiscountPromptType:
     """
-    Convert DiscountPromptModel to a dictionary type.
+    Nested resolver approach: return minimal discount_prompt data.
+    Those are resolved lazily by DiscountPromptType resolvers.
     """
-    try:
-        prompt_dict = discount_prompt.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
-    return DiscountPromptType(**Serializer.json_normalize(prompt_dict))
+    _ = info  # Keep for signature compatibility with decorators
+    discount_prompt_dict = discount_prompt.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return DiscountPromptType(**Serializer.json_normalize(discount_prompt_dict))
 
 
 def resolve_discount_prompt(

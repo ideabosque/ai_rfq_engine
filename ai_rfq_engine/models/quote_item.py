@@ -293,47 +293,12 @@ def get_quote_item_count(quote_uuid: str, quote_item_uuid: str) -> int:
 
 
 def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteItemType:
-    try:
-        quote_item_dict: Dict = quote_item.__dict__["attribute_values"]
-
-        # Get batch information if batch_no exists
-        # slow_move_item = False
-        # guardrail_price_per_uom = None
-
-        # if quote_item_dict.get("batch_no"):
-        #     from .provider_item_batches import get_provider_item_batch
-
-        #     try:
-        #         batch = get_provider_item_batch(
-        #             quote_item_dict["provider_item_uuid"], quote_item_dict["batch_no"]
-        #         )
-        #         slow_move_item = (
-        #             batch.slow_move_item if batch.slow_move_item is not None else False
-        #         )
-        #         guardrail_price_per_uom = batch.guardrail_price_per_uom
-        #     except Exception:
-        #         # If batch not found, use default values
-        #         pass
-        # else:
-        #     # If no batch_no, get guardrail_price_per_uom from ProviderItemModel.base_price_per_uom
-        #     from .provider_item import get_provider_item
-
-        #     try:
-        #         provider_item = get_provider_item(
-        #             quote_item_dict["partition_key"],
-        #             quote_item_dict["provider_item_uuid"],
-        #         )
-        #         guardrail_price_per_uom = provider_item.base_price_per_uom
-        #     except Exception:
-        #         # If provider item not found, use None
-        #         pass
-
-        # quote_item_dict["slow_move_item"] = slow_move_item
-        # quote_item_dict["guardrail_price_per_uom"] = guardrail_price_per_uom
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
+    """
+    Nested resolver approach: return minimal quote_item data.
+    Those are resolved lazily by QuoteItemType resolvers.
+    """
+    _ = info  # Keep for signature compatibility with decorators
+    quote_item_dict = quote_item.__dict__["attribute_values"].copy()
     return QuoteItemType(**Serializer.json_normalize(quote_item_dict))
 
 

@@ -159,13 +159,14 @@ def get_segment_count(partition_key: str, segment_uuid: str) -> int:
 
 
 def get_segment_type(info: ResolveInfo, segment: SegmentModel) -> SegmentType:
-    try:
-        segment = segment.__dict__["attribute_values"]
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
-    return SegmentType(**Serializer.json_normalize(segment))
+    """
+    Nested resolver approach: return minimal segment data.
+    Those are resolved lazily by SegmentType resolvers.
+    """
+    _ = info  # Keep for signature compatibility with decorators
+    segment_dict = segment.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return SegmentType(**Serializer.json_normalize(segment_dict))
 
 
 def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType | None:

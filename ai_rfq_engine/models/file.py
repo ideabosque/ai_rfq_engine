@@ -172,13 +172,9 @@ def get_file_type(info: ResolveInfo, file: FileModel) -> FileType:
     - Do NOT embed 'request'.
     'request' is resolved lazily by FileType.resolve_request.
     """
-    try:
-        file_dict = file.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
+    _ = info  # Keep for signature compatibility with decorators
+    file_dict = file.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
     return FileType(**Serializer.json_normalize(file_dict))
 
 
