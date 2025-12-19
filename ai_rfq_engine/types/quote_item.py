@@ -37,6 +37,48 @@ class QuoteItemType(ObjectType):
     created_at = DateTime()
     updated_at = DateTime()
 
+    def resolve_guardrail_price_per_uom(parent, info):
+        """Resolve nested Quote for this quote item using DataLoader."""
+        # Case 2: already embedded
+        existing = getattr(parent, "slow_move_item", None)
+        if existing:
+            return existing
+
+        # Case 1: need to fetch using DataLoader
+        provider_item_uuid = getattr(parent, "provider_item_uuid", None)
+        batch_no = getattr(parent, "batch_no", None)
+        partition_key =  getattr(parent, "partition_key", None) #info.context.get("partition_key")
+        if not provider_item_uuid:
+            return None
+        
+        loaders = get_loaders(info.context)
+        if batch_no:
+            return loaders.provider_item_batch_loader.load((provider_item_uuid, batch_no)).then(
+                lambda provider_item_batch: provider_item_batch.get("guardrail_price_per_uom", None) if provider_item_batch else None
+            )
+        else:
+            return loaders.provider_item_loader.load((partition_key, provider_item_uuid)).then(
+                lambda provider_item: provider_item.get("base_price_per_uom", None) if provider_item else None
+            )
+    
+    def resolve_slow_move_item(parent, info):
+        """Resolve nested Quote for this quote item using DataLoader."""
+        # Case 2: already embedded
+        existing = getattr(parent, "slow_move_item", None)
+        if existing:
+            return existing
+
+        # Case 1: need to fetch using DataLoader
+        provider_item_uuid = getattr(parent, "provider_item_uuid", None)
+        batch_no = getattr(parent, "batch_no", None)
+        if not provider_item_uuid or not batch_no:
+            return None
+
+        loaders = get_loaders(info.context)
+        return loaders.provider_item_batch_loader.load((provider_item_uuid, batch_no)).then(
+            lambda provider_item_batch: provider_item_batch.get("slow_move_item", None) if provider_item_batch else None
+        )
+    
     # ------- Nested resolvers -------
     def resolve_quote(parent, info):
         """Resolve nested Quote for this quote item using DataLoader."""

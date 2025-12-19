@@ -13,11 +13,11 @@ from ...handlers.config import Config
 from .base import SafeDataLoader, normalize_model, Key
 
 
-class ProviderItemBatchListLoader(SafeDataLoader):
+class ProviderItemBatchLoader(SafeDataLoader):
     """Batch loader returning batches for a provider item keyed by provider_item_uuid."""
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
-        super(ProviderItemBatchListLoader, self).__init__(
+        super(ProviderItemBatchLoader, self).__init__(
             logger=logger, cache_enabled=cache_enabled, **kwargs
         )
         if self.cache_enabled:
@@ -27,7 +27,7 @@ class ProviderItemBatchListLoader(SafeDataLoader):
             cache_meta = Config.get_cache_entity_config().get("provider_item_batch")
             self.cache_func_prefix = ""
             if cache_meta:
-                self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_provider_item_batches_by_provider_item"])
+                self.cache_func_prefix = ".".join([cache_meta.get("module"), cache_meta.get("getter")])
 
     def generate_cache_key(self, key: Key) -> str:
         if not isinstance(key, tuple):
@@ -54,7 +54,7 @@ class ProviderItemBatchListLoader(SafeDataLoader):
         self.cache.set(cache_key, data, ttl=Config.get_cache_ttl())
 
     def batch_load_fn(self, keys: List[str]) -> Promise:
-        from ..provider_item_batches import get_provider_item_batches_by_provider_item
+        from ..provider_item_batches import ProviderItemBatchModel
         unique_keys = list(dict.fromkeys(keys))
         key_map: Dict[str, List[Dict[str, Any]]] = {}
         uncached_keys = []
@@ -69,17 +69,19 @@ class ProviderItemBatchListLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        for provider_item_uuid in uncached_keys:
+        if uncached_keys:
             try:
-                batches = get_provider_item_batches_by_provider_item(provider_item_uuid)
-                # if self.cache_enabled:
-                #     self.set_cache_data((provider_item_uuid), batches)
-                normalized = [normalize_model(batch) for batch in batches]
-                key_map[provider_item_uuid] = normalized
+                for pib in ProviderItemBatchModel.batch_get(uncached_keys):
+                    key = (pib.provider_item_uuid, pib.batch_no)
+                    
+                    if self.cache_enabled:
+                        self.set_cache_data(key, pib)
+                        
+                    normalized = normalize_model(pib)
+                    key_map[key] = normalized
 
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
-                key_map[provider_item_uuid] = []
 
-        return Promise.resolve([key_map.get(key, []) for key in keys])
+        return Promise.resolve([key_map.get(key) for key in keys])
