@@ -28,7 +28,6 @@ class QuoteItemType(ObjectType):
     slow_move_item = Boolean()
 
     # Nested resolver: strongly-typed nested relationships
-    quote = Field(lambda: QuoteType)
     item = Field(lambda: ItemType)
     provider_item = Field(lambda: ProviderItemType)
     provider_item_batch = Field(lambda: ProviderItemBatchType)
@@ -36,27 +35,6 @@ class QuoteItemType(ObjectType):
     updated_by = String()
     created_at = DateTime()
     updated_at = DateTime()
-
-    # ------- Nested resolvers -------
-    def resolve_quote(parent, info):
-        """Resolve nested Quote for this quote item using DataLoader."""
-        # Case 2: already embedded
-        existing = getattr(parent, "quote", None)
-        if isinstance(existing, dict):
-            return QuoteType(**existing)
-        if isinstance(existing, QuoteType):
-            return existing
-
-        # Case 1: need to fetch using DataLoader
-        request_uuid = getattr(parent, "request_uuid", None)
-        quote_uuid = getattr(parent, "quote_uuid", None)
-        if not request_uuid or not quote_uuid:
-            return None
-
-        loaders = get_loaders(info.context)
-        return loaders.quote_loader.load((request_uuid, quote_uuid)).then(
-            lambda quote_dict: QuoteType(**quote_dict) if quote_dict else None
-        )
 
     def resolve_item(parent, info):
         """Resolve nested Item for this quote item using DataLoader."""

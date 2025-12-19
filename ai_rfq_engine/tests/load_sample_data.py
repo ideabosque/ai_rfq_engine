@@ -201,7 +201,9 @@ def generate_and_load_data(engine):
             }
         )
 
-    first_segment_uuid = None  # Will store the first segment UUID for reuse across sections
+    first_segment_uuid = (
+        None  # Will store the first segment UUID for reuse across sections
+    )
     for segment_data in local_segments:
         print(f"Creating Segment: {segment_data['name']}...")
         mutation = """
@@ -222,7 +224,9 @@ def generate_and_load_data(engine):
             segment_map[segment_data["local_id"]] = api_uuid
             if first_segment_uuid is None:
                 first_segment_uuid = api_uuid  # Capture the first segment
-                print(f"  -> Success. API UUID: {api_uuid} (FIRST SEGMENT - will be used for price tiers and quote items)")
+                print(
+                    f"  -> Success. API UUID: {api_uuid} (FIRST SEGMENT - will be used for price tiers and quote items)"
+                )
             else:
                 print(f"  -> Success. API UUID: {api_uuid}")
             test_data_updates["segment_test_data"].append(
@@ -579,7 +583,8 @@ def generate_and_load_data(engine):
 
     # Get list of segment contacts (emails) to use in requests
     segment_contact_emails = [
-        contact["email"] for contact in test_data_updates.get("segment_contact_test_data", [])
+        contact["email"]
+        for contact in test_data_updates.get("segment_contact_test_data", [])
     ]
 
     # Get list of items to add to requests
@@ -587,7 +592,11 @@ def generate_and_load_data(engine):
 
     for i in range(NUM_REQUESTS):
         # Pick a random email from segment contacts or generate new one
-        email = random.choice(segment_contact_emails) if segment_contact_emails else fake.email()
+        email = (
+            random.choice(segment_contact_emails)
+            if segment_contact_emails
+            else fake.email()
+        )
         request_title = fake.catch_phrase()
         request_description = fake.sentence()
 
@@ -639,7 +648,9 @@ def generate_and_load_data(engine):
         }
 
         # Set expiration date 30-90 days in future
-        expired_at = (pendulum.now("UTC") + timedelta(days=random.randint(30, 90))).isoformat()
+        expired_at = (
+            pendulum.now("UTC") + timedelta(days=random.randint(30, 90))
+        ).isoformat()
 
         mutation = """
         mutation InsertUpdateRequest(
@@ -719,7 +730,9 @@ def generate_and_load_data(engine):
             provider_corp_external_id = f"PROV-{random.randint(100, 999)}"
             sales_rep_email = fake.email()
 
-            print(f"Creating Quote for Request {request_uuid} (Provider: {provider_corp_external_id})...")
+            print(
+                f"Creating Quote for Request {request_uuid} (Provider: {provider_corp_external_id})..."
+            )
 
             mutation = """
             mutation InsertUpdateQuote(
@@ -796,8 +809,8 @@ def generate_and_load_data(engine):
     create_quote_items = False
 
     if create_quote_items:
-        print("Waiting 90 seconds for price tiers to propagate in DynamoDB...")
-        time.sleep(90)  # Wait for DynamoDB eventual consistency (60s wasn't enough)
+        # print("Waiting 90 seconds for price tiers to propagate in DynamoDB...")
+        # time.sleep(90)  # Wait for DynamoDB eventual consistency (60s wasn't enough)
 
         # Use the same first_segment_uuid that was used for price tiers
         print(f"Using segment UUID for quote items: {first_segment_uuid}")
@@ -822,7 +835,9 @@ def generate_and_load_data(engine):
 
                 qty = random.randint(50, 500)
 
-                print(f"Creating Quote Item for Quote {quote_uuid} (Item: {item_uuid}, Provider: {provider_item_uuid}, Qty: {qty}, Segment: {first_segment_uuid})...")
+                print(
+                    f"Creating Quote Item for Quote {quote_uuid} (Item: {item_uuid}, Provider: {provider_item_uuid}, Qty: {qty}, Segment: {first_segment_uuid})..."
+                )
 
                 mutation = """
                 mutation InsertUpdateQuoteItem(
@@ -858,8 +873,14 @@ def generate_and_load_data(engine):
                 }
 
                 result = run_graphql_mutation(engine, mutation, variables)
-                if result and result.get("insertUpdateQuoteItem") and result["insertUpdateQuoteItem"].get("quoteItem"):
-                    quote_item_uuid = result["insertUpdateQuoteItem"]["quoteItem"]["quoteItemUuid"]
+                if (
+                    result
+                    and result.get("insertUpdateQuoteItem")
+                    and result["insertUpdateQuoteItem"].get("quoteItem")
+                ):
+                    quote_item_uuid = result["insertUpdateQuoteItem"]["quoteItem"][
+                        "quoteItemUuid"
+                    ]
                     quote_item_map[f"{quote_key}_item_{item_idx}"] = quote_item_uuid
                     print(f"  -> Success. Quote Item UUID: {quote_item_uuid}")
                     test_data_updates["quote_item_test_data"].append(
@@ -886,7 +907,9 @@ def generate_and_load_data(engine):
                     continue
 
         if quote_item_failed_count > 0:
-            print(f"\nNote: {quote_item_failed_count} quote items were skipped due to DynamoDB eventual consistency")
+            print(
+                f"\nNote: {quote_item_failed_count} quote items were skipped due to DynamoDB eventual consistency"
+            )
 
     # 9. Installments
     print("\n--- Loading Installments ---")
@@ -897,7 +920,9 @@ def generate_and_load_data(engine):
 
         for inst_idx in range(NUM_INSTALLMENTS_PER_QUOTE):
             priority = inst_idx + 1
-            scheduled_date = (pendulum.now("UTC") + timedelta(days=30 * (inst_idx + 1))).isoformat()
+            scheduled_date = (
+                pendulum.now("UTC") + timedelta(days=30 * (inst_idx + 1))
+            ).isoformat()
             installment_amount = round(random.uniform(500.0, 5000.0), 2)
 
             print(f"Creating Installment {priority} for Quote {quote_uuid}...")
@@ -933,14 +958,18 @@ def generate_and_load_data(engine):
                 "priority": priority,
                 "scheduled": scheduled_date,
                 "amount": installment_amount,
-                "payment": random.choice(["credit_card", "wire_transfer", "check", "ach"]),
+                "payment": random.choice(
+                    ["credit_card", "wire_transfer", "check", "ach"]
+                ),
                 "status": "pending",
                 "by": UPDATED_BY,
             }
 
             result = run_graphql_mutation(engine, mutation, variables)
             if result:
-                installment_uuid = result["insertUpdateInstallment"]["installment"]["installmentUuid"]
+                installment_uuid = result["insertUpdateInstallment"]["installment"][
+                    "installmentUuid"
+                ]
                 print(f"  -> Success. Installment UUID: {installment_uuid}")
                 test_data_updates["installment_test_data"].append(
                     {
