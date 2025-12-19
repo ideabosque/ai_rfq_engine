@@ -85,15 +85,27 @@ def get_price_per_uom(
         return tier.price_per_uom
 
     # If tier has margin_per_uom with batches, find the matching batch price
-    if hasattr(tier, "provider_item_batches") and tier.provider_item_batches:
+    provider_item_batches = []
+
+    if getattr(tier, "margin_per_uom", None) is not None:
+        from .provider_item_batches import get_provider_item_batches_by_provider_item
+
+        for batch in get_provider_item_batches_by_provider_item(provider_item_uuid):
+            cost = batch.total_cost_per_uom or 0
+            price = cost * (1 + float(tier.margin_per_uom))
+            provider_item_batches.append(
+                {"batch_no": batch.batch_no, "price_per_uom": price}
+            )
+
+    if provider_item_batches:
         # If batch_no is specified, find that specific batch
         if batch_no:
-            for batch in tier.provider_item_batches:
+            for batch in provider_item_batches:
                 if batch["batch_no"] == batch_no:
                     return batch["price_per_uom"]
 
         # Otherwise, return the first available batch price
-        return tier.provider_item_batches[0]["price_per_uom"]
+        return provider_item_batches[0]["price_per_uom"]
 
     return None
 

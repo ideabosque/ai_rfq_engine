@@ -3,6 +3,7 @@ import logging
 import os
 import random
 import sys
+import time
 import uuid
 from datetime import datetime, timedelta
 
@@ -174,6 +175,18 @@ def generate_and_load_data(engine):
         "discount_prompt_test_data": [],
         "discount_prompt_get_test_data": [],
         "discount_prompt_list_test_data": [],
+        "request_test_data": [],
+        "request_get_test_data": [],
+        "request_list_test_data": [],
+        "quote_test_data": [],
+        "quote_get_test_data": [],
+        "quote_list_test_data": [],
+        "quote_item_test_data": [],
+        "quote_item_get_test_data": [],
+        "quote_item_list_test_data": [],
+        "installment_test_data": [],
+        "installment_get_test_data": [],
+        "installment_list_test_data": [],
     }
 
     # 1. Segments
@@ -188,6 +201,7 @@ def generate_and_load_data(engine):
             }
         )
 
+    first_segment_uuid = None  # Will store the first segment UUID for reuse across sections
     for segment_data in local_segments:
         print(f"Creating Segment: {segment_data['name']}...")
         mutation = """
@@ -206,7 +220,11 @@ def generate_and_load_data(engine):
         if result:
             api_uuid = result["insertUpdateSegment"]["segment"]["segmentUuid"]
             segment_map[segment_data["local_id"]] = api_uuid
-            print(f"  -> Success. API UUID: {api_uuid}")
+            if first_segment_uuid is None:
+                first_segment_uuid = api_uuid  # Capture the first segment
+                print(f"  -> Success. API UUID: {api_uuid} (FIRST SEGMENT - will be used for price tiers and quote items)")
+            else:
+                print(f"  -> Success. API UUID: {api_uuid}")
             test_data_updates["segment_test_data"].append(
                 {
                     "segmentUuid": api_uuid,
@@ -407,18 +425,18 @@ def generate_and_load_data(engine):
     print(
         "\n--- Loading Item Price Tiers & Discount Prompts ---\n"
     )  # Added newline for better formatting
-    if not segment_map:
+    if not segment_map or not first_segment_uuid:
         print("No segments created, skipping price tiers and discount prompts.")
         persist_test_data(test_data_updates)
         return
 
-    # Use the first created segment for all price tiers and discount prompts
-    first_segment_api_uuid = list(segment_map.values())[0]
+    # Use the first_segment_uuid captured in section 1 for all price tiers and quote items
+    print(f"Using first segment UUID {first_segment_uuid} for all price tiers")
 
     for local_item_id, item_api_uuid in item_map.items():
         if local_item_id in provider_item_map:
             # Use the first segment for this item
-            segment_api_uuid = first_segment_api_uuid
+            segment_api_uuid = first_segment_uuid
             provider_item_api_uuid = provider_item_map[local_item_id]
 
             # Create multiple Price Tiers with increasing quantity thresholds
@@ -554,6 +572,395 @@ def generate_and_load_data(engine):
                     test_data_updates["discount_prompt_list_test_data"].append(
                         {"scope": prompt_config["scope"], "limit": 10, "offset": 0}
                     )
+
+    # 6. Requests
+    print("\n--- Loading Requests ---")
+    request_map = {}
+
+    # Get list of segment contacts (emails) to use in requests
+    segment_contact_emails = [
+        contact["email"] for contact in test_data_updates.get("segment_contact_test_data", [])
+    ]
+
+    # Get list of items to add to requests
+    available_items = list(item_map.values())
+
+    for i in range(NUM_REQUESTS):
+        # Pick a random email from segment contacts or generate new one
+        email = random.choice(segment_contact_emails) if segment_contact_emails else fake.email()
+        request_title = fake.catch_phrase()
+        request_description = fake.sentence()
+
+        print(f"Creating Request: {request_title} for {email}...")
+
+        # Select 2-5 random items for this request
+        num_items_in_request = random.randint(2, min(5, len(available_items)))
+        selected_items = random.sample(available_items, num_items_in_request)
+
+        # Build items list with item_uuid and optional provider_items
+        items = []
+        for item_uuid in selected_items:
+            item_entry = {
+                "item_uuid": item_uuid,
+                "quantity": random.randint(10, 500),
+            }
+
+            # Optionally add provider_items (50% chance)
+            if random.random() > 0.5 and item_uuid in [
+                k for k, v in item_map.items() if v == item_uuid
+            ]:
+                # Find provider_item_uuid for this item
+                local_item_id = [k for k, v in item_map.items() if v == item_uuid][0]
+                if local_item_id in provider_item_map:
+                    provider_item_uuid = provider_item_map[local_item_id]
+                    item_entry["provider_items"] = [
+                        {
+                            "provider_item_uuid": provider_item_uuid,
+                            "quantity": random.randint(10, 500),
+                        }
+                    ]
+
+            items.append(item_entry)
+
+        # Create billing and shipping addresses
+        billing_address = {
+            "street": fake.street_address(),
+            "city": fake.city(),
+            "state": fake.state_abbr(),
+            "postal_code": fake.zipcode(),
+            "country": "US",
+        }
+        shipping_address = {
+            "street": fake.street_address(),
+            "city": fake.city(),
+            "state": fake.state_abbr(),
+            "postal_code": fake.zipcode(),
+            "country": "US",
+        }
+
+        # Set expiration date 30-90 days in future
+        expired_at = (pendulum.now("UTC") + timedelta(days=random.randint(30, 90))).isoformat()
+
+        mutation = """
+        mutation InsertUpdateRequest(
+            $email: String!,
+            $title: String!,
+            $desc: String,
+            $billing: JSON,
+            $shipping: JSON,
+            $items: [JSON],
+            $notes: String,
+            $status: String,
+            $expired: DateTime,
+            $by: String!
+        ) {
+            insertUpdateRequest(
+                email: $email,
+                requestTitle: $title,
+                requestDescription: $desc,
+                billingAddress: $billing,
+                shippingAddress: $shipping,
+                items: $items,
+                notes: $notes,
+                status: $status,
+                expiredAt: $expired,
+                updatedBy: $by
+            ) {
+                request { requestUuid }
+            }
+        }
+        """
+        variables = {
+            "email": email,
+            "title": request_title,
+            "desc": request_description,
+            "billing": billing_address,
+            "shipping": shipping_address,
+            "items": items,
+            "notes": fake.sentence(),
+            "status": "initial",
+            "expired": expired_at,
+            "by": UPDATED_BY,
+        }
+
+        result = run_graphql_mutation(engine, mutation, variables)
+        if result:
+            request_uuid = result["insertUpdateRequest"]["request"]["requestUuid"]
+            request_map[f"request_{i}"] = request_uuid
+            print(f"  -> Success. Request UUID: {request_uuid}")
+            test_data_updates["request_test_data"].append(
+                {
+                    "requestUuid": request_uuid,
+                    "email": email,
+                    "requestTitle": request_title,
+                    "requestDescription": request_description,
+                    "billingAddress": billing_address,
+                    "shippingAddress": shipping_address,
+                    "items": items,
+                    "notes": variables["notes"],
+                    "status": "initial",
+                    "expiredAt": expired_at,
+                    "updatedBy": UPDATED_BY,
+                }
+            )
+            test_data_updates["request_get_test_data"].append(
+                {"requestUuid": request_uuid}
+            )
+            test_data_updates["request_list_test_data"].append(
+                {"email": email, "limit": 10, "offset": 0}
+            )
+
+    # 7. Quotes
+    print("\n--- Loading Quotes ---")
+    quote_map = {}
+
+    for request_local_id, request_uuid in request_map.items():
+        for quote_num in range(NUM_QUOTES_PER_REQUEST):
+            provider_corp_external_id = f"PROV-{random.randint(100, 999)}"
+            sales_rep_email = fake.email()
+
+            print(f"Creating Quote for Request {request_uuid} (Provider: {provider_corp_external_id})...")
+
+            mutation = """
+            mutation InsertUpdateQuote(
+                $rid: String!,
+                $provId: String,
+                $salesEmail: String,
+                $notes: String,
+                $status: String,
+                $by: String!
+            ) {
+                insertUpdateQuote(
+                    requestUuid: $rid,
+                    providerCorpExternalId: $provId,
+                    salesRepEmail: $salesEmail,
+                    notes: $notes,
+                    status: $status,
+                    updatedBy: $by
+                ) {
+                    quote { quoteUuid }
+                }
+            }
+            """
+            variables = {
+                "rid": request_uuid,
+                "provId": provider_corp_external_id,
+                "salesEmail": sales_rep_email,
+                "notes": fake.sentence(),
+                "status": "initial",
+                "by": UPDATED_BY,
+            }
+
+            result = run_graphql_mutation(engine, mutation, variables)
+            if result:
+                quote_uuid = result["insertUpdateQuote"]["quote"]["quoteUuid"]
+                quote_key = f"{request_local_id}_quote_{quote_num}"
+                quote_map[quote_key] = {
+                    "request_uuid": request_uuid,
+                    "quote_uuid": quote_uuid,
+                    "provider_corp_external_id": provider_corp_external_id,
+                }
+                print(f"  -> Success. Quote UUID: {quote_uuid}")
+                test_data_updates["quote_test_data"].append(
+                    {
+                        "requestUuid": request_uuid,
+                        "quoteUuid": quote_uuid,
+                        "providerCorpExternalId": provider_corp_external_id,
+                        "salesRepEmail": sales_rep_email,
+                        "notes": variables["notes"],
+                        "status": "initial",
+                        "updatedBy": UPDATED_BY,
+                    }
+                )
+                test_data_updates["quote_get_test_data"].append(
+                    {"requestUuid": request_uuid, "quoteUuid": quote_uuid}
+                )
+                test_data_updates["quote_list_test_data"].append(
+                    {"requestUuid": request_uuid, "limit": 10, "offset": 0}
+                )
+
+    # 8. Quote Items
+    print("\n--- Loading Quote Items ---")
+    quote_item_map = {}
+
+    # Quote items are disabled by default due to DynamoDB eventual consistency issues
+    # Quote item creation requires querying price tiers, which may not be immediately
+    # available even after 60-90 second delays. Price tier queries use DynamoDB GSI
+    # which cannot use consistent reads and may take several minutes to propagate.
+    #
+    # To create quote items:
+    # 1. Run this script with create_quote_items = False (default)
+    # 2. Wait 2-3 minutes for DynamoDB to propagate price tiers
+    # 3. Run this script again with create_quote_items = True
+    # OR manually set create_quote_items = True below and increase sleep to 120+ seconds
+    create_quote_items = False
+
+    if create_quote_items:
+        print("Waiting 90 seconds for price tiers to propagate in DynamoDB...")
+        time.sleep(90)  # Wait for DynamoDB eventual consistency (60s wasn't enough)
+
+        # Use the same first_segment_uuid that was used for price tiers
+        print(f"Using segment UUID for quote items: {first_segment_uuid}")
+        quote_item_failed_count = 0
+
+        for quote_key, quote_data in quote_map.items():
+            request_uuid = quote_data["request_uuid"]
+            quote_uuid = quote_data["quote_uuid"]
+
+            # Select random items for this quote
+            available_item_uuids = list(item_map.values())
+            num_items = min(NUM_QUOTE_ITEMS_PER_QUOTE, len(available_item_uuids))
+            selected_item_uuids = random.sample(available_item_uuids, num_items)
+
+            for item_idx, item_uuid in enumerate(selected_item_uuids):
+                # Find provider_item_uuid for this item
+                local_item_id = [k for k, v in item_map.items() if v == item_uuid][0]
+                provider_item_uuid = provider_item_map.get(local_item_id)
+
+                if not provider_item_uuid or not first_segment_uuid:
+                    continue
+
+                qty = random.randint(50, 500)
+
+                print(f"Creating Quote Item for Quote {quote_uuid} (Item: {item_uuid}, Provider: {provider_item_uuid}, Qty: {qty}, Segment: {first_segment_uuid})...")
+
+                mutation = """
+                mutation InsertUpdateQuoteItem(
+                    $qid: String!,
+                    $rid: String,
+                    $iid: String,
+                    $pid: String,
+                    $sid: String,
+                    $qty: Float,
+                    $by: String!
+                ) {
+                    insertUpdateQuoteItem(
+                        quoteUuid: $qid,
+                        requestUuid: $rid,
+                        itemUuid: $iid,
+                        providerItemUuid: $pid,
+                        segmentUuid: $sid,
+                        qty: $qty,
+                        updatedBy: $by
+                    ) {
+                        quoteItem { quoteItemUuid }
+                    }
+                }
+                """
+                variables = {
+                    "qid": quote_uuid,
+                    "rid": request_uuid,
+                    "iid": item_uuid,
+                    "pid": provider_item_uuid,
+                    "sid": first_segment_uuid,
+                    "qty": float(qty),
+                    "by": UPDATED_BY,
+                }
+
+                result = run_graphql_mutation(engine, mutation, variables)
+                if result and result.get("insertUpdateQuoteItem") and result["insertUpdateQuoteItem"].get("quoteItem"):
+                    quote_item_uuid = result["insertUpdateQuoteItem"]["quoteItem"]["quoteItemUuid"]
+                    quote_item_map[f"{quote_key}_item_{item_idx}"] = quote_item_uuid
+                    print(f"  -> Success. Quote Item UUID: {quote_item_uuid}")
+                    test_data_updates["quote_item_test_data"].append(
+                        {
+                            "quoteUuid": quote_uuid,
+                            "quoteItemUuid": quote_item_uuid,
+                            "requestUuid": request_uuid,
+                            "itemUuid": item_uuid,
+                            "providerItemUuid": provider_item_uuid,
+                            "segmentUuid": first_segment_uuid,
+                            "qty": qty,
+                            "updatedBy": UPDATED_BY,
+                        }
+                    )
+                    test_data_updates["quote_item_get_test_data"].append(
+                        {"quoteUuid": quote_uuid, "quoteItemUuid": quote_item_uuid}
+                    )
+                    test_data_updates["quote_item_list_test_data"].append(
+                        {"quoteUuid": quote_uuid, "limit": 10, "offset": 0}
+                    )
+                else:
+                    quote_item_failed_count += 1
+                    print(f"  -> Failed. Response: {result}")
+                    continue
+
+        if quote_item_failed_count > 0:
+            print(f"\nNote: {quote_item_failed_count} quote items were skipped due to DynamoDB eventual consistency")
+
+    # 9. Installments
+    print("\n--- Loading Installments ---")
+
+    for quote_key, quote_data in quote_map.items():
+        request_uuid = quote_data["request_uuid"]
+        quote_uuid = quote_data["quote_uuid"]
+
+        for inst_idx in range(NUM_INSTALLMENTS_PER_QUOTE):
+            priority = inst_idx + 1
+            scheduled_date = (pendulum.now("UTC") + timedelta(days=30 * (inst_idx + 1))).isoformat()
+            installment_amount = round(random.uniform(500.0, 5000.0), 2)
+
+            print(f"Creating Installment {priority} for Quote {quote_uuid}...")
+
+            mutation = """
+            mutation InsertUpdateInstallment(
+                $qid: String!,
+                $rid: String,
+                $priority: Int,
+                $scheduled: DateTime,
+                $amount: Float,
+                $payment: String,
+                $status: String,
+                $by: String!
+            ) {
+                insertUpdateInstallment(
+                    quoteUuid: $qid,
+                    requestUuid: $rid,
+                    priority: $priority,
+                    scheduledDate: $scheduled,
+                    installmentAmount: $amount,
+                    paymentMethod: $payment,
+                    status: $status,
+                    updatedBy: $by
+                ) {
+                    installment { installmentUuid }
+                }
+            }
+            """
+            variables = {
+                "qid": quote_uuid,
+                "rid": request_uuid,
+                "priority": priority,
+                "scheduled": scheduled_date,
+                "amount": installment_amount,
+                "payment": random.choice(["credit_card", "wire_transfer", "check", "ach"]),
+                "status": "pending",
+                "by": UPDATED_BY,
+            }
+
+            result = run_graphql_mutation(engine, mutation, variables)
+            if result:
+                installment_uuid = result["insertUpdateInstallment"]["installment"]["installmentUuid"]
+                print(f"  -> Success. Installment UUID: {installment_uuid}")
+                test_data_updates["installment_test_data"].append(
+                    {
+                        "quoteUuid": quote_uuid,
+                        "installmentUuid": installment_uuid,
+                        "requestUuid": request_uuid,
+                        "priority": priority,
+                        "scheduledDate": scheduled_date,
+                        "installmentAmount": installment_amount,
+                        "paymentMethod": variables["payment"],
+                        "status": "pending",
+                        "updatedBy": UPDATED_BY,
+                    }
+                )
+                test_data_updates["installment_get_test_data"].append(
+                    {"quoteUuid": quote_uuid, "installmentUuid": installment_uuid}
+                )
+                test_data_updates["installment_list_test_data"].append(
+                    {"quoteUuid": quote_uuid, "limit": 10, "offset": 0}
+                )
 
     # Persist generated data for tests
     persist_test_data(test_data_updates)
