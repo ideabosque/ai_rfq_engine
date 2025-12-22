@@ -20,7 +20,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -80,7 +81,7 @@ class QuoteModel(BaseModel):
     quote_uuid = UnicodeAttribute(range_key=True)
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
     sales_rep_email = UnicodeAttribute(null=True)
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     shipping_method = UnicodeAttribute(null=True)
     shipping_amount = NumberAttribute(default=0)
     total_quote_amount = NumberAttribute(default=0)
@@ -136,7 +137,10 @@ def purge_cache():
                         context_keys=None,
                         entity_keys={"request_uuid": kwargs.get("request_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_quotes_by_request", "custom_cache_keys": ["key:request_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_quotes_by_request",
+                            "custom_cache_keys": ["key:request_uuid"],
+                        },
                     )
 
                 return result
@@ -257,49 +261,13 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
     Nested resolver approach: return minimal quote data.
     - Do NOT embed 'request'.
     'request' is resolved lazily by QuoteType.resolve_request.
-    - 'quote_items' ARE still embedded for now (List(JSON)).
+    - Do NOT embed 'quote_items'.
+    'quote_items' are resolved lazily by QuoteType.resolve_quote_items.
     """
-    try:
-        # Import here to avoid circular dependency
-        from .quote_item import resolve_quote_item_list
-
-        quote_dict: Dict = quote.__dict__["attribute_values"]
-
-        # Get quote items for this quote (still eager for now)
-        quote_item_list = resolve_quote_item_list(
-            info, **{"quote_uuid": quote.quote_uuid}
-        )
-        quote_items = [
-            Utility.json_normalize(
-                {
-                    k: getattr(item, k, None)
-                    for k in [
-                        "quote_item_uuid",
-                        "provider_item_uuid",
-                        "item_uuid",
-                        "batch_no",
-                        "request_data",
-                        "slow_move_item",
-                        "guardrail_price_per_uom",
-                        "price_per_uom",
-                        "qty",
-                        "subtotal",
-                        "subtotal_discount",
-                        "final_subtotal",
-                    ]
-                }
-            )
-            for item in quote_item_list.quote_item_list
-        ]
-
-        quote_dict["quote_items"] = quote_items
-        # quote_dict.pop("endpoint_id")
-        # quote_dict.pop("request_uuid")
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
-    return QuoteType(**Utility.json_normalize(quote_dict))
+    _ = info  # Keep for signature compatibility with decorators
+    quote_dict = quote.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return QuoteType(**Serializer.json_normalize(quote_dict))
 
 
 def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType | None:
@@ -429,7 +397,7 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         )
 
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
@@ -515,6 +483,7 @@ def delete_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,

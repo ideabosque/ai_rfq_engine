@@ -15,10 +15,10 @@ from .base import Key, SafeDataLoader, normalize_model
 
 class SegmentContactLoader(SafeDataLoader):
     """
-    Batch loader for segment_contact by (endpoint_id, email).
+    Batch loader for segment_contact by (partition_key, email).
 
     Usage:
-        loaders.segment_contact_loader.load((endpoint_id, email))
+        loaders.segment_contact_loader.load((partition_key, email))
 
     Returns:
         Segment contact dict or None if not found
@@ -42,7 +42,7 @@ class SegmentContactLoader(SafeDataLoader):
     def generate_cache_key(self, key: Key) -> str:
         if not isinstance(key, tuple):
             key = (key,)
-        # Key is (endpoint_id, email)
+        # Key is (partition_key, email)
         key_data = ":".join([str(k) for k in key])
         return self.cache._generate_key(self.cache_func_prefix, key_data)
 
@@ -79,7 +79,7 @@ class SegmentContactLoader(SafeDataLoader):
         if uncached_keys:
             try:
                 for segment_contact in SegmentContactModel.batch_get(uncached_keys):
-                    key = (segment_contact.endpoint_id, segment_contact.email)
+                    key = (segment_contact.partition_key, segment_contact.email)
 
                     if self.cache_enabled:
                         self.set_cache_data(key, segment_contact)

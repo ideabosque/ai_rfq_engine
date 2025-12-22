@@ -25,7 +25,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -72,7 +73,7 @@ class ProviderItemBatchModel(BaseModel):
     provider_item_uuid = UnicodeAttribute(hash_key=True)
     batch_no = UnicodeAttribute(range_key=True)
     item_uuid = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     expired_at = UTCDateTimeAttribute()
     produced_at = UTCDateTimeAttribute()
     cost_per_uom = NumberAttribute()
@@ -201,17 +202,10 @@ def get_provider_item_batch_type(
     - Do NOT embed 'item' or 'provider_item'.
     Those are resolved lazily by ProviderItemBatchType resolvers.
     """
-    try:
-        batch_dict = provider_item_batch.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
-    batch_dict.pop("endpoint_id", None)
-    valid_fields = ProviderItemBatchType._meta.fields.keys()
-    filtered_batch_dict = {k: v for k, v in batch_dict.items() if k in valid_fields}
-    return ProviderItemBatchType(**Utility.json_normalize(filtered_batch_dict))
+    _ = info  # Keep for signature compatibility with decorators
+    batch_dict = provider_item_batch.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return ProviderItemBatchType(**Serializer.json_normalize(batch_dict))
 
 
 def resolve_provider_item_batch(
@@ -245,7 +239,7 @@ def resolve_provider_item_batch_list(
 ) -> Any:
     provider_item_uuid = kwargs.get("provider_item_uuid")
     item_uuid = kwargs.get("item_uuid")
-    endpoint_id = info.context["endpoint_id"]
+    partition_key = info.context["partition_key"]
     expired_at_gt = kwargs.get("expired_at_gt")
     expired_at_lt = kwargs.get("expired_at_lt")
     produced_at_gt = kwargs.get("produced_at_gt")
@@ -286,8 +280,8 @@ def resolve_provider_item_batch_list(
     the_filters = None  # We can add filters for the query
     if item_uuid and range_key_condition is not None:
         the_filters &= ProviderItemBatchModel.item_uuid == item_uuid
-    if endpoint_id:
-        the_filters &= ProviderItemBatchModel.endpoint_id == endpoint_id
+    if partition_key:
+        the_filters &= ProviderItemBatchModel.partition_key == partition_key
     if expired_at_gt:
         the_filters &= ProviderItemBatchModel.expired_at >= expired_at_gt
     if expired_at_lt:
@@ -336,7 +330,7 @@ def insert_update_provider_item_batch(
     batch_no = kwargs.get("batch_no")
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),

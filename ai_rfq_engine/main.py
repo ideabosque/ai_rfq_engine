@@ -252,12 +252,26 @@ class AIRFQEngine(Graphql):
         self.logger = logger
         self.setting = setting
 
-    def ai_rfq_graphql(self, **params: Dict[str, Any]) -> Any:
+    def _apply_partition_defaults(self, params: Dict[str, Any]) -> None:
+        """
+        Ensure endpoint_id/part_id defaults and assemble partition_key.
+        """
         ## Test the waters 🧪 before diving in!
         ##<--Testing Data-->##
         if params.get("endpoint_id") is None:
             params["endpoint_id"] = self.setting.get("endpoint_id")
+        if params.get("part_id") is None:
+            params["part_id"] = self.setting.get("part_id")
         ##<--Testing Data-->##
+
+        endpoint_id = params.get("endpoint_id")
+        part_id = params.get("part_id")
+        params["partition_key"] = f"{endpoint_id}#{part_id}"
+
+    def ai_rfq_graphql(self, **params: Dict[str, Any]) -> Any:
+
+        self._apply_partition_defaults(params)
+
         schema = Schema(
             query=Query,
             mutation=Mutations,

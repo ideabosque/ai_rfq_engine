@@ -20,7 +20,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -38,7 +39,7 @@ class ConsumerCorpExternalIdIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "consumer_corp_external_id-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     consumer_corp_external_id = UnicodeAttribute(range_key=True)
 
 
@@ -53,7 +54,7 @@ class SegmentUuidIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "segment_uuid-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     segment_uuid = UnicodeAttribute(range_key=True)
 
 
@@ -68,7 +69,7 @@ class UpdateAtIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "updated_at-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     updated_at = UnicodeAttribute(range_key=True)
 
 
@@ -76,7 +77,7 @@ class SegmentContactModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-segment_contacts"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     email = UnicodeAttribute(range_key=True)
     segment_uuid = UnicodeAttribute()
     contact_uuid = UnicodeAttribute(null=True)
@@ -106,15 +107,17 @@ def purge_cache():
                 if entity:
                     entity_keys["segment_uuid"] = getattr(entity, "segment_uuid", None)
                     entity_keys["email"] = getattr(entity, "email", None)
-                    entity_keys["endpoint_id"] = getattr(entity, "endpoint_id", None)
+                    entity_keys["partition_key"] = getattr(
+                        entity, "partition_key", None
+                    )
 
                 # Fallback to kwargs (for creates/deletes)
                 if not entity_keys.get("segment_uuid"):
                     entity_keys["segment_uuid"] = kwargs.get("segment_uuid")
                 if not entity_keys.get("email"):
                     entity_keys["email"] = kwargs.get("email")
-                if not entity_keys.get("endpoint_id"):
-                    entity_keys["endpoint_id"] = kwargs.get("endpoint_id")
+                if not entity_keys.get("partition_key"):
+                    entity_keys["partition_key"] = kwargs.get("partition_key")
 
                 context_keys = None
 
@@ -126,20 +129,20 @@ def purge_cache():
                     cascade_depth=3,
                 )
 
-                endpoint_id = args[0].context.get("endpoint_id") or kwargs.get(
-                    "endpoint_id"
+                partition_key = args[0].context.get("partition_key") or kwargs.get(
+                    "partition_key"
                 )
-                if kwargs.get("segment_uuid") and endpoint_id:
+                if kwargs.get("segment_uuid") and partition_key:
                     purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="segment_contact",
-                        context_keys={"endpoint_id": endpoint_id},
+                        context_keys={"partition_key": partition_key},
                         entity_keys={"segment_uuid": kwargs.get("segment_uuid")},
                         cascade_depth=3,
                         custom_options={
                             "custom_getter": "get_segment_contacts_by_segment",
                             "custom_cache_keys": [
-                                "context:endpoint_id",
+                                "context:partition_key",
                                 "key:segment_uuid",
                             ],
                         },
@@ -174,8 +177,8 @@ def create_segment_contact_table(logger: logging.Logger) -> bool:
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "segment_contact"),
 )
-def get_segment_contact(endpoint_id: str, email: str) -> SegmentContactModel:
-    return SegmentContactModel.get(endpoint_id, email)
+def get_segment_contact(partition_key: str, email: str) -> SegmentContactModel:
+    return SegmentContactModel.get(partition_key, email)
 
 
 @retry(
@@ -183,12 +186,12 @@ def get_segment_contact(endpoint_id: str, email: str) -> SegmentContactModel:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-def _get_segment_contact(endpoint_id: str, email: str) -> SegmentContactModel:
-    return SegmentContactModel.get(endpoint_id, email)
+def _get_segment_contact(partition_key: str, email: str) -> SegmentContactModel:
+    return SegmentContactModel.get(partition_key, email)
 
 
-def get_segment_contact_count(endpoint_id: str, email: str) -> int:
-    return SegmentContactModel.count(endpoint_id, SegmentContactModel.email == email)
+def get_segment_contact_count(partition_key: str, email: str) -> int:
+    return SegmentContactModel.count(partition_key, SegmentContactModel.email == email)
 
 
 def get_segment_contact_type(
@@ -199,20 +202,16 @@ def get_segment_contact_type(
     - Do NOT embed 'segment'.
     'segment' is resolved lazily by SegmentContactType.resolve_segment.
     """
-    try:
-        sc_dict = segment_contact.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
-    return SegmentContactType(**Utility.json_normalize(sc_dict))
+    _ = info  # Keep for signature compatibility with decorators
+    sc_dict = segment_contact.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return SegmentContactType(**Serializer.json_normalize(sc_dict))
 
 
 def resolve_segment_contact(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> SegmentContactType | None:
-    endpoint_id = info.context["endpoint_id"]
+    partition_key = info.context["partition_key"]
     segment_uuid = kwargs.get("segment_uuid")
     email = kwargs["email"]
 
@@ -220,7 +219,7 @@ def resolve_segment_contact(
     if segment_uuid:
         results = list(
             SegmentContactModel.segment_uuid_index.query(
-                endpoint_id,
+                partition_key,
                 SegmentContactModel.segment_uuid == segment_uuid,
                 SegmentContactModel.email == email,
             )
@@ -229,10 +228,10 @@ def resolve_segment_contact(
             return None
         segment_contact = results[0]
     else:
-        count = get_segment_contact_count(endpoint_id, email)
+        count = get_segment_contact_count(partition_key, email)
         if count == 0:
             return None
-        segment_contact = get_segment_contact(endpoint_id, email)
+        segment_contact = get_segment_contact(partition_key, email)
 
     return get_segment_contact_type(info, segment_contact)
 
@@ -254,15 +253,15 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     contact_uuid = kwargs.get("contact_uuid")
     consumer_corp_external_id = kwargs.get("consumer_corp_external_id")
     email = kwargs.get("email")
-    endpoint_id = info.context.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
 
     args = []
     inquiry_funct = SegmentContactModel.scan
     count_funct = SegmentContactModel.count
 
-    # Query by endpoint_id (hash key)
-    if endpoint_id:
-        args = [endpoint_id, None]
+    # Query by partition_key (hash key)
+    if partition_key:
+        args = [partition_key, None]
         inquiry_funct = SegmentContactModel.query
         count_funct = SegmentContactModel.count
 
@@ -295,7 +294,7 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 
 @insert_update_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "email",
     },
     range_key_required=True,
@@ -305,7 +304,7 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
 )
 @purge_cache()
 def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    endpoint_id = kwargs.get("endpoint_id") or info.context.get("endpoint_id")
+    partition_key = kwargs.get("partition_key") or info.context.get("partition_key")
     email = kwargs.get("email")
     if kwargs.get("entity") is None:
         cols = {
@@ -318,7 +317,7 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
             if key in kwargs:
                 cols[key] = kwargs[key]
         SegmentContactModel(
-            endpoint_id,
+            partition_key,
             email,
             **cols,
         ).save()
@@ -348,7 +347,7 @@ def insert_update_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 
 @delete_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "email",
     },
     model_funct=get_segment_contact,
@@ -368,10 +367,10 @@ def delete_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "segment_contact"),
 )
-def get_segment_contacts_by_segment(endpoint_id: str, segment_uuid: str) -> Any:
+def get_segment_contacts_by_segment(partition_key: str, segment_uuid: str) -> Any:
     segment_contacts = []
     for contact in SegmentContactModel.segment_uuid_index.query(
-        endpoint_id, SegmentContactModel.segment_uuid == segment_uuid
+        partition_key, SegmentContactModel.segment_uuid == segment_uuid
     ):
         segment_contacts.append(contact)
     return segment_contacts

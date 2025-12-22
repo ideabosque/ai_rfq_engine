@@ -1,184 +1,174 @@
-# AI RFQ Engine Test Data
+# Test Data Generation
 
-## Overview
+This directory contains scripts for generating comprehensive test data for the AI RFQ Engine.
 
-This directory contains the test suite for the AI RFQ Engine. Test data is externalized in a JSON file for easy maintenance and modification.
+## Quick Start
 
-## Test Data File
+### Basic Test Data (Without Quote Items)
 
-**File**: `test_data.json`
-
-This file contains all test data used by the parametrized tests. The data is organized by entity type.
-
-## Structure
-
-```json
-{
-  "item_test_data": [...],
-  "segment_test_data": [...],
-  "segment_contact_test_data": [...],
-  "provider_item_test_data": [...],
-  "provider_item_batch_test_data": [...],
-  "item_price_tier_test_data": [...],
-  "discount_rule_test_data": [...],
-  "request_test_data": [...],
-  "quote_test_data": [...],
-  "quote_item_test_data": [...],
-  "installment_test_data": [...],
-  "file_test_data": [...]
-}
+```bash
+python ai_rfq_engine/tests/load_sample_data.py
 ```
 
-Each key contains an array of test cases. Each array element represents one test scenario that will be run.
+This creates:
+- 3 segments
+- 15 segment contacts (5 per segment)
+- 20 items with corresponding provider items
+- 40 provider item batches (2 per provider item)
+- 80 item price tiers (4 tiers × 20 items)
+- 80 discount prompts (4 scopes × 20 items)
+- 5 requests
+- 10 quotes (2 per request)
+- 20 installments (2 per quote)
 
-## Adding New Test Cases
+**Total: ~293 records**
 
-To add new test cases, simply edit `test_data.json` and add new objects to the appropriate array:
+### Full Test Data (Including Quote Items)
 
-```json
-{
-  "item_test_data": [
-    {
-      "itemUuid": "89151803645574004864",
-      "itemType": "raw_material",
-      "itemName": "Steel Plate",
-      ...
+Due to DynamoDB eventual consistency, quote items must be created separately:
+
+```bash
+# Step 1: Create base test data
+python ai_rfq_engine/tests/load_sample_data.py
+
+# Step 2: Wait 2-3 minutes for DynamoDB to propagate
+
+# Step 3: Create quote items
+python ai_rfq_engine/tests/create_quote_items.py
+```
+
+This adds:
+- 30 quote items (3 per quote × 10 quotes)
+
+**Total: ~323 records**
+
+## Why Two Scripts?
+
+### DynamoDB Eventual Consistency Issue
+
+Quote item creation has a chicken-and-egg problem with DynamoDB's eventual consistency:
+
+1. **Quote items require price tiers**: When creating a quote item, the system must query price tiers to calculate pricing
+2. **Price tier queries use GSI**: The price tier query uses a Global Secondary Index for efficient filtering
+3. **GSI reads are eventually consistent**: GSIs cannot use consistent reads and may take 30-180 seconds to reflect new data
+4. **Single-script delays are impractical**: Even with 90-120 second delays, quote item creation still fails
+
+### The Solution
+
+By splitting the process into two scripts:
+- `load_sample_data.py` creates all base data including price tiers
+- User waits 2-3 minutes for DynamoDB eventual consistency
+- `create_quote_items.py` creates quote items using now-available price tiers
+
+This ensures reliable test data generation without requiring 3+ minute delays in a single script run.
+
+## Test Data Output
+
+Both scripts save data to `ai_rfq_engine/tests/test_data.json` which contains:
+- UUIDs of all created entities
+- Test parameters for GraphQL queries
+- Structured data for automated testing
+
+## Configuration
+
+### Customizing Data Volume
+
+Edit `load_sample_data.py` to change these constants:
+
+```python
+NUM_SEGMENTS = 3  # Number of customer segments
+NUM_CONTACTS_PER_SEGMENT = 5  # Contacts per segment
+NUM_ITEMS = 20  # Catalog items
+NUM_BATCHES_PER_PROVIDER_ITEM = 2  # Inventory batches
+NUM_REQUESTS = 5  # RFQ requests
+NUM_QUOTES_PER_REQUEST = 2  # Quotes per request
+NUM_INSTALLMENTS_PER_QUOTE = 2  # Payment installments per quote
+```
+
+Edit `create_quote_items.py` to change:
+
+```python
+NUM_QUOTE_ITEMS_PER_QUOTE = 3  # Line items per quote
+```
+
+### Partition Key
+
+Both scripts use `partition_key = "TENANT001"`. Change this in the Engine initialization if needed:
+
+```python
+engine = Engine(
+    name="AI RFQ Engine",
+    engine_type="graphql",
+    event={},
+    metadata={
+        "partition_key": "YOUR_TENANT_ID",  # Change this
+        "endpoint_id": "ENDPOINT001",
+        "part_id": "MAIN",
     },
-    {
-      "itemUuid": "12345678901234567890",
-      "itemType": "finished_good",
-      "itemName": "Widget",
-      ...
-    }
-  ]
-}
+)
 ```
-
-The test will automatically run for each object in the array.
-
-## Test Execution
-
-### Run All Tests
-```bash
-pytest ai_rfq_engine/tests/test_ai_rfq_engine.py -v
-```
-
-### Run Only Unit Tests
-```bash
-pytest ai_rfq_engine/tests/test_ai_rfq_engine.py -m unit -v
-```
-
-### Run Only Integration Tests
-```bash
-pytest ai_rfq_engine/tests/test_ai_rfq_engine.py -m integration -v
-```
-
-### Run Specific Test Function
-```bash
-pytest ai_rfq_engine/tests/test_ai_rfq_engine.py::test_graphql_insert_update_item_py -v
-```
-
-### Run Tests Matching a Pattern
-```bash
-pytest ai_rfq_engine/tests/test_ai_rfq_engine.py -k "item" -v
-```
-
-### Using Environment Variables
-```bash
-# Run tests matching function name
-AI_RFQ_TEST_FUNCTION=item pytest ai_rfq_engine/tests/test_ai_rfq_engine.py -v
-
-# Run tests with specific markers
-AI_RFQ_TEST_MARKERS=integration pytest ai_rfq_engine/tests/test_ai_rfq_engine.py -v
-```
-
-## Test Data Categories
-
-### Item Test Data
-- **Purpose**: Test item CRUD operations
-- **Key Fields**: itemUuid, itemType, itemName, itemDescription, uom, itemExternalId
-
-### Segment Test Data
-- **Purpose**: Test customer segment management
-- **Key Fields**: segmentUuid, segmentName, segmentDescription
-
-### Segment Contact Test Data
-- **Purpose**: Test segment-contact associations
-- **Key Fields**: segmentUuid, email
-
-### Provider Item Test Data
-- **Purpose**: Test provider item configurations
-- **Key Fields**: providerItemUuid, itemUuid, basePricePerUom, itemSpec
-
-### Provider Item Batch Test Data
-- **Purpose**: Test batch/lot tracking for provider items
-- **Key Fields**: providerItemUuid, batchNo, expiredAt, producedAt, costPerUom
-
-### Item Price Tier Test Data
-- **Purpose**: Test tiered pricing rules
-- **Key Fields**: itemPriceTierUuid, quantityGreaterThen, quantityLessThen, marginPerUom, pricePerUom, status
-- **Note**: The system now supports efficient database-level filtering using `quantityValue` parameter in queries, which automatically returns only the matching tier for a given quantity
-
-### Discount Rule Test Data
-- **Purpose**: Test discount calculation rules
-- **Key Fields**: discountRuleUuid, subtotalGreaterThan, subtotalLessThan, maxDiscountPercentage, status
-- **Note**: The system now supports efficient database-level filtering using `subtotalValue` parameter in queries, which automatically returns only the matching rule for a given subtotal
-
-### Request Test Data
-- **Purpose**: Test RFQ request creation and management
-- **Key Fields**: requestUuid, email, requestTitle, billingAddress, shippingAddress, items
-
-### Quote Test Data
-- **Purpose**: Test quote generation and management
-- **Key Fields**: quoteUuid, requestUuid, providerCorpExternalId, totalQuoteAmount
-
-### Quote Item Test Data
-- **Purpose**: Test individual items within quotes
-- **Key Fields**: quoteItemUuid, quoteUuid, itemUuid, providerItemUuid, segmentUuid, requestUuid, qty, pricePerUom (auto-calculated), subtotal (auto-calculated), finalSubtotal (auto-calculated)
-- **Note**: When creating quote items, `pricePerUom` is automatically calculated from item price tiers based on the quantity, segment, and provider item. The `subtotal` and `finalSubtotal` are also automatically calculated
-
-### Installment Test Data
-- **Purpose**: Test payment installment schedules
-- **Key Fields**: installmentUuid, quoteUuid, scheduledDate, installmentAmount, paymentMethod
-- **Note**: The `installmentRatio` is automatically calculated based on `installmentAmount` and the quote's `finalTotalQuoteAmount`. It cannot be manually set via mutation.
-
-### File Test Data
-- **Purpose**: Test file attachments to requests
-- **Key Fields**: requestUuid, fileName, email
-
-## Benefits of JSON-Based Test Data
-
-1. **Easy Maintenance**: Non-developers can update test data without touching Python code
-2. **Version Control**: Test data changes are tracked separately from code changes
-3. **Reusability**: Same test data can be used across different test suites
-4. **Scalability**: Easy to add new test scenarios by adding JSON objects
-5. **Clarity**: Test data is clearly separated from test logic
 
 ## Troubleshooting
 
-### Test Data Not Loading
-If you see warnings about missing test data:
-```
-WARNING - Test data file not found: /path/to/test_data.json
-```
+### Quote Items Still Failing After 3 Minutes
 
-Ensure `test_data.json` exists in the same directory as `test_ai_rfq_engine.py`.
+If `create_quote_items.py` still reports failures:
 
-### JSON Parse Errors
-If you see JSON parsing errors:
-```
-ERROR - Error parsing test data JSON: ...
-```
+1. **Wait longer**: DynamoDB eventual consistency can occasionally take 5+ minutes
+2. **Check price tiers exist**: Verify price tiers were created in the first script
+3. **Verify segment UUID matches**: Ensure both scripts use the same first segment UUID
+4. **Run again**: Simply re-run `create_quote_items.py` after waiting
 
-Validate your JSON using a JSON validator (e.g., jsonlint.com) to ensure proper syntax.
+### No Segments/Items/Quotes Found
 
-## Logging
+This means `test_data.json` is missing or incomplete. Run `load_sample_data.py` first.
 
-The test suite provides comprehensive logging:
-- Test start/end with execution time
-- GraphQL query being executed
-- Test data being used
-- Method call details with correlation IDs
-- Results and errors
+### Permission Errors
 
-All logs are output to stdout with timestamps and log levels.
+Ensure the IAM role/user has DynamoDB permissions for:
+- PutItem
+- GetItem
+- Query
+- Scan
+- UpdateItem
+
+## Architecture Notes
+
+### Partition Key Migration
+
+This test data generation uses the new `partition_key` approach:
+- All models use `partition_key` as the hash key (not `endpoint_id`)
+- `endpoint_id` and `part_id` are maintained as regular attributes for backward compatibility
+- All utility functions in `models/utils.py` use `partition_key` for lookups
+
+### Price Tier Calculation
+
+Price tiers are created with:
+- 4 quantity tiers per item: 0, 100, 500, 1000 units
+- Decreasing margins for higher quantities (bulk discounts)
+- All tiers assigned to the first segment for consistency
+- Both margin-based and batch-cost-based pricing supported
+
+### Discount Prompts
+
+Four hierarchical scopes are created:
+- **GLOBAL**: Applies to all quotes in the partition
+- **SEGMENT**: Applies to specific customer segments
+- **ITEM**: Applies to specific catalog items
+- **PROVIDER_ITEM**: Applies to specific provider offerings
+
+## Related Files
+
+- `load_sample_data.py` - Main test data generation script
+- `create_quote_items.py` - Quote item creation (run after delay)
+- `test_data.json` - Generated test data output
+- `test_graphql_*.py` - Test files that use this data
+
+## Migration from endpoint_id
+
+If you have existing test data created with `endpoint_id`:
+
+1. The new scripts create data with `partition_key = "TENANT001"`
+2. Old data with different endpoint_ids will not conflict
+3. Update test queries to use the new partition_key value
+4. Consider archiving or deleting old test data to avoid confusion

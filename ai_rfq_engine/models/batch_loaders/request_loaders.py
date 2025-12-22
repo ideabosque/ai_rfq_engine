@@ -28,6 +28,7 @@ from .request_loader import RequestLoader
 from .segment_contact_by_segment_loader import SegmentContactBySegmentLoader
 from .segment_contact_loader import SegmentContactLoader
 from .segment_loader import SegmentLoader
+from .provider_item_batch_loader import ProviderItemBatchLoader
 
 
 class RequestLoaders:
@@ -95,6 +96,9 @@ class RequestLoaders:
         self.segment_contact_loader = SegmentContactLoader(
             logger=logger, cache_enabled=cache_enabled
         )
+        self.provider_item_batch_loader = ProviderItemBatchLoader(
+            logger=logger, cache_enabled=cache_enabled
+        )
 
     def invalidate_cache(self, entity_type: str, entity_keys: Dict[str, str]):
         """Invalidate specific cache entries when entities are modified."""
@@ -102,11 +106,11 @@ class RequestLoaders:
             return
 
         if entity_type == "item" and "item_uuid" in entity_keys:
-            cache_key = self.item_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['item_uuid']))
+            cache_key = self.item_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['item_uuid']))
             if hasattr(self.item_loader, "cache"):
                 self.item_loader.cache.delete(cache_key)
         elif entity_type == "provider_item" and "provider_item_uuid" in entity_keys:
-            cache_key = self.provider_item_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['provider_item_uuid']))
+            cache_key = self.provider_item_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['provider_item_uuid']))
             if hasattr(self.provider_item_loader, "cache"):
                 self.provider_item_loader.cache.delete(cache_key)
             if (
@@ -114,14 +118,14 @@ class RequestLoaders:
                 and hasattr(self.provider_items_by_item_loader, "cache")
                 and "item_uuid" in entity_keys
             ):
-                list_cache_key = self.provider_items_by_item_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['item_uuid']))
+                list_cache_key = self.provider_items_by_item_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['item_uuid']))
                 self.provider_items_by_item_loader.cache.delete(list_cache_key)
         elif entity_type == "segment" and "segment_uuid" in entity_keys:
-            cache_key = self.segment_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['segment_uuid']))
+            cache_key = self.segment_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['segment_uuid']))
             if hasattr(self.segment_loader, "cache"):
                 self.segment_loader.cache.delete(cache_key)
         elif entity_type == "request" and "request_uuid" in entity_keys:
-            cache_key = self.request_loader.generate_cache_key((entity_keys.get('endpoint_id'),entity_keys['request_uuid']))
+            cache_key = self.request_loader.generate_cache_key((entity_keys.get('partition_key'),entity_keys['request_uuid']))
             if hasattr(self.request_loader, "cache"):
                 self.request_loader.cache.delete(cache_key)
         elif entity_type == "quote" and "quote_uuid" in entity_keys:
@@ -144,6 +148,13 @@ class RequestLoaders:
                 self.provider_item_batch_list_loader, "cache"
             ):
                 self.provider_item_batch_list_loader.cache.delete(cache_key)
+            
+            if "batch_no" in entity_keys:
+                if hasattr(self, "provider_item_batch_loader") and hasattr(
+                    self.provider_item_batch_loader, "cache"
+                ):
+                    cache_key = self.provider_item_batch_loader.generate_cache_key((entity_keys.get('provider_item_uuid'), entity_keys['batch_no']))
+                    self.provider_item_batch_loader.cache.delete(cache_key)
         elif (
             entity_type == "item_price_tier"
             and "item_uuid" in entity_keys

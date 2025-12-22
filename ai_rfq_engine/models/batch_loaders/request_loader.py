@@ -14,7 +14,7 @@ from .base import Key, SafeDataLoader, normalize_model
 
 
 class RequestLoader(SafeDataLoader):
-    """Batch loader for RequestModel keyed by (endpoint_id, request_uuid)."""
+    """Batch loader for RequestModel keyed by (partition_key, request_uuid)."""
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
         super(RequestLoader, self).__init__(
@@ -72,7 +72,7 @@ class RequestLoader(SafeDataLoader):
         if uncached_keys:
             try:
                 for request in RequestModel.batch_get(uncached_keys):
-                    key = (request.endpoint_id, request.request_uuid)
+                    key = (request.partition_key, request.request_uuid)
 
                     if self.cache_enabled:
                         self.set_cache_data(key, request)

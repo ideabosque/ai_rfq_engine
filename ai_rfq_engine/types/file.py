@@ -14,7 +14,7 @@ class FileType(ObjectType):
     request_uuid = String()  # keep raw id
     file_name = String()
     email = String()
-    endpoint_id = String()
+    partition_key = String()
 
     # Nested resolver: strongly-typed nested relationship
     request = Field(lambda: RequestType)
@@ -35,13 +35,13 @@ class FileType(ObjectType):
             return existing
 
         # Case 1: need to fetch using DataLoader
-        endpoint_id = info.context.get("endpoint_id")
+        partition_key = info.context.get("partition_key")
         request_uuid = getattr(parent, "request_uuid", None)
-        if not endpoint_id or not request_uuid:
+        if not partition_key or not request_uuid:
             return None
 
         loaders = get_loaders(info.context)
-        return loaders.request_loader.load((endpoint_id, request_uuid)).then(
+        return loaders.request_loader.load((partition_key, request_uuid)).then(
             lambda request_dict: RequestType(**request_dict) if request_dict else None
         )
 

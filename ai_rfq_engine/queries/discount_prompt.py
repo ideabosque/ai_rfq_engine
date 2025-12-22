@@ -41,8 +41,8 @@ def resolve_discount_prompts(
     from ..models.utils import _combine_all_discount_prompts
 
     loaders = get_loaders(info.context)
-    endpoint_id = info.context.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
     email = kwargs["email"]
     quote_items = kwargs.get("quote_items", [])
 
-    return _combine_all_discount_prompts(endpoint_id, email, quote_items, loaders)
+    return _combine_all_discount_prompts(partition_key, email, quote_items, loaders)

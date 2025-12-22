@@ -25,7 +25,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, convert_decimal_to_number, method_cache
+from silvaengine_utility import convert_decimal_to_number, method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -84,15 +85,27 @@ def get_price_per_uom(
         return tier.price_per_uom
 
     # If tier has margin_per_uom with batches, find the matching batch price
-    if hasattr(tier, "provider_item_batches") and tier.provider_item_batches:
+    provider_item_batches = []
+
+    if getattr(tier, "margin_per_uom", None) is not None:
+        from .provider_item_batches import get_provider_item_batches_by_provider_item
+
+        for batch in get_provider_item_batches_by_provider_item(provider_item_uuid):
+            cost = batch.total_cost_per_uom or 0
+            price = cost * (1 + float(tier.margin_per_uom))
+            provider_item_batches.append(
+                {"batch_no": batch.batch_no, "price_per_uom": price}
+            )
+
+    if provider_item_batches:
         # If batch_no is specified, find that specific batch
         if batch_no:
-            for batch in tier.provider_item_batches:
+            for batch in provider_item_batches:
                 if batch["batch_no"] == batch_no:
                     return batch["price_per_uom"]
 
         # Otherwise, return the first available batch price
-        return tier.provider_item_batches[0]["price_per_uom"]
+        return provider_item_batches[0]["price_per_uom"]
 
     return None
 
@@ -167,7 +180,7 @@ class QuoteItemModel(BaseModel):
     item_uuid = UnicodeAttribute()
     batch_no = UnicodeAttribute(null=True)
     request_uuid = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     request_data = MapAttribute(null=True)
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()
@@ -280,48 +293,13 @@ def get_quote_item_count(quote_uuid: str, quote_item_uuid: str) -> int:
 
 
 def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteItemType:
-    try:
-        quote_item_dict: Dict = quote_item.__dict__["attribute_values"]
-
-        # Get batch information if batch_no exists
-        slow_move_item = False
-        guardrail_price_per_uom = None
-
-        if quote_item_dict.get("batch_no"):
-            from .provider_item_batches import get_provider_item_batch
-
-            try:
-                batch = get_provider_item_batch(
-                    quote_item_dict["provider_item_uuid"], quote_item_dict["batch_no"]
-                )
-                slow_move_item = (
-                    batch.slow_move_item if batch.slow_move_item is not None else False
-                )
-                guardrail_price_per_uom = batch.guardrail_price_per_uom
-            except Exception:
-                # If batch not found, use default values
-                pass
-        else:
-            # If no batch_no, get guardrail_price_per_uom from ProviderItemModel.base_price_per_uom
-            from .provider_item import get_provider_item
-
-            try:
-                provider_item = get_provider_item(
-                    quote_item_dict["endpoint_id"],
-                    quote_item_dict["provider_item_uuid"],
-                )
-                guardrail_price_per_uom = provider_item.base_price_per_uom
-            except Exception:
-                # If provider item not found, use None
-                pass
-
-        quote_item_dict["slow_move_item"] = slow_move_item
-        quote_item_dict["guardrail_price_per_uom"] = guardrail_price_per_uom
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
-    return QuoteItemType(**Utility.json_normalize(quote_item_dict))
+    """
+    Nested resolver approach: return minimal quote_item data.
+    Those are resolved lazily by QuoteItemType resolvers.
+    """
+    _ = info  # Keep for signature compatibility with decorators
+    quote_item_dict = quote_item.__dict__["attribute_values"].copy()
+    return QuoteItemType(**Serializer.json_normalize(quote_item_dict))
 
 
 def resolve_quote_item(
@@ -463,7 +441,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
 
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),

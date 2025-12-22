@@ -9,7 +9,9 @@ from silvaengine_dynamodb_base import ListObjectType
 
 
 class ItemType(ObjectType):
+    partition_key = String()
     endpoint_id = String()
+    part_id = String()
     item_uuid = String()
     item_type = String()
     item_name = String()

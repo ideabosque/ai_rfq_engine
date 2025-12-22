@@ -40,17 +40,17 @@ def _initialize_tables(logger: logging.Logger) -> None:
     return
 
 
-def _get_request(endpoint_id: str, request_uuid: str) -> Dict[str, Any]:
+def _get_request(partition_key: str, request_uuid: str) -> Dict[str, Any]:
     from .request import get_request, get_request_count
 
-    count = get_request_count(endpoint_id, request_uuid)
+    count = get_request_count(partition_key, request_uuid)
     if count == 0:
         return {}
 
-    request = get_request(endpoint_id, request_uuid)
+    request = get_request(partition_key, request_uuid)
 
     return {
-        "endpoint_id": request.endpoint_id,
+        "partition_key": request.partition_key,
         "request_uuid": request.request_uuid,
         "email": request.email,
         "request_title": request.request_title,
@@ -73,7 +73,7 @@ def _get_quote(request_uuid: str, quote_uuid: str) -> Dict[str, Any]:
     quote = get_quote(request_uuid, quote_uuid)
 
     return {
-        "request": _get_request(quote.endpoint_id, quote.request_uuid),
+        "request": _get_request(quote.partition_key, quote.request_uuid),
         "quote_uuid": quote.quote_uuid,
         "provider_corp_external_id": quote.provider_corp_external_id,
         "sales_rep_email": quote.sales_rep_email,
@@ -87,18 +87,18 @@ def _get_quote(request_uuid: str, quote_uuid: str) -> Dict[str, Any]:
     }
 
 
-def _validate_item_exists(endpoint_id: str, item_uuid: str) -> bool:
+def _validate_item_exists(partition_key: str, item_uuid: str) -> bool:
     """Validate if an item exists in the database."""
     from .item import get_item_count
 
-    return get_item_count(endpoint_id, item_uuid) > 0
+    return get_item_count(partition_key, item_uuid) > 0
 
 
-def _validate_provider_item_exists(endpoint_id: str, provider_item_uuid: str) -> bool:
+def _validate_provider_item_exists(partition_key: str, provider_item_uuid: str) -> bool:
     """Validate if a provider item exists in the database."""
     from .provider_item import get_provider_item_count
 
-    return get_provider_item_count(endpoint_id, provider_item_uuid) > 0
+    return get_provider_item_count(partition_key, provider_item_uuid) > 0
 
 
 def _validate_batch_exists(provider_item_uuid: str, batch_no: str) -> bool:
@@ -109,7 +109,7 @@ def _validate_batch_exists(provider_item_uuid: str, batch_no: str) -> bool:
 
 
 def _combine_all_discount_prompts(
-    endpoint_id: str,
+    partition_key: str,
     email: str,
     quote_items: List[Dict[str, Any]],
     loaders: Any,
@@ -118,7 +118,7 @@ def _combine_all_discount_prompts(
     Combine discount prompts from all hierarchical scopes and deduplicate.
 
     This function implements a sophisticated multi-level discount prompt loading strategy:
-    1. GLOBAL scope - applies to all quotes for this endpoint
+    1. GLOBAL scope - applies to all quotes for this partition
     2. SEGMENT scope - applies to customers in a specific segment (via email lookup)
     3. ITEM scope - applies to specific catalog items
     4. PROVIDER_ITEM scope - applies to specific provider offerings
@@ -128,7 +128,7 @@ def _combine_all_discount_prompts(
     Stage 2: Load all discount prompts in parallel and merge
 
     Args:
-        endpoint_id: The tenant/endpoint identifier
+        partition_key: The tenant/partition identifier
         email: Customer email for segment lookup (can be None)
         quote_items: List of quote items to determine ITEM and PROVIDER_ITEM scopes
         loaders: RequestLoaders instance containing all batch loaders
@@ -142,16 +142,16 @@ def _combine_all_discount_prompts(
     seen_uuids = set()
 
     # STEP 1: Load GLOBAL prompts (always included)
-    # Global prompts apply to all quotes for this endpoint
-    global_promise = loaders.discount_prompt_global_loader.load(endpoint_id)
+    # Global prompts apply to all quotes for this partition
+    global_promise = loaders.discount_prompt_global_loader.load(partition_key)
 
     # STEP 2: Look up segment via email
     # email → segment_contact → segment_uuid
     segment_contact_promise = None
     if email:
-        # Load segment_contact by (endpoint_id, email) to get segment_uuid
+        # Load segment_contact by (partition_key, email) to get segment_uuid
         segment_contact_promise = loaders.segment_contact_loader.load(
-            (endpoint_id, email)
+            (partition_key, email)
         )
 
     # STEP 3: Collect unique items and provider items from quote
@@ -179,7 +179,7 @@ def _combine_all_discount_prompts(
         # Note: ItemLoader automatically includes GLOBAL prompts (via dependency injection)
         for item_uuid in unique_item_uuids:
             item_promises.append(
-                loaders.discount_prompt_by_item_loader.load((endpoint_id, item_uuid))
+                loaders.discount_prompt_by_item_loader.load((partition_key, item_uuid))
             )
 
         # Load PROVIDER_ITEM scope prompts for each unique provider item
@@ -187,7 +187,7 @@ def _combine_all_discount_prompts(
         for item_uuid, provider_item_uuid in unique_provider_items:
             provider_item_promises.append(
                 loaders.discount_prompt_by_provider_item_loader.load(
-                    (endpoint_id, item_uuid, provider_item_uuid)
+                    (partition_key, item_uuid, provider_item_uuid)
                 )
             )
 
@@ -214,7 +214,7 @@ def _combine_all_discount_prompts(
             segment_uuid = segment_contact["segment_uuid"]
             # Load SEGMENT scope prompts (includes GLOBAL via dependency injection)
             segment_promise = loaders.discount_prompt_by_segment_loader.load(
-                (endpoint_id, segment_uuid)
+                (partition_key, segment_uuid)
             )
             promises_to_resolve.append(segment_promise)
 
@@ -267,7 +267,7 @@ def _combine_all_discount_prompts(
 
 
 def _combine_all_item_price_tiers(
-    endpoint_id: str,
+    partition_key: str,
     email: str,
     quote_items: List[Dict[str, Any]],
     loaders: Any,
@@ -282,7 +282,7 @@ def _combine_all_item_price_tiers(
     4. Return tier models for conversion at the query layer
 
     Args:
-        endpoint_id: The tenant/endpoint identifier
+        partition_key: The tenant/partition identifier
         email: Customer email for segment lookup (can be None)
         quote_items: List of quote items to determine which price tiers to load
         loaders: RequestLoaders instance containing all batch loaders
@@ -369,7 +369,7 @@ def _combine_all_item_price_tiers(
 
     # Start by loading segment contact
     if email:
-        return loaders.segment_contact_loader.load((endpoint_id, email)).then(
+        return loaders.segment_contact_loader.load((partition_key, email)).then(
             process_with_segment
         )
     else:

@@ -18,10 +18,10 @@ class DiscountPromptGlobalLoader(SafeDataLoader):
     Batch loader returning ACTIVE GLOBAL discount prompts.
 
     Usage:
-        loaders.discount_prompt_global_loader.load(endpoint_id)
+        loaders.discount_prompt_global_loader.load(partition_key)
 
     Returns:
-        List of active discount prompts with scope GLOBAL for the given endpoint
+        List of active discount prompts with scope GLOBAL for the given partition
     """
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
@@ -40,7 +40,7 @@ class DiscountPromptGlobalLoader(SafeDataLoader):
                 )
 
     def generate_cache_key(self, key: Key) -> str:
-        # Key is just endpoint_id
+        # Key is just partition_key
         if not isinstance(key, tuple):
             key = (key,)
         key_data = ":".join([str(key)] + [str({})])
@@ -80,18 +80,18 @@ class DiscountPromptGlobalLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        for endpoint_id in uncached_keys:
+        for partition_key in uncached_keys:
             try:
-                # Load GLOBAL prompts for this endpoint
-                global_prompts = get_global_discount_prompts(endpoint_id)
+                # Load GLOBAL prompts for this partition
+                global_prompts = get_global_discount_prompts(partition_key)
                 normalized = [normalize_model(p) for p in global_prompts]
                 # if self.cache_enabled:
-                #     self.set_cache_data(endpoint_id, normalized)
-                key_map[endpoint_id] = normalized
+                #     self.set_cache_data(partition_key, normalized)
+                key_map[partition_key] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
-                key_map[endpoint_id] = []
+                key_map[partition_key] = []
 
         return Promise.resolve([key_map.get(key, []) for key in keys])
 
@@ -101,7 +101,7 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
     Batch loader returning ACTIVE discount prompts for segments with hierarchical scopes.
 
     Usage:
-        loaders.discount_prompt_by_segment_loader.load((endpoint_id, segment_uuid))
+        loaders.discount_prompt_by_segment_loader.load((partition_key, segment_uuid))
 
     Returns:
         List of active discount prompts with scopes GLOBAL + SEGMENT for the given segment
@@ -123,7 +123,7 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
                 )
 
     def generate_cache_key(self, key: Key) -> str:
-        # Key is (endpoint_id, segment_uuid)
+        # Key is (partition_key, segment_uuid)
         if not isinstance(key, tuple):
             key = (key,)
         key_data = ":".join([str(key)] + [str({})])
@@ -163,18 +163,18 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        for endpoint_id, segment_uuid in uncached_keys:
+        for partition_key, segment_uuid in uncached_keys:
             try:
                 # Load SEGMENT-specific prompts
-                segment_prompts = get_discount_prompts_by_segment(endpoint_id, segment_uuid)
+                segment_prompts = get_discount_prompts_by_segment(partition_key, segment_uuid)
                 normalized = [normalize_model(p) for p in segment_prompts]
                 # if self.cache_enabled:
-                #     self.set_cache_data((endpoint_id, segment_uuid), normalized)
-                key_map[(endpoint_id, segment_uuid)] = normalized
+                #     self.set_cache_data((partition_key, segment_uuid), normalized)
+                key_map[(partition_key, segment_uuid)] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
-                key_map[(endpoint_id, segment_uuid)] = []
+                key_map[(partition_key, segment_uuid)] = []
 
         return Promise.resolve([key_map.get(key, []) for key in keys])
 
@@ -185,7 +185,7 @@ class DiscountPromptByItemLoader(SafeDataLoader):
     Batch loader returning ACTIVE discount prompts for items with hierarchical scopes.
 
     Usage:
-        loaders.discount_prompt_by_item_loader.load((endpoint_id, item_uuid))
+        loaders.discount_prompt_by_item_loader.load((partition_key, item_uuid))
 
     Returns:
         List of active discount prompts with scopes GLOBAL + ITEM for the given item
@@ -247,20 +247,20 @@ class DiscountPromptByItemLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        for endpoint_id, item_uuid in uncached_keys:
+        for partition_key, item_uuid in uncached_keys:
             try:
                 # Load ITEM-specific prompts
-                item_prompts = get_discount_prompts_by_item(endpoint_id, item_uuid)
+                item_prompts = get_discount_prompts_by_item(partition_key, item_uuid)
 
                 # Combine GLOBAL + ITEM prompts
                 normalized = [normalize_model(p) for p in item_prompts]
                 # if self.cache_enabled:
-                #     self.set_cache_data((endpoint_id, item_uuid), normalized)
-                key_map[(endpoint_id, item_uuid)] = normalized
+                #     self.set_cache_data((partition_key, item_uuid), normalized)
+                key_map[(partition_key, item_uuid)] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
-                key_map[(endpoint_id, item_uuid)] = []
+                key_map[(partition_key, item_uuid)] = []
 
         return Promise.resolve([key_map.get(key, []) for key in keys])
 
@@ -270,7 +270,7 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
     Batch loader returning ACTIVE discount prompts for provider items with hierarchical scopes.
 
     Usage:
-        loaders.discount_prompt_by_provider_item_loader.load((endpoint_id, item_uuid, provider_item_uuid))
+        loaders.discount_prompt_by_provider_item_loader.load((partition_key, item_uuid, provider_item_uuid))
 
     Returns:
         List of active discount prompts with scopes GLOBAL + PROVIDER_ITEM for the given provider item
@@ -332,24 +332,24 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        
-        for endpoint_id, item_uuid, provider_item_uuid in uncached_keys:
+
+        for partition_key, item_uuid, provider_item_uuid in uncached_keys:
             try:
                 # Load PROVIDER_ITEM-specific prompts
                 provider_item_prompts = get_discount_prompts_by_provider_item(
-                    endpoint_id, provider_item_uuid
+                    partition_key, provider_item_uuid
                 )
 
                 # Combine GLOBAL + PROVIDER_ITEM prompts
                 normalized = [normalize_model(p) for p in provider_item_prompts]
                 # if self.cache_enabled:
                 #     self.set_cache_data(
-                #         (endpoint_id, item_uuid, provider_item_uuid), normalized
+                #         (partition_key, item_uuid, provider_item_uuid), normalized
                 #     )
-                key_map[(endpoint_id, item_uuid, provider_item_uuid)] = normalized
+                key_map[(partition_key, item_uuid, provider_item_uuid)] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
-                key_map[(endpoint_id, item_uuid, provider_item_uuid)] = []
+                key_map[(partition_key, item_uuid, provider_item_uuid)] = []
 
         return Promise.resolve([key_map.get(key, []) for key in keys])

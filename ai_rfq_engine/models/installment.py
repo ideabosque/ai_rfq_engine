@@ -20,7 +20,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -49,7 +50,7 @@ class InstallmentModel(BaseModel):
 
     quote_uuid = UnicodeAttribute(hash_key=True)
     installment_uuid = UnicodeAttribute(range_key=True)
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     request_uuid = UnicodeAttribute()
     priority = NumberAttribute(default=0)
     salesorder_no = UnicodeAttribute(null=True)
@@ -200,14 +201,10 @@ def get_installment_type(
     - Do NOT embed 'quote'.
     'quote' is resolved lazily by InstallmentType.resolve_quote.
     """
-    try:
-        inst_dict = installment.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
-    return InstallmentType(**Utility.json_normalize(inst_dict))
+    _ = info  # Keep for signature compatibility with decorators
+    inst_dict = installment.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return InstallmentType(**Serializer.json_normalize(inst_dict))
 
 
 def resolve_installment(
@@ -232,7 +229,7 @@ def resolve_installment(
 def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     quote_uuid = kwargs.get("quote_uuid")
     request_uuid = kwargs.get("request_uuid")
-    endpoint_id = info.context.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
     priority = kwargs.get("priority")
     salesorder_no = kwargs.get("salesorder_no")
     from_scheduled_date = kwargs.get("from_scheduled_date")
@@ -266,8 +263,8 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
         count_funct = InstallmentModel.updated_at_index.count
 
     the_filters = None
-    if endpoint_id:
-        the_filters = InstallmentModel.endpoint_id == endpoint_id
+    if partition_key:
+        the_filters = InstallmentModel.partition_key == partition_key
     if request_uuid:
         the_filters &= InstallmentModel.request_uuid == request_uuid
     if priority:
@@ -311,7 +308,7 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
     installment_uuid = kwargs.get("installment_uuid")
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "request_uuid": kwargs.get("request_uuid"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
