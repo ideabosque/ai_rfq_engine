@@ -1,3 +1,4 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
@@ -9,21 +10,21 @@ from promise import Promise
 from silvaengine_utility.cache import HybridCacheEngine
 
 from ...handlers.config import Config
-from .base import Key, SafeDataLoader, normalize_model
+from .base import SafeDataLoader, normalize_model, Key
 
 
-class ProviderItemLoader(SafeDataLoader):
-    """Batch loader for ProviderItemModel keyed by (partition_key, provider_item_uuid)."""
+class ProviderItemBatchLoader(SafeDataLoader):
+    """Batch loader returning batches for a provider item keyed by provider_item_uuid."""
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
-        super(ProviderItemLoader, self).__init__(
+        super(ProviderItemBatchLoader, self).__init__(
             logger=logger, cache_enabled=cache_enabled, **kwargs
         )
         if self.cache_enabled:
             self.cache = HybridCacheEngine(
-                Config.get_cache_name("models", "provider_item")
+                Config.get_cache_name("models", "provider_item_batch")
             )
-            cache_meta = Config.get_cache_entity_config().get("provider_item")
+            cache_meta = Config.get_cache_entity_config().get("provider_item_batch")
             self.cache_func_prefix = ""
             if cache_meta:
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), cache_meta.get("getter")])
@@ -52,17 +53,17 @@ class ProviderItemLoader(SafeDataLoader):
         cache_key = self.generate_cache_key(key)
         self.cache.set(cache_key, data, ttl=Config.get_cache_ttl())
 
-    def batch_load_fn(self, keys: List[Key]) -> Promise:
-        from ..provider_item import ProviderItemModel
+    def batch_load_fn(self, keys: List[str]) -> Promise:
+        from ..provider_item_batches import ProviderItemBatchModel
         unique_keys = list(dict.fromkeys(keys))
-        key_map: Dict[Key, Dict[str, Any]] = {}
+        key_map: Dict[str, List[Dict[str, Any]]] = {}
         uncached_keys = []
 
         if self.cache_enabled:
             for key in unique_keys:
-                cached_item = self.get_cache_data(key)
-                if cached_item:
-                    key_map[key] = cached_item
+                cached_batches = self.get_cache_data(key)
+                if cached_batches is not None:
+                    key_map[key] = cached_batches
                 else:
                     uncached_keys.append(key)
         else:
@@ -70,13 +71,13 @@ class ProviderItemLoader(SafeDataLoader):
 
         if uncached_keys:
             try:
-                for pi in ProviderItemModel.batch_get(uncached_keys):
-                    key = (pi.partition_key, pi.provider_item_uuid)
+                for pib in ProviderItemBatchModel.batch_get(uncached_keys):
+                    key = (pib.provider_item_uuid, pib.batch_no)
                     
                     if self.cache_enabled:
-                        self.set_cache_data(key, pi)
+                        self.set_cache_data(key, pib)
                         
-                    normalized = normalize_model(pi)
+                    normalized = normalize_model(pib)
                     key_map[key] = normalized
 
             except Exception as exc:  # pragma: no cover - defensive

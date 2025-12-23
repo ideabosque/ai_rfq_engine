@@ -24,7 +24,7 @@ class ProviderItemBatchListLoader(SafeDataLoader):
             self.cache = HybridCacheEngine(
                 Config.get_cache_name("models", "provider_item_batch")
             )
-            cache_meta = Config.get_cache_entity_config().get("item_price_tier")
+            cache_meta = Config.get_cache_entity_config().get("provider_item_batch")
             self.cache_func_prefix = ""
             if cache_meta:
                 self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_provider_item_batches_by_provider_item"])

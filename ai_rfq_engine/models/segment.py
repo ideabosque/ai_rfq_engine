@@ -20,7 +20,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -39,7 +40,7 @@ class ProviderCorpExternalIdIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "provider_corp_external_id-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     provider_corp_external_id = UnicodeAttribute(range_key=True)
 
 
@@ -54,7 +55,7 @@ class UpdateAtIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "updated_at-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     updated_at = UnicodeAttribute(range_key=True)
 
 
@@ -62,9 +63,11 @@ class SegmentModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-segments"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     segment_uuid = UnicodeAttribute(range_key=True)
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
+    endpoint_id = UnicodeAttribute()
+    part_id = UnicodeAttribute()
     segment_name = UnicodeAttribute()
     segment_description = UnicodeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
@@ -79,29 +82,36 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for segments
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                endpoint_id = args[0].context.get("endpoint_id") or kwargs.get(
-                    "endpoint_id"
-                )
-                context_keys = {"endpoint_id": endpoint_id} if endpoint_id else None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("endpoint_id"):
-                    entity_keys["endpoint_id"] = kwargs.get("endpoint_id")
-                if kwargs.get("segment_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["segment_uuid"] = getattr(entity, "segment_uuid", None)
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("segment_uuid"):
                     entity_keys["segment_uuid"] = kwargs.get("segment_uuid")
 
-                result = purge_entity_cascading_cache(
+                # Get partition_key from context or kwargs
+                partition_key = args[0].context.get("partition_key") or kwargs.get(
+                    "partition_key"
+                )
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="segment",
-                    context_keys=context_keys,
+                    context_keys=(
+                        {"partition_key": partition_key} if partition_key else None
+                    ),
                     entity_keys=entity_keys if entity_keys else None,
                     cascade_depth=3,
                 )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -131,8 +141,8 @@ def create_segment_table(logger: logging.Logger) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "segment")
 )
-def get_segment(endpoint_id: str, segment_uuid: str) -> SegmentModel:
-    return SegmentModel.get(endpoint_id, segment_uuid)
+def get_segment(partition_key: str, segment_uuid: str) -> SegmentModel:
+    return SegmentModel.get(partition_key, segment_uuid)
 
 
 @retry(
@@ -140,39 +150,41 @@ def get_segment(endpoint_id: str, segment_uuid: str) -> SegmentModel:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-def _get_segment(endpoint_id: str, segment_uuid: str) -> SegmentModel:
-    return SegmentModel.get(endpoint_id, segment_uuid)
+def _get_segment(partition_key: str, segment_uuid: str) -> SegmentModel:
+    return SegmentModel.get(partition_key, segment_uuid)
 
 
-def get_segment_count(endpoint_id: str, segment_uuid: str) -> int:
-    return SegmentModel.count(endpoint_id, SegmentModel.segment_uuid == segment_uuid)
+def get_segment_count(partition_key: str, segment_uuid: str) -> int:
+    return SegmentModel.count(partition_key, SegmentModel.segment_uuid == segment_uuid)
 
 
 def get_segment_type(info: ResolveInfo, segment: SegmentModel) -> SegmentType:
-    try:
-        segment = segment.__dict__["attribute_values"]
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
-    return SegmentType(**Utility.json_normalize(segment))
+    """
+    Nested resolver approach: return minimal segment data.
+    Those are resolved lazily by SegmentType resolvers.
+    """
+    _ = info  # Keep for signature compatibility with decorators
+    segment_dict = segment.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return SegmentType(**Serializer.json_normalize(segment_dict))
 
 
 def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType | None:
-    count = get_segment_count(info.context["endpoint_id"], kwargs["segment_uuid"])
+    partition_key = info.context.get("partition_key")
+    count = get_segment_count(partition_key, kwargs["segment_uuid"])
     if count == 0:
         return None
 
     return get_segment_type(
         info,
-        get_segment(info.context["endpoint_id"], kwargs["segment_uuid"]),
+        get_segment(partition_key, kwargs["segment_uuid"]),
     )
 
 
 @monitor_decorator
 @resolve_list_decorator(
     attributes_to_get=[
-        "endpoint_id",
+        "partition_key",
         "segment_uuid",
         "provider_corp_external_id",
         "updated_at",
@@ -181,7 +193,7 @@ def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType 
     type_funct=get_segment_type,
 )
 def resolve_segment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
-    endpoint_id = info.context["endpoint_id"]
+    partition_key = info.context.get("partition_key")
     provider_corp_external_id = kwargs.get("provider_corp_external_id")
     segment_name = kwargs.get("segment_name")
     segment_description = kwargs.get("segment_description")
@@ -189,8 +201,8 @@ def resolve_segment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     args = []
     inquiry_funct = SegmentModel.scan
     count_funct = SegmentModel.count
-    if endpoint_id:
-        args = [endpoint_id, None]
+    if partition_key:
+        args = [partition_key, None]
         inquiry_funct = SegmentModel.updated_at_index.query
         count_funct = SegmentModel.updated_at_index.count
         if provider_corp_external_id:
@@ -211,21 +223,23 @@ def resolve_segment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "segment_uuid",
     },
     model_funct=_get_segment,
     count_funct=get_segment_count,
     type_funct=get_segment_type,
 )
+@purge_cache()
 def insert_update_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    endpoint_id = kwargs.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
     segment_uuid = kwargs.get("segment_uuid")
     if kwargs.get("entity") is None:
         cols = {
+            "endpoint_id": info.context.get("endpoint_id"),
+            "part_id": info.context.get("part_id"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
@@ -238,7 +252,7 @@ def insert_update_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             if key in kwargs:
                 cols[key] = kwargs[key]
         SegmentModel(
-            endpoint_id,
+            partition_key,
             segment_uuid,
             **cols,
         ).save()
@@ -267,14 +281,14 @@ def insert_update_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "segment_uuid",
     },
     model_funct=get_segment,
 )
+@purge_cache()
 def delete_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     segment_contact_list = resolve_segment_contact_list(
         info, **{"segment_uuid": kwargs.get("entity").segment_uuid}

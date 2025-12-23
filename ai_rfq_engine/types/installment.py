@@ -15,7 +15,7 @@ class InstallmentType(ObjectType):
     installment_uuid = String()
     request_uuid = String()  # keep raw id for convenience
     priority = Int()
-    endpoint_id = String()
+    partition_key = String()
     installment_amount = String()
     installment_ratio = String()
     salesorder_no = String()

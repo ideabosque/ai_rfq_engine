@@ -56,7 +56,7 @@ def resolve_item_price_tiers(
     from ..models.item_price_tier import get_item_price_tier_type
 
     loaders = get_loaders(info.context)
-    endpoint_id = info.context.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
     email = kwargs.get("email")
     quote_items = kwargs.get("quote_items", [])
 
@@ -66,5 +66,5 @@ def resolve_item_price_tiers(
         return [get_item_price_tier_type(info, tier_model) for tier_model in tier_models]
 
     return _combine_all_item_price_tiers(
-        endpoint_id, email, quote_items, loaders
+        partition_key, email, quote_items, loaders
     ).then(convert_to_types)

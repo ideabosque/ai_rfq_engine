@@ -15,7 +15,7 @@ from ..utils.normalization import normalize_to_json
 class QuoteType(ObjectType):
     request_uuid = String()  # keep raw id
     quote_uuid = String()
-    endpoint_id = String()
+    partition_key = String()
     provider_corp_external_id = String()
     sales_rep_email = String()
     rounds = Int()
@@ -53,13 +53,13 @@ class QuoteType(ObjectType):
             return existing
 
         # Case 1: need to fetch using DataLoader
-        endpoint_id = info.context.get("endpoint_id")
+        partition_key = info.context.get("partition_key")
         request_uuid = getattr(parent, "request_uuid", None)
-        if not endpoint_id or not request_uuid:
+        if not partition_key or not request_uuid:
             return None
 
         loaders = get_loaders(info.context)
-        return loaders.request_loader.load((endpoint_id, request_uuid)).then(
+        return loaders.request_loader.load((partition_key, request_uuid)).then(
             lambda request_dict: RequestType(**request_dict) if request_dict else None
         )
 
@@ -117,8 +117,8 @@ class QuoteType(ObjectType):
         if isinstance(existing, list):
             return [normalize_to_json(dp) for dp in existing]
 
-        endpoint_id = info.context.get("endpoint_id")
-        if not endpoint_id:
+        partition_key = info.context.get("partition_key")
+        if not partition_key:
             return []
 
         quote_uuid = getattr(parent, "quote_uuid", None)
@@ -148,14 +148,14 @@ class QuoteType(ObjectType):
             request_dict, quote_items = results
             email = request_dict.get("email") if request_dict else None
             return _combine_all_discount_prompts(
-                endpoint_id, email, quote_items, loaders
+                partition_key, email, quote_items, loaders
             )
 
         # Load request and quote_items in parallel, then combine all prompts
         # using the utility function from models.utils
         return Promise.all(
             [
-                loaders.request_loader.load((endpoint_id, request_uuid)),
+                loaders.request_loader.load((partition_key, request_uuid)),
                 loaders.quote_item_list_loader.load(quote_uuid),
             ]
         ).then(combine_prompts_wrapper)

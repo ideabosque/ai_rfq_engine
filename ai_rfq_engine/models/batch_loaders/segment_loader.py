@@ -14,7 +14,7 @@ from .base import Key, SafeDataLoader, normalize_model
 
 
 class SegmentLoader(SafeDataLoader):
-    """Batch loader for SegmentModel keyed by (endpoint_id, segment_uuid)."""
+    """Batch loader for SegmentModel keyed by (partition_key, segment_uuid)."""
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
         super(SegmentLoader, self).__init__(
@@ -72,7 +72,7 @@ class SegmentLoader(SafeDataLoader):
         if uncached_keys:
             try:
                 for segment in SegmentModel.batch_get(uncached_keys):
-                    key = (segment.endpoint_id, segment.segment_uuid)
+                    key = (segment.partition_key, segment.segment_uuid)
 
                     if self.cache_enabled:
                         self.set_cache_data(key, segment)

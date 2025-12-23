@@ -11,7 +11,7 @@ from ..models.batch_loaders import get_loaders
 
 
 class SegmentContactType(ObjectType):
-    endpoint_id = String()
+    partition_key = String()
     email = String()
     contact_uuid = String()
     consumer_corp_external_id = String()
@@ -36,13 +36,13 @@ class SegmentContactType(ObjectType):
             return existing
 
         # Case 1: need to fetch using DataLoader
-        endpoint_id = getattr(parent, "endpoint_id", None)
+        partition_key = getattr(parent, "partition_key", None)
         segment_uuid = getattr(parent, "segment_uuid", None)
-        if not endpoint_id or not segment_uuid:
+        if not partition_key or not segment_uuid:
             return None
 
         loaders = get_loaders(info.context)
-        return loaders.segment_loader.load((endpoint_id, segment_uuid)).then(
+        return loaders.segment_loader.load((partition_key, segment_uuid)).then(
             lambda segment_dict: SegmentType(**segment_dict) if segment_dict else None
         )
 

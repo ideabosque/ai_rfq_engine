@@ -14,7 +14,7 @@ from .base import Key, SafeDataLoader, normalize_model
 
 
 class ItemLoader(SafeDataLoader):
-    """Batch loader for ItemModel records keyed by (endpoint_id, item_uuid)."""
+    """Batch loader for ItemModel records keyed by (partition_key, item_uuid)."""
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
         super(ItemLoader, self).__init__(
@@ -70,7 +70,7 @@ class ItemLoader(SafeDataLoader):
         if uncached_keys:
             try:
                 for item in ItemModel.batch_get(uncached_keys):
-                    key = (item.endpoint_id, item.item_uuid)
+                    key = (item.partition_key, item.item_uuid)
                     if self.cache_enabled:
                         self.set_cache_data(key, item)
 
