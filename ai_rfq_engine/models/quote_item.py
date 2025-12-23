@@ -25,7 +25,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, convert_decimal_to_number, method_cache
+from silvaengine_utility import convert_decimal_to_number, method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -84,15 +85,27 @@ def get_price_per_uom(
         return tier.price_per_uom
 
     # If tier has margin_per_uom with batches, find the matching batch price
-    if hasattr(tier, "provider_item_batches") and tier.provider_item_batches:
+    provider_item_batches = []
+
+    if getattr(tier, "margin_per_uom", None) is not None:
+        from .provider_item_batches import get_provider_item_batches_by_provider_item
+
+        for batch in get_provider_item_batches_by_provider_item(provider_item_uuid):
+            cost = batch.total_cost_per_uom or 0
+            price = cost * (1 + float(tier.margin_per_uom))
+            provider_item_batches.append(
+                {"batch_no": batch.batch_no, "price_per_uom": price}
+            )
+
+    if provider_item_batches:
         # If batch_no is specified, find that specific batch
         if batch_no:
-            for batch in tier.provider_item_batches:
+            for batch in provider_item_batches:
                 if batch["batch_no"] == batch_no:
                     return batch["price_per_uom"]
 
         # Otherwise, return the first available batch price
-        return tier.provider_item_batches[0]["price_per_uom"]
+        return provider_item_batches[0]["price_per_uom"]
 
     return None
 
@@ -167,7 +180,7 @@ class QuoteItemModel(BaseModel):
     item_uuid = UnicodeAttribute()
     batch_no = UnicodeAttribute(null=True)
     request_uuid = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     request_data = MapAttribute(null=True)
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()
@@ -188,17 +201,30 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for quotes
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("quote_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["quote_uuid"] = getattr(entity, "quote_uuid", None)
+                    entity_keys["quote_item_uuid"] = getattr(
+                        entity, "quote_item_uuid", None
+                    )
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("quote_uuid"):
                     entity_keys["quote_uuid"] = kwargs.get("quote_uuid")
-                if kwargs.get("quote_item_uuid"):
+                if not entity_keys.get("quote_item_uuid"):
                     entity_keys["quote_item_uuid"] = kwargs.get("quote_item_uuid")
 
-                result = purge_entity_cascading_cache(
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="quote",
                     context_keys=context_keys,
@@ -207,17 +233,17 @@ def purge_cache():
                 )
 
                 if kwargs.get("quote_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="provider_item",
                         context_keys=context_keys,
                         entity_keys={"quote_uuid": kwargs.get("quote_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_quote_items_by_quote", "custom_cache_keys": ["key:quote_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_quote_items_by_quote",
+                            "custom_cache_keys": ["key:quote_uuid"],
+                        },
                     )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -267,48 +293,13 @@ def get_quote_item_count(quote_uuid: str, quote_item_uuid: str) -> int:
 
 
 def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteItemType:
-    try:
-        quote_item_dict: Dict = quote_item.__dict__["attribute_values"]
-
-        # Get batch information if batch_no exists
-        slow_move_item = False
-        guardrail_price_per_uom = None
-
-        if quote_item_dict.get("batch_no"):
-            from .provider_item_batches import get_provider_item_batch
-
-            try:
-                batch = get_provider_item_batch(
-                    quote_item_dict["provider_item_uuid"], quote_item_dict["batch_no"]
-                )
-                slow_move_item = (
-                    batch.slow_move_item if batch.slow_move_item is not None else False
-                )
-                guardrail_price_per_uom = batch.guardrail_price_per_uom
-            except Exception:
-                # If batch not found, use default values
-                pass
-        else:
-            # If no batch_no, get guardrail_price_per_uom from ProviderItemModel.base_price_per_uom
-            from .provider_item import get_provider_item
-
-            try:
-                provider_item = get_provider_item(
-                    quote_item_dict["endpoint_id"],
-                    quote_item_dict["provider_item_uuid"],
-                )
-                guardrail_price_per_uom = provider_item.base_price_per_uom
-            except Exception:
-                # If provider item not found, use None
-                pass
-
-        quote_item_dict["slow_move_item"] = slow_move_item
-        quote_item_dict["guardrail_price_per_uom"] = guardrail_price_per_uom
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
-    return QuoteItemType(**Utility.json_normalize(quote_item_dict))
+    """
+    Nested resolver approach: return minimal quote_item data.
+    Those are resolved lazily by QuoteItemType resolvers.
+    """
+    _ = info  # Keep for signature compatibility with decorators
+    quote_item_dict = quote_item.__dict__["attribute_values"].copy()
+    return QuoteItemType(**Serializer.json_normalize(quote_item_dict))
 
 
 def resolve_quote_item(
@@ -429,8 +420,6 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -440,6 +429,7 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     count_funct=get_quote_item_count,
     type_funct=get_quote_item_type,
 )
+@purge_cache()
 def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     quote_uuid = kwargs.get("quote_uuid")
     quote_item_uuid = kwargs.get("quote_item_uuid")
@@ -451,7 +441,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
 
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
@@ -560,8 +550,6 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
     return
 
 
-@purge_cache()
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -569,6 +557,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
     },
     model_funct=get_quote_item,
 )
+@purge_cache()
 def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     installment_list = resolve_installment_list(
         info,
@@ -592,6 +581,7 @@ def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     update_quote_totals(info, request_uuid, quote_uuid)
 
     return True
+
 
 @retry(
     reraise=True,

@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.join(base_dir, "silvaengine_utility"))
 sys.path.insert(1, os.path.join(base_dir, "silvaengine_dynamodb_base"))
 sys.path.insert(2, os.path.join(base_dir, "ai_rfq_engine"))
 
-from silvaengine_utility import Utility
+from silvaengine_utility.graphql import Graphql
 
 from ai_rfq_engine import AIRFQEngine
 
@@ -48,6 +48,7 @@ SETTING = {
         },
     },
     "endpoint_id": os.getenv("endpoint_id"),
+    "part_id": os.getenv("part_id"),
     "execute_mode": os.getenv("execute_mode", "local"),
     "initialize_tables": os.getenv("initialize_tables", 0),
 }
@@ -78,15 +79,16 @@ def schema(ai_rfq_engine):
     Depends on ai_rfq_engine fixture.
     """
     endpoint_id = SETTING.get("endpoint_id")
-    execute_mode = SETTING.get("execute_mode")
 
     try:
-        schema = Utility.fetch_graphql_schema(
-            logger,
-            endpoint_id,
+        context = {
+            "endpoint_id": endpoint_id,
+            "setting": SETTING,
+            "logger": logger,
+        }
+        schema = Graphql.fetch_graphql_schema(
+            context,
             "ai_rfq_graphql",
-            setting=SETTING,
-            test_mode=execute_mode,
         )
         logger.info("GraphQL schema fetched successfully")
         return schema

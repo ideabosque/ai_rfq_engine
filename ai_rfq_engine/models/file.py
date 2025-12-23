@@ -20,7 +20,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -64,7 +65,7 @@ class FileModel(BaseModel):
     request_uuid = UnicodeAttribute(hash_key=True)
     file_name = UnicodeAttribute(range_key=True)
     email = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -77,17 +78,29 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for files
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("request_uuid"):
-                    entity_keys["request_uuid"] = kwargs.get("request_uuid")
-                if kwargs.get("file_uuid"):
-                    entity_keys["file_uuid"] = kwargs.get("file_uuid")
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["request_uuid"] = getattr(entity, "request_uuid", None)
+                    entity_keys["file_name"] = getattr(entity, "file_name", None)
 
-                result = purge_entity_cascading_cache(
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("request_uuid"):
+                    entity_keys["request_uuid"] = kwargs.get("request_uuid")
+                if not entity_keys.get("file_name"):
+                    entity_keys["file_name"] = kwargs.get("file_name")
+
+                # Note: file_uuid doesn't exist in FileModel, using file_name instead
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="file",
                     context_keys=context_keys,
@@ -96,17 +109,17 @@ def purge_cache():
                 )
 
                 if kwargs.get("request_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="file",
                         context_keys=context_keys,
                         entity_keys={"request_uuid": kwargs.get("request_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_files_by_request", "custom_cache_keys": ["key:request_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_files_by_request",
+                            "custom_cache_keys": ["key:request_uuid"],
+                        },
                     )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -159,14 +172,10 @@ def get_file_type(info: ResolveInfo, file: FileModel) -> FileType:
     - Do NOT embed 'request'.
     'request' is resolved lazily by FileType.resolve_request.
     """
-    try:
-        file_dict = file.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
-    return FileType(**Utility.json_normalize(file_dict))
+    _ = info  # Keep for signature compatibility with decorators
+    file_dict = file.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return FileType(**Serializer.json_normalize(file_dict))
 
 
 def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType | None:
@@ -189,7 +198,7 @@ def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType | None
 def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     request_uuid = kwargs.get("request_uuid")
     email = kwargs.get("email")
-    endpoint_id = info.context.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
 
     args = []
     inquiry_funct = FileModel.scan
@@ -206,15 +215,14 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     the_filters = None
     if email and not request_uuid:
         the_filters &= FileModel.email == email
-    if endpoint_id:
-        the_filters &= FileModel.endpoint_id == endpoint_id
+    if partition_key:
+        the_filters &= FileModel.partition_key == partition_key
     if the_filters is not None:
         args.append(the_filters)
 
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "request_uuid",
@@ -225,12 +233,13 @@ def resolve_file_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     count_funct=get_file_count,
     type_funct=get_file_type,
 )
+@purge_cache()
 def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     request_uuid = kwargs.get("request_uuid")
     file_name = kwargs.get("file_name")
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
@@ -266,7 +275,6 @@ def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "request_uuid",
@@ -274,9 +282,11 @@ def insert_update_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     },
     model_funct=get_file,
 )
+@purge_cache()
 def delete_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,

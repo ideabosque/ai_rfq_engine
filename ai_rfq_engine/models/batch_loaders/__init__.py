@@ -29,6 +29,7 @@ from .request_loader import RequestLoader
 from .segment_contact_by_segment_loader import SegmentContactBySegmentLoader
 from .segment_contact_loader import SegmentContactLoader
 from .segment_loader import SegmentLoader
+from .provider_item_batch_loader import ProviderItemBatchLoader 
 
 # Backwards-compatible aliases for prior internal names
 _normalize_model = normalize_model
@@ -61,6 +62,7 @@ __all__ = [
     "SegmentContactBySegmentLoader",
     "SegmentContactLoader",
     "SegmentLoader",
+    "ProviderItemBatchLoader",
     "clear_loaders",
     "get_loaders",
 ]

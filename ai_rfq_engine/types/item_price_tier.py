@@ -13,7 +13,7 @@ from ..utils.normalization import normalize_to_json
 
 
 class ItemPriceTierType(ObjectType):
-    endpoint_id = String()
+    partition_key = String()
     item_uuid = String()
     item_price_tier_uuid = String()
     provider_item_uuid = String()  # keep raw id
@@ -45,14 +45,14 @@ class ItemPriceTierType(ObjectType):
             return existing
 
         # Case 1: need to fetch using DataLoader
-        endpoint_id = getattr(parent, "endpoint_id", None)
+        partition_key = getattr(parent, "partition_key", None)
         provider_item_uuid = getattr(parent, "provider_item_uuid", None)
-        if not endpoint_id or not provider_item_uuid:
+        if not partition_key or not provider_item_uuid:
             return None
 
         loaders = get_loaders(info.context)
         return loaders.provider_item_loader.load(
-            (endpoint_id, provider_item_uuid)
+            (partition_key, provider_item_uuid)
         ).then(lambda pi_dict: ProviderItemType(**pi_dict) if pi_dict else None)
 
     def resolve_segment(parent, info):
@@ -65,13 +65,13 @@ class ItemPriceTierType(ObjectType):
             return existing
 
         # Case 1: need to fetch using DataLoader
-        endpoint_id = getattr(parent, "endpoint_id", None)
+        partition_key = getattr(parent, "partition_key", None)
         segment_uuid = getattr(parent, "segment_uuid", None)
-        if not endpoint_id or not segment_uuid:
+        if not partition_key or not segment_uuid:
             return None
 
         loaders = get_loaders(info.context)
-        return loaders.segment_loader.load((endpoint_id, segment_uuid)).then(
+        return loaders.segment_loader.load((partition_key, segment_uuid)).then(
             lambda segment_dict: SegmentType(**segment_dict) if segment_dict else None
         )
 

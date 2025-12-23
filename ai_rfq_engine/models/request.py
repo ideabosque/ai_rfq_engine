@@ -25,7 +25,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -50,7 +51,7 @@ class EmailIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "email-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     email = UnicodeAttribute(range_key=True)
 
 
@@ -65,7 +66,7 @@ class UpdateAtIndex(LocalSecondaryIndex):
         projection = AllProjection()
         index_name = "updated_at-index"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     updated_at = UnicodeAttribute(range_key=True)
 
 
@@ -73,9 +74,11 @@ class RequestModel(BaseModel):
     class Meta(BaseModel.Meta):
         table_name = "are-requests"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     request_uuid = UnicodeAttribute(range_key=True)
     email = UnicodeAttribute()
+    endpoint_id = UnicodeAttribute()
+    part_id = UnicodeAttribute()
     request_title = UnicodeAttribute()
     request_description = UnicodeAttribute(null=True)
     billing_address = MapAttribute(null=True)
@@ -96,26 +99,36 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for requests
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                endpoint_id = args[0].context.get("endpoint_id") or kwargs.get(
-                    "endpoint_id"
-                )
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("request_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["request_uuid"] = getattr(entity, "request_uuid", None)
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("request_uuid"):
                     entity_keys["request_uuid"] = kwargs.get("request_uuid")
 
-                result = purge_entity_cascading_cache(
+                # Get partition_key from context or kwargs
+                partition_key = args[0].context.get("partition_key") or kwargs.get(
+                    "partition_key"
+                )
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="request",
-                    context_keys={"endpoint_id": endpoint_id} if endpoint_id else None,
+                    context_keys=(
+                        {"partition_key": partition_key} if partition_key else None
+                    ),
                     entity_keys=entity_keys if entity_keys else None,
                     cascade_depth=3,
                 )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -145,8 +158,8 @@ def create_request_table(logger: logging.Logger) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "request")
 )
-def get_request(endpoint_id: str, request_uuid: str) -> RequestModel:
-    return RequestModel.get(endpoint_id, request_uuid)
+def get_request(partition_key: str, request_uuid: str) -> RequestModel:
+    return RequestModel.get(partition_key, request_uuid)
 
 
 @retry(
@@ -154,43 +167,45 @@ def get_request(endpoint_id: str, request_uuid: str) -> RequestModel:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-def _get_request(endpoint_id: str, request_uuid: str) -> RequestModel:
-    return RequestModel.get(endpoint_id, request_uuid)
+def _get_request(partition_key: str, request_uuid: str) -> RequestModel:
+    return RequestModel.get(partition_key, request_uuid)
 
 
-def get_request_count(endpoint_id: str, request_uuid: str) -> int:
-    return RequestModel.count(endpoint_id, RequestModel.request_uuid == request_uuid)
+def get_request_count(partition_key: str, request_uuid: str) -> int:
+    return RequestModel.count(partition_key, RequestModel.request_uuid == request_uuid)
 
 
 def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
-    try:
-        request = request.__dict__["attribute_values"]
-    except Exception as e:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise e
-    return RequestType(**Utility.json_normalize(request))
+    """
+    Nested resolver approach: return minimal request data.
+    Those are resolved lazily by RequestType resolvers.
+    """
+    _ = info  # Keep for signature compatibility with decorators
+    request_dict = request.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return RequestType(**Serializer.json_normalize(request_dict))
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType | None:
-    count = get_request_count(info.context["endpoint_id"], kwargs["request_uuid"])
+    partition_key = info.context.get("partition_key")
+    count = get_request_count(partition_key, kwargs["request_uuid"])
     if count == 0:
         return None
 
     return get_request_type(
         info,
-        get_request(info.context["endpoint_id"], kwargs["request_uuid"]),
+        get_request(partition_key, kwargs["request_uuid"]),
     )
 
 
 @monitor_decorator
 @resolve_list_decorator(
-    attributes_to_get=["endpoint_id", "request_uuid", "email", "updated_at"],
+    attributes_to_get=["partition_key", "request_uuid", "email", "updated_at"],
     list_type_class=RequestListType,
     type_funct=get_request_type,
 )
 def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
-    endpoint_id = kwargs.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
     email = kwargs.get("email")
     request_title = kwargs.get("request_title")
     request_description = kwargs.get("request_description")
@@ -204,7 +219,7 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     inquiry_funct = RequestModel.scan
     count_funct = RequestModel.count
     range_key_condition = None
-    if endpoint_id:
+    if partition_key:
 
         # Build range key condition for updated_at when using updated_at_index
         if updated_at_gt is not None and updated_at_lt is not None:
@@ -216,7 +231,7 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         elif updated_at_lt is not None:
             range_key_condition = RequestModel.updated_at < updated_at_lt
 
-        args = [endpoint_id, range_key_condition]
+        args = [partition_key, range_key_condition]
         inquiry_funct = RequestModel.updated_at_index.query
         count_funct = RequestModel.updated_at_index.count
         if email and args[1] is None:
@@ -241,7 +256,7 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     return inquiry_funct, count_funct, args
 
 
-def _validate_request_items(endpoint_id: str, items: list) -> None:
+def _validate_request_items(partition_key: str, items: list) -> None:
     """Validate item_uuid, provider_item_uuid, and batch_no in request items."""
     if not items:
         return
@@ -249,7 +264,7 @@ def _validate_request_items(endpoint_id: str, items: list) -> None:
     for idx, item in enumerate(items):
         # Validate item_uuid if provided
         if "item_uuid" in item and item["item_uuid"]:
-            if not _validate_item_exists(endpoint_id, item["item_uuid"]):
+            if not _validate_item_exists(partition_key, item["item_uuid"]):
                 raise ValueError(
                     f"Item at index {idx}: item_uuid '{item['item_uuid']}' does not exist"
                 )
@@ -263,7 +278,7 @@ def _validate_request_items(endpoint_id: str, items: list) -> None:
                     and provider_item["provider_item_uuid"]
                 ):
                     if not _validate_provider_item_exists(
-                        endpoint_id, provider_item["provider_item_uuid"]
+                        partition_key, provider_item["provider_item_uuid"]
                     ):
                         raise ValueError(
                             f"Item at index {idx}, provider_item at index {provider_idx}: "
@@ -283,26 +298,28 @@ def _validate_request_items(endpoint_id: str, items: list) -> None:
                             )
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "request_uuid",
     },
     model_funct=_get_request,
     count_funct=get_request_count,
     type_funct=get_request_type,
 )
+@purge_cache()
 def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
-    endpoint_id = kwargs.get("endpoint_id") or info.context.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
     request_uuid = kwargs.get("request_uuid")
 
     # Validate items if provided (runs for both insert and update operations)
     if "items" in kwargs and kwargs["items"]:
-        _validate_request_items(endpoint_id, kwargs["items"])
+        _validate_request_items(partition_key, kwargs["items"])
 
     if kwargs.get("entity") is None:
         cols = {
+            "endpoint_id": info.context.get("endpoint_id"),
+            "part_id": info.context.get("part_id"),
             "items": [],
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
@@ -322,7 +339,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             if key in kwargs:
                 cols[key] = kwargs[key]
         RequestModel(
-            endpoint_id,
+            partition_key,
             request_uuid,
             **cols,
         ).save()
@@ -357,14 +374,14 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
-        "hash_key": "endpoint_id",
+        "hash_key": "partition_key",
         "range_key": "request_uuid",
     },
     model_funct=get_request,
 )
+@purge_cache()
 def delete_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     quote_list = resolve_quote_list(
         info, **{"request_uuid": kwargs.get("entity").request_uuid}

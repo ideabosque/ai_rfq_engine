@@ -14,7 +14,7 @@ from .base import Key, SafeDataLoader, normalize_model
 
 
 class ProviderItemsByItemLoader(SafeDataLoader):
-    """Batch loader returning provider items keyed by (endpoint_id, item_uuid)."""
+    """Batch loader returning provider items keyed by (partition_key, item_uuid)."""
 
     def __init__(self, logger=None, cache_enabled=True, **kwargs):
         super(ProviderItemsByItemLoader, self).__init__(
@@ -70,17 +70,17 @@ class ProviderItemsByItemLoader(SafeDataLoader):
         else:
             uncached_keys = unique_keys
 
-        for endpoint_id, item_uuid in uncached_keys:
+        for partition_key, item_uuid in uncached_keys:
             try:
-                provider_items = get_provider_items_by_item(endpoint_id, item_uuid)
+                provider_items = get_provider_items_by_item(partition_key, item_uuid)
                 # if self.cache_enabled:
-                #     self.set_cache_data((endpoint_id, item_uuid), provider_items)
+                #     self.set_cache_data((partition_key, item_uuid), provider_items)
                 normalized = [normalize_model(pi) for pi in provider_items]
-                key_map[(endpoint_id, item_uuid)] = normalized
-                
+                key_map[(partition_key, item_uuid)] = normalized
+
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
                     self.logger.exception(exc)
-                key_map[(endpoint_id, item_uuid)] = []
+                key_map[(partition_key, item_uuid)] = []
 
         return Promise.resolve([key_map.get(key, []) for key in keys])

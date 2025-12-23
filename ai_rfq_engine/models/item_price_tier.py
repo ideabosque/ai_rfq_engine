@@ -20,43 +20,46 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
 
 
-def _get_provider_item(endpoint_id: str, provider_item_uuid: str) -> Dict[str, Any]:
+def _get_provider_item(partition_key: str, provider_item_uuid: str) -> Dict[str, Any]:
     """Helper to get provider_item data for eager loading."""
     from .provider_item import get_provider_item, get_provider_item_count
 
-    count = get_provider_item_count(endpoint_id, provider_item_uuid)
+    count = get_provider_item_count(partition_key, provider_item_uuid)
     if count == 0:
         return {}
 
-    provider_item = get_provider_item(endpoint_id, provider_item_uuid)
+    provider_item = get_provider_item(partition_key, provider_item_uuid)
     return {
-        "endpoint_id": provider_item.endpoint_id,
+        "partition_key": provider_item.partition_key,
         "provider_item_uuid": provider_item.provider_item_uuid,
         "provider_corp_external_id": provider_item.provider_corp_external_id,
-        "provider_item_external_id": getattr(provider_item, "provider_item_external_id", None),
+        "provider_item_external_id": getattr(
+            provider_item, "provider_item_external_id", None
+        ),
         "base_price_per_uom": provider_item.base_price_per_uom,
         "item_uuid": provider_item.item_uuid,
     }
 
 
-def _get_segment(endpoint_id: str, segment_uuid: str) -> Dict[str, Any]:
+def _get_segment(partition_key: str, segment_uuid: str) -> Dict[str, Any]:
     """Helper to get segment data for eager loading."""
     from .segment import get_segment, get_segment_count
 
-    count = get_segment_count(endpoint_id, segment_uuid)
+    count = get_segment_count(partition_key, segment_uuid)
     if count == 0:
         return {}
 
-    segment = get_segment(endpoint_id, segment_uuid)
+    segment = get_segment(partition_key, segment_uuid)
     return {
-        "endpoint_id": segment.endpoint_id,
+        "partition_key": segment.partition_key,
         "segment_uuid": segment.segment_uuid,
         "provider_corp_external_id": segment.provider_corp_external_id,
         "segment_name": segment.segment_name,
@@ -117,7 +120,7 @@ class ItemPriceTierModel(BaseModel):
     item_price_tier_uuid = UnicodeAttribute(range_key=True)
     provider_item_uuid = UnicodeAttribute()
     segment_uuid = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     quantity_greater_then = NumberAttribute()
     quantity_less_then = NumberAttribute(null=True)
     margin_per_uom = NumberAttribute(null=True)
@@ -136,19 +139,32 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for item_price_tiers
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("item_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["item_uuid"] = getattr(entity, "item_uuid", None)
+                    entity_keys["item_price_tier_uuid"] = getattr(
+                        entity, "item_price_tier_uuid", None
+                    )
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("item_uuid"):
                     entity_keys["item_uuid"] = kwargs.get("item_uuid")
-                if kwargs.get("item_price_tier_uuid"):
+                if not entity_keys.get("item_price_tier_uuid"):
                     entity_keys["item_price_tier_uuid"] = kwargs.get(
                         "item_price_tier_uuid"
                     )
 
-                result = purge_entity_cascading_cache(
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="item_price_tier",
                     context_keys=context_keys,
@@ -157,27 +173,37 @@ def purge_cache():
                 )
 
                 if kwargs.get("item_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="item_price_tier",
                         context_keys=context_keys,
                         entity_keys={"item_uuid": kwargs.get("item_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_item_price_tiers_by_item", "custom_cache_keys": ["key:item_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_item_price_tiers_by_item",
+                            "custom_cache_keys": ["key:item_uuid"],
+                        },
                     )
 
                 if kwargs.get("item_uuid") and kwargs.get("item_price_tier_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="item_price_tier",
                         context_keys=context_keys,
-                        entity_keys={"item_uuid": kwargs.get("item_uuid"), "item_price_tier_uuid": kwargs.get("item_price_tier_uuid")},
+                        entity_keys={
+                            "item_uuid": kwargs.get("item_uuid"),
+                            "item_price_tier_uuid": kwargs.get("item_price_tier_uuid"),
+                        },
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_item_price_tiers_by_provider_item", "custom_cache_keys": ["key:item_uuid", "key:item_price_tier_uuid", "key:segment_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_item_price_tiers_by_provider_item",
+                            "custom_cache_keys": [
+                                "key:item_uuid",
+                                "key:item_price_tier_uuid",
+                                "key:segment_uuid",
+                            ],
+                        },
                     )
-                   
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -238,14 +264,10 @@ def get_item_price_tier_type(
     Convert ItemPriceTierModel to ItemPriceTierType.
     Nested relationships are lazily loaded via nested resolvers.
     """
-    try:
-        tier_dict: Dict = item_price_tier.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
-    return ItemPriceTierType(**Utility.json_normalize(tier_dict))
+    _ = info  # Keep for signature compatibility with decorators
+    tier_dict = item_price_tier.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return ItemPriceTierType(**Serializer.json_normalize(tier_dict))
 
 
 def resolve_item_price_tier(
@@ -283,7 +305,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     item_uuid = kwargs.get("item_uuid")
     provider_item_uuid = kwargs.get("provider_item_uuid")
     segment_uuid = kwargs.get("segment_uuid")
-    endpoint_id = info.context["endpoint_id"]
+    partition_key = info.context["partition_key"]
     quantity_value = kwargs.get("quantity_value")
     max_price = kwargs.get("max_price")
     min_price = kwargs.get("min_price")
@@ -321,8 +343,8 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
             inquiry_funct = ItemPriceTierModel.segment_uuid_index.query
 
     the_filters = None  # We can add filters for the query
-    if endpoint_id:
-        the_filters &= ItemPriceTierModel.endpoint_id == endpoint_id
+    if partition_key:
+        the_filters &= ItemPriceTierModel.partition_key == partition_key
     if (
         provider_item_uuid
         and args[1] is not None
@@ -458,7 +480,6 @@ def _update_previous_tier(
     )
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "item_uuid",
@@ -468,6 +489,7 @@ def _update_previous_tier(
     count_funct=get_item_price_tier_count,
     type_funct=get_item_price_tier_type,
 )
+@purge_cache()
 def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     item_uuid = kwargs.get("item_uuid")
     item_price_tier_uuid = kwargs.get("item_price_tier_uuid")
@@ -476,7 +498,7 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
         previous_tier = _get_previous_tier(info, **kwargs)
 
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
             "updated_at": pendulum.now("UTC"),
@@ -539,7 +561,6 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "item_uuid",
@@ -547,9 +568,11 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
     },
     model_funct=get_item_price_tier,
 )
+@purge_cache()
 def delete_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,
@@ -560,10 +583,9 @@ def delete_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "item_price_tier"),
 )
-def get_item_price_tiers_by_item(
-    item_uuid: str
-) -> Any:
+def get_item_price_tiers_by_item(item_uuid: str) -> Any:
     return ItemPriceTierModel.query(item_uuid)
+
 
 @retry(
     reraise=True,

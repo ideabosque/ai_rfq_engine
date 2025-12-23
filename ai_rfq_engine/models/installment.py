@@ -20,7 +20,8 @@ from silvaengine_dynamodb_base import (
     monitor_decorator,
     resolve_list_decorator,
 )
-from silvaengine_utility import Utility, method_cache
+from silvaengine_utility import method_cache
+from silvaengine_utility.serializer import Serializer
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -49,7 +50,7 @@ class InstallmentModel(BaseModel):
 
     quote_uuid = UnicodeAttribute(hash_key=True)
     installment_uuid = UnicodeAttribute(range_key=True)
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     request_uuid = UnicodeAttribute()
     priority = NumberAttribute(default=0)
     salesorder_no = UnicodeAttribute(null=True)
@@ -69,17 +70,30 @@ def purge_cache():
         @functools.wraps(original_function)
         def wrapper_function(*args, **kwargs):
             try:
-                # Use cascading cache purging for installments
+                # Execute original function first
+                result = original_function(*args, **kwargs)
+
+                # Then purge cache after successful operation
                 from ..models.cache import purge_entity_cascading_cache
 
-                context_keys = None
+                # Get entity keys from entity parameter (for updates)
                 entity_keys = {}
-                if kwargs.get("quote_uuid"):
+                entity = kwargs.get("entity")
+                if entity:
+                    entity_keys["quote_uuid"] = getattr(entity, "quote_uuid", None)
+                    entity_keys["installment_uuid"] = getattr(
+                        entity, "installment_uuid", None
+                    )
+
+                # Fallback to kwargs (for creates/deletes)
+                if not entity_keys.get("quote_uuid"):
                     entity_keys["quote_uuid"] = kwargs.get("quote_uuid")
-                if kwargs.get("installment_uuid"):
+                if not entity_keys.get("installment_uuid"):
                     entity_keys["installment_uuid"] = kwargs.get("installment_uuid")
 
-                result = purge_entity_cascading_cache(
+                context_keys = None
+
+                purge_entity_cascading_cache(
                     args[0].context.get("logger"),
                     entity_type="installment",
                     context_keys=context_keys,
@@ -88,17 +102,17 @@ def purge_cache():
                 )
 
                 if kwargs.get("quote_uuid"):
-                   result = purge_entity_cascading_cache(
+                    purge_entity_cascading_cache(
                         args[0].context.get("logger"),
                         entity_type="installment",
                         context_keys=context_keys,
                         entity_keys={"quote_uuid": kwargs.get("quote_uuid")},
                         cascade_depth=3,
-                        custom_options={"custom_getter": "get_installments_by_quote", "custom_cache_keys": ["key:quote_uuid"]}
+                        custom_options={
+                            "custom_getter": "get_installments_by_quote",
+                            "custom_cache_keys": ["key:quote_uuid"],
+                        },
                     )
-
-                ## Original function.
-                result = original_function(*args, **kwargs)
 
                 return result
             except Exception as e:
@@ -187,14 +201,10 @@ def get_installment_type(
     - Do NOT embed 'quote'.
     'quote' is resolved lazily by InstallmentType.resolve_quote.
     """
-    try:
-        inst_dict = installment.__dict__["attribute_values"]
-    except Exception:
-        log = traceback.format_exc()
-        info.context.get("logger").exception(log)
-        raise
-
-    return InstallmentType(**Utility.json_normalize(inst_dict))
+    _ = info  # Keep for signature compatibility with decorators
+    inst_dict = installment.__dict__["attribute_values"].copy()
+    # Keep all fields including FKs - nested resolvers will handle lazy loading
+    return InstallmentType(**Serializer.json_normalize(inst_dict))
 
 
 def resolve_installment(
@@ -219,7 +229,7 @@ def resolve_installment(
 def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     quote_uuid = kwargs.get("quote_uuid")
     request_uuid = kwargs.get("request_uuid")
-    endpoint_id = info.context.get("endpoint_id")
+    partition_key = info.context.get("partition_key")
     priority = kwargs.get("priority")
     salesorder_no = kwargs.get("salesorder_no")
     from_scheduled_date = kwargs.get("from_scheduled_date")
@@ -253,8 +263,8 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
         count_funct = InstallmentModel.updated_at_index.count
 
     the_filters = None
-    if endpoint_id:
-        the_filters = InstallmentModel.endpoint_id == endpoint_id
+    if partition_key:
+        the_filters = InstallmentModel.partition_key == partition_key
     if request_uuid:
         the_filters &= InstallmentModel.request_uuid == request_uuid
     if priority:
@@ -283,7 +293,6 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
     return inquiry_funct, count_funct, args
 
 
-@purge_cache()
 @insert_update_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -293,12 +302,13 @@ def resolve_installment_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any
     count_funct=get_installment_count,
     type_funct=get_installment_type,
 )
+@purge_cache()
 def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     quote_uuid = kwargs.get("quote_uuid")
     installment_uuid = kwargs.get("installment_uuid")
     if kwargs.get("entity") is None:
         cols = {
-            "endpoint_id": info.context.get("endpoint_id"),
+            "partition_key": info.context.get("partition_key"),
             "request_uuid": kwargs.get("request_uuid"),
             "updated_by": kwargs["updated_by"],
             "created_at": pendulum.now("UTC"),
@@ -366,7 +376,6 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
     return
 
 
-@purge_cache()
 @delete_decorator(
     keys={
         "hash_key": "quote_uuid",
@@ -374,9 +383,11 @@ def insert_update_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> No
     },
     model_funct=get_installment,
 )
+@purge_cache()
 def delete_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     kwargs.get("entity").delete()
     return True
+
 
 @retry(
     reraise=True,
