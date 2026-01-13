@@ -8,6 +8,7 @@ import logging
 from typing import Any, Dict, List
 
 from graphene import Schema
+
 from silvaengine_dynamodb_base import BaseModel
 from silvaengine_utility import Graphql
 
@@ -254,19 +255,44 @@ class AIRFQEngine(Graphql):
 
     def _apply_partition_defaults(self, params: Dict[str, Any]) -> None:
         """
-        Ensure endpoint_id/part_id defaults and assemble partition_key.
-        """
-        ## Test the waters 🧪 before diving in!
-        ##<--Testing Data-->##
-        if params.get("endpoint_id") is None:
-            params["endpoint_id"] = self.setting.get("endpoint_id")
-        if params.get("part_id") is None:
-            params["part_id"] = self.setting.get("part_id")
-        ##<--Testing Data-->##
+        Apply default partition values if not provided in params.
 
-        endpoint_id = params.get("endpoint_id")
-        part_id = params.get("part_id")
-        params["partition_key"] = f"{endpoint_id}#{part_id}"
+        Args:
+            params (Dict[str, Any]): A dictionary of parameters required to build the GraphQL query.
+        """
+        endpoint_id = params.get("endpoint_id", self.setting.get("endpoint_id"))
+        part_id = params.get("custom_headers", {}).get(
+            "part_id",
+            params.get("part_id", self.setting.get("part_id")),
+        )
+
+        if params.get("context") is None:
+            params["context"] = {}
+
+        if "endpoint_id" not in params["context"]:
+            params["context"]["endpoint_id"] = endpoint_id
+        if "part_id" not in params["context"]:
+            params["context"]["part_id"] = part_id
+        if "connection_id" not in params:
+            params["connection_id"] = self.setting.get("connection_id")
+
+        if "partition_key" not in params["context"]:
+            # Validate endpoint_id and part_id before creating partition_key
+            if not endpoint_id or not part_id:
+                self.logger.error(
+                    f"Missing endpoint_id or part_id: endpoint_id={endpoint_id}, part_id={part_id}"
+                )
+                # Only create partition key if both values are present
+                if endpoint_id and part_id:
+                    params["context"]["partition_key"] = f"{endpoint_id}#{part_id}"
+            else:
+                params["context"]["partition_key"] = f"{endpoint_id}#{part_id}"
+
+        if "logger" in params:
+            params.pop("logger")
+
+        if "setting" in params:
+            params.pop("setting")
 
     def ai_rfq_graphql(self, **params: Dict[str, Any]) -> Any:
 
