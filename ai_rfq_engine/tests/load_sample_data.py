@@ -23,9 +23,8 @@ sys.path.insert(0, os.path.join(BASE_DIR, "silvaengine_utility"))
 sys.path.insert(1, os.path.join(BASE_DIR, "silvaengine_dynamodb_base"))
 sys.path.insert(2, os.path.join(BASE_DIR, "ai_rfq_engine"))
 
-from silvaengine_utility.serializer import Serializer  # noqa: E402
-
 from ai_rfq_engine import AIRFQEngine  # noqa: E402
+from silvaengine_utility.serializer import Serializer  # noqa: E402
 
 try:
     from faker import Faker
@@ -121,6 +120,8 @@ def run_graphql_mutation(engine, query, variables):
         return None
 
     print(f"  -> Success: {query.strip().splitlines()[0]} ...")
+    if "data" in data:
+        return data["data"]
     return data
 
 
