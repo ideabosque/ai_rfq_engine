@@ -13,6 +13,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -22,7 +24,6 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import method_cache
 from silvaengine_utility.serializer import Serializer
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.item import ItemListType, ItemType
@@ -174,7 +175,7 @@ def get_item_type(info: ResolveInfo, item: ItemModel) -> ItemType:
 def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType | None:
     partition_key = info.context.get("partition_key")
 
-    if "item_external_id" in kwargs:
+    if "item_external_id" in kwargs and kwargs["item_external_id"]:
         # Get item by external id
         results = ItemModel.query(
             partition_key,

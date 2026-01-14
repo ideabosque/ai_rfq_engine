@@ -18,6 +18,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,7 +29,6 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import method_cache
 from silvaengine_utility.serializer import Serializer
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.provider_item import ProviderItemListType, ProviderItemType
@@ -243,7 +244,7 @@ def resolve_provider_item(
 ) -> ProviderItemType | None:
     partition_key = info.context.get("partition_key")
 
-    if "provider_item_external_id" in kwargs:
+    if "provider_item_external_id" in kwargs and kwargs["provider_item_external_id"]:
         results = ProviderItemModel.query(
             partition_key,
             None,
