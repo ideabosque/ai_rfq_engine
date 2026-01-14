@@ -19,6 +19,9 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+from silvaengine_constants import DiscountPromptScope, DiscountPromptStatus
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -28,25 +31,9 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import method_cache
 from silvaengine_utility.serializer import Serializer
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.discount_prompt import DiscountPromptListType, DiscountPromptType
-
-
-# Status constants for DiscountPrompt
-class DiscountPromptStatus:
-    IN_REVIEW = "in_review"
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-
-
-# Scope constants for DiscountPrompt
-class DiscountPromptScope:
-    GLOBAL = "global"
-    SEGMENT = "segment"
-    ITEM = "item"
-    PROVIDER_ITEM = "provider_item"
 
 
 def validate_and_normalize_discount_rules(discount_rules):
