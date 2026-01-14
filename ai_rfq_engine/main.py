@@ -304,3 +304,11 @@ class AIRFQEngine(Graphql):
             types=type_class(),
         )
         return self.execute(schema, **params)
+
+    @staticmethod
+    def build_graphql_schema() -> Schema:
+        return Schema(
+            query=Query,
+            mutation=Mutations,
+            types=type_class(),
+        )
