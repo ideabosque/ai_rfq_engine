@@ -5,7 +5,6 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import functools
-import logging
 import traceback
 from typing import Any, Dict
 
@@ -26,7 +25,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.installment import InstallmentListType, InstallmentType
-from .utils import _get_quote
+from .utils import get_quote
 
 
 class UpdateAtIndex(LocalSecondaryIndex):
@@ -125,15 +124,6 @@ def purge_cache():
     return actual_decorator
 
 
-def create_installment_table(logger: logging.Logger) -> bool:
-    """Create the Installment table if it doesn't exist."""
-    if not InstallmentModel.exists():
-        # Create with on-demand billing (PAY_PER_REQUEST)
-        InstallmentModel.create_table(billing_mode="PAY_PER_REQUEST", wait=True)
-        logger.info("The Installment table has been created.")
-    return True
-
-
 @retry(
     reraise=True,
     wait=wait_exponential(multiplier=1, max=60),
@@ -182,7 +172,7 @@ def _calculate_installment_ratio(
         The calculated installment_ratio as a percentage, or None if calculation fails
     """
     try:
-        quote = _get_quote(request_uuid, quote_uuid)
+        quote = get_quote(request_uuid, quote_uuid)
         if quote["final_total_quote_amount"] and quote["final_total_quote_amount"] > 0:
             return (
                 float(installment_amount) / float(quote["final_total_quote_amount"])

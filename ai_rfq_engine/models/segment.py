@@ -124,15 +124,6 @@ def purge_cache():
     return actual_decorator
 
 
-def create_segment_table(logger: logging.Logger) -> bool:
-    """Create the Segment table if it doesn't exist."""
-    if not SegmentModel.exists():
-        # Create with on-demand billing (PAY_PER_REQUEST)
-        SegmentModel.create_table(billing_mode="PAY_PER_REQUEST", wait=True)
-        logger.info("The Segment table has been created.")
-    return True
-
-
 @retry(
     reraise=True,
     wait=wait_exponential(multiplier=1, max=60),

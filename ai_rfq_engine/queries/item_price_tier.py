@@ -43,7 +43,7 @@ def resolve_item_price_tiers(
     """
     Resolve item price tiers for quote items using batch loaders.
 
-    Uses the _combine_all_item_price_tiers utility from models.utils
+    Uses the combine_all_item_price_tiers utility from models.utils
     to handle the complex Promise chaining and hierarchical loading logic,
     then converts the results to ItemPriceTierType.
 
@@ -55,7 +55,7 @@ def resolve_item_price_tiers(
         Promise that resolves to list of ItemPriceTierType objects with price tier information
     """
     from ..models.item_price_tier import get_item_price_tier_type
-    from ..models.utils import _combine_all_item_price_tiers
+    from ..models.utils import combine_all_item_price_tiers
 
     loaders = get_loaders(info.context)
     partition_key = info.context.get("partition_key")
@@ -69,6 +69,6 @@ def resolve_item_price_tiers(
             get_item_price_tier_type(info, tier_model) for tier_model in tier_models
         ]
 
-    return _combine_all_item_price_tiers(
+    return combine_all_item_price_tiers(
         partition_key, email, quote_items, loaders
     ).then(convert_to_types)

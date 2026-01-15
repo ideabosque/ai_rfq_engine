@@ -5,7 +5,6 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import DateTime, Field, Int, List, ObjectType, String
-
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSON
 
@@ -144,11 +143,11 @@ class QuoteType(ObjectType):
             Returns:
                 Promise that resolves to combined list of discount prompts
             """
-            from ..models.utils import _combine_all_discount_prompts
+            from ..models.utils import combine_all_discount_prompts
 
             request_dict, quote_items = results
             email = request_dict.get("email") if request_dict else None
-            return _combine_all_discount_prompts(
+            return combine_all_discount_prompts(
                 partition_key, email, quote_items, loaders
             )
 

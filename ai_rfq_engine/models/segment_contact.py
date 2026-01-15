@@ -5,7 +5,6 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import functools
-import logging
 import traceback
 from typing import Any, Dict
 
@@ -13,8 +12,6 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -24,6 +21,7 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import method_cache
 from silvaengine_utility.serializer import Serializer
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.segment_contact import SegmentContactListType, SegmentContactType
@@ -158,15 +156,6 @@ def purge_cache():
         return wrapper_function
 
     return actual_decorator
-
-
-def create_segment_contact_table(logger: logging.Logger) -> bool:
-    """Create the Segment Contact table if it doesn't exist."""
-    if not SegmentContactModel.exists():
-        # Create with on-demand billing (PAY_PER_REQUEST)
-        SegmentContactModel.create_table(billing_mode="PAY_PER_REQUEST", wait=True)
-        logger.info("The SegmentContact table has been created.")
-    return True
 
 
 @retry(
