@@ -7,6 +7,7 @@ __author__ = "bibow"
 from typing import Any, Dict, List
 
 from promise import Promise
+
 from silvaengine_utility.cache import HybridCacheEngine
 
 from ...handlers.config import Config
@@ -27,17 +28,16 @@ class SegmentContactBySegmentLoader(SafeDataLoader):
             cache_meta = Config.get_cache_entity_config().get("segment_contact")
             self.cache_func_prefix = ""
             if cache_meta:
-                self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_segment_contacts_by_segment"])
+                self.cache_func_prefix = ".".join(
+                    [cache_meta.get("module"), "get_segment_contacts_by_segment"]
+                )
 
     def generate_cache_key(self, key: Key) -> str:
         if not isinstance(key, tuple):
             key = (key,)
         key_data = ":".join([str(key), str({})])
-        return self.cache._generate_key(
-            self.cache_func_prefix,
-            key_data
-        )
-    
+        return self.cache._generate_key(self.cache_func_prefix, key_data)
+
     def get_cache_data(self, key: Key) -> Dict[str, Any] | None | List[Dict[str, Any]]:
         cache_key = self.generate_cache_key(key)
         cached_item = self.cache.get(cache_key)
@@ -52,8 +52,10 @@ class SegmentContactBySegmentLoader(SafeDataLoader):
     def set_cache_data(self, key: Key, data: Any) -> None:
         cache_key = self.generate_cache_key(key)
         self.cache.set(cache_key, data, ttl=Config.get_cache_ttl())
+
     def batch_load_fn(self, keys: List[Key]) -> Promise:
         from ..segment_contact import get_segment_contacts_by_segment
+
         unique_keys = list(dict.fromkeys(keys))
         key_map: Dict[Key, List[Dict[str, Any]]] = {}
         uncached_keys: List[Key] = []
@@ -71,8 +73,6 @@ class SegmentContactBySegmentLoader(SafeDataLoader):
         for partition_key, segment_uuid in uncached_keys:
             try:
                 contacts = get_segment_contacts_by_segment(partition_key, segment_uuid)
-                # if self.cache_enabled:
-                #     self.set_cache_data((partition_key, segment_uuid), contacts)
                 normalized = [normalize_model(contact) for contact in contacts]
                 key_map[(partition_key, segment_uuid)] = normalized
 

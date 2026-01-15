@@ -7,6 +7,7 @@ __author__ = "bibow"
 from typing import Any, Dict, List
 
 from promise import Promise
+
 from silvaengine_utility.cache import HybridCacheEngine
 
 from ...handlers.config import Config
@@ -38,7 +39,9 @@ class ItemPriceTierByProviderItemLoader(SafeDataLoader):
             cache_meta = Config.get_cache_entity_config().get("item_price_tier")
             self.cache_func_prefix = ""
             if cache_meta:
-                self.cache_func_prefix = ".".join([cache_meta.get("module"), "get_item_price_tiers_by_provider_item"])
+                self.cache_func_prefix = ".".join(
+                    [cache_meta.get("module"), "get_item_price_tiers_by_provider_item"]
+                )
 
     def generate_cache_key(self, key: Key) -> str:
         # Key is (item_uuid, provider_item_uuid, segment_uuid)
@@ -48,11 +51,8 @@ class ItemPriceTierByProviderItemLoader(SafeDataLoader):
         if not isinstance(key, tuple):
             key = (key,)
         key_data = ":".join([str(key), str({})])
-        return self.cache._generate_key(
-            self.cache_func_prefix,
-            key_data
-        )
-    
+        return self.cache._generate_key(self.cache_func_prefix, key_data)
+
     def get_cache_data(self, key: Key) -> Dict[str, Any] | None | List[Dict[str, Any]]:
         cache_key = self.generate_cache_key(key)
         cached_item = self.cache.get(cache_key)
@@ -70,6 +70,7 @@ class ItemPriceTierByProviderItemLoader(SafeDataLoader):
 
     def batch_load_fn(self, keys: List[Key]) -> Promise:
         from ..item_price_tier import get_item_price_tiers_by_provider_item
+
         unique_keys = list(dict.fromkeys(keys))
         key_map: Dict[Key, List[Dict[str, Any]]] = {}
         uncached_keys: List[Key] = []
@@ -95,12 +96,8 @@ class ItemPriceTierByProviderItemLoader(SafeDataLoader):
 
             try:
                 tiers = get_item_price_tiers_by_provider_item(
-                    item_uuid,
-                    provider_item_uuid,
-                    segment_uuid
+                    item_uuid, provider_item_uuid, segment_uuid
                 )
-                # if self.cache_enabled:
-                #     self.set_cache_data(key, tiers)
                 normalized = [normalize_model(tier) for tier in tiers]
                 key_map[key] = normalized
             except Exception as exc:  # pragma: no cover - defensive
