@@ -7,22 +7,24 @@ __author__ = "bibow"
 from typing import Any, Dict
 
 from graphene import ResolveInfo
-
 from silvaengine_utility import method_cache
 
 from ..handlers.config import Config
-
 from ..models import segment_contact
 from ..types.segment_contact import SegmentContactListType, SegmentContactType
 
 
 def resolve_segment_contact(
     info: ResolveInfo, **kwargs: Dict[str, Any]
-) -> SegmentContactType:
+) -> SegmentContactType | None:
     return segment_contact.resolve_segment_contact(info, **kwargs)
 
 
-@method_cache(ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name('queries', 'segment_contact'))
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("queries", "segment_contact"),
+    cache_enabled=Config.is_cache_enabled,
+)
 def resolve_segment_contact_list(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> SegmentContactListType:

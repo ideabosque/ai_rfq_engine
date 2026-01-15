@@ -249,6 +249,10 @@ class Config:
         """
         cls.source_email = setting.get("source_email")
 
+        # Set cache enabled flag (defaults to True if not specified)
+        if "cache_enabled" in setting:
+            cls.CACHE_ENABLED = setting.get("cache_enabled", True)
+
     @classmethod
     def _initialize_aws_services(cls, setting: Dict[str, Any]) -> None:
         """

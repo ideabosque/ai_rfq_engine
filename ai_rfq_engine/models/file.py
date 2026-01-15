@@ -147,7 +147,9 @@ def create_file_table(logger: logging.Logger) -> bool:
     stop=stop_after_attempt(5),
 )
 @method_cache(
-    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "file")
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "file"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_file(request_uuid: str, file_name: str) -> FileModel:
     return FileModel.get(request_uuid, file_name)
@@ -294,7 +296,9 @@ def delete_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     stop=stop_after_attempt(5),
 )
 @method_cache(
-    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "file")
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "file"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_files_by_request(request_uuid: str) -> Any:
     files = []

@@ -177,6 +177,7 @@ def create_segment_contact_table(logger: logging.Logger) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "segment_contact"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_segment_contact(partition_key: str, email: str) -> SegmentContactModel:
     return SegmentContactModel.get(partition_key, email)
@@ -367,6 +368,7 @@ def delete_segment_contact(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "segment_contact"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_segment_contacts_by_segment(partition_key: str, segment_uuid: str) -> Any:
     segment_contacts = []

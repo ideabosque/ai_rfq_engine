@@ -258,6 +258,7 @@ def create_discount_prompt_table(logger: logging.Logger) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "discount_prompt"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_discount_prompts_by_segment(partition_key: str, segment_uuid: str) -> Any:
     """
@@ -287,6 +288,7 @@ def get_discount_prompts_by_segment(partition_key: str, segment_uuid: str) -> An
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "discount_prompt"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_discount_prompts_by_item(partition_key: str, item_uuid: str) -> Any:
     """
@@ -316,6 +318,7 @@ def get_discount_prompts_by_item(partition_key: str, item_uuid: str) -> Any:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "discount_prompt"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_discount_prompts_by_provider_item(
     partition_key: str, provider_item_uuid: str
@@ -347,6 +350,7 @@ def get_discount_prompts_by_provider_item(
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "discount_prompt"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_global_discount_prompts(partition_key: str) -> Any:
     """Get all ACTIVE global discount prompts for a partition."""
@@ -368,6 +372,7 @@ def get_global_discount_prompts(partition_key: str) -> Any:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "discount_prompt"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_discount_prompt(
     partition_key: str, discount_prompt_uuid: str

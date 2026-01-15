@@ -7,19 +7,21 @@ __author__ = "bibow"
 from typing import Any, Dict
 
 from graphene import ResolveInfo
-
 from silvaengine_utility import method_cache
 
 from ..handlers.config import Config
-
 from ..models import item
 from ..types.item import ItemListType, ItemType
 
 
-def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
+def resolve_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType | None:
     return item.resolve_item(info, **kwargs)
 
 
-@method_cache(ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name('queries', 'item'))
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("queries", "item"),
+    cache_enabled=Config.is_cache_enabled,
+)
 def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemListType:
     return item.resolve_item_list(info, **kwargs)
