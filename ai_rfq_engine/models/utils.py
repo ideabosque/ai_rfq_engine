@@ -11,33 +11,43 @@ from promise import Promise
 from ..utils.normalization import normalize_to_json
 
 
-def _initialize_tables(logger: logging.Logger) -> None:
-    from .discount_prompt import create_discount_prompt_table
-    from .file import create_file_table
-    from .installment import create_installment_table
-    from .item import create_item_table
-    from .item_price_tier import create_item_price_tier_table
-    from .provider_item import create_provider_item_table
-    from .provider_item_batches import create_provider_item_batch_table
-    from .quote import create_quote_table
-    from .quote_item import create_quote_item_table
-    from .request import create_request_table
-    from .segment import create_segment_table
-    from .segment_contact import create_segment_contact_table
+def initialize_tables(logger: logging.Logger) -> None:
+    from .discount_prompt import DiscountPromptModel
+    from .file import FileModel
+    from .installment import InstallmentModel
+    from .item import ItemModel
+    from .item_price_tier import ItemPriceTierModel
+    from .provider_item import ProviderItemModel
+    from .provider_item_batches import ProviderItemBatchModel
+    from .quote import QuoteModel
+    from .quote_item import QuoteItemModel
+    from .request import RequestModel
+    from .segment import SegmentModel
+    from .segment_contact import SegmentContactModel
 
-    create_item_table(logger)
-    create_provider_item_table(logger)
-    create_provider_item_batch_table(logger)
-    create_item_price_tier_table(logger)
-    create_segment_table(logger)
-    create_segment_contact_table(logger)
-    create_quote_table(logger)
-    create_quote_item_table(logger)
-    create_request_table(logger)
-    create_file_table(logger)
-    create_installment_table(logger)
-    create_discount_prompt_table(logger)
-    return
+    models: List = [
+        DiscountPromptModel,
+        FileModel,
+        InstallmentModel,
+        ItemModel,
+        ItemPriceTierModel,
+        ProviderItemModel,
+        ProviderItemBatchModel,
+        QuoteModel,
+        QuoteItemModel,
+        RequestModel,
+        SegmentModel,
+        SegmentContactModel,
+    ]
+
+    for model in models:
+        if model.exists():
+            continue
+
+        table_name = model.Meta.table_name
+        # Create with on-demand billing (PAY_PER_REQUEST)
+        model.create_table(billing_mode="PAY_PER_REQUEST", wait=True)
+        logger.info(f"The {table_name} table has been created.")
 
 
 def _get_request(partition_key: str, request_uuid: str) -> Dict[str, Any]:
@@ -63,7 +73,7 @@ def _get_request(partition_key: str, request_uuid: str) -> Dict[str, Any]:
     }
 
 
-def _get_quote(request_uuid: str, quote_uuid: str) -> Dict[str, Any]:
+def get_quote(request_uuid: str, quote_uuid: str) -> Dict[str, Any]:
     from .quote import get_quote, get_quote_count
 
     count = get_quote_count(request_uuid, quote_uuid)
@@ -87,28 +97,28 @@ def _get_quote(request_uuid: str, quote_uuid: str) -> Dict[str, Any]:
     }
 
 
-def _validate_item_exists(partition_key: str, item_uuid: str) -> bool:
+def validate_item_exists(partition_key: str, item_uuid: str) -> bool:
     """Validate if an item exists in the database."""
     from .item import get_item_count
 
     return get_item_count(partition_key, item_uuid) > 0
 
 
-def _validate_provider_item_exists(partition_key: str, provider_item_uuid: str) -> bool:
+def validate_provider_item_exists(partition_key: str, provider_item_uuid: str) -> bool:
     """Validate if a provider item exists in the database."""
     from .provider_item import get_provider_item_count
 
     return get_provider_item_count(partition_key, provider_item_uuid) > 0
 
 
-def _validate_batch_exists(provider_item_uuid: str, batch_no: str) -> bool:
+def validate_batch_exists(provider_item_uuid: str, batch_no: str) -> bool:
     """Validate if a batch exists for a given provider item."""
     from .provider_item_batches import get_provider_item_batch_count
 
     return get_provider_item_batch_count(provider_item_uuid, batch_no) > 0
 
 
-def _combine_all_discount_prompts(
+def combine_all_discount_prompts(
     partition_key: str,
     email: str,
     quote_items: List[Dict[str, Any]],
@@ -266,7 +276,7 @@ def _combine_all_discount_prompts(
         return load_segment_prompts_and_merge(None)
 
 
-def _combine_all_item_price_tiers(
+def combine_all_item_price_tiers(
     partition_key: str,
     email: str,
     quote_items: List[Dict[str, Any]],

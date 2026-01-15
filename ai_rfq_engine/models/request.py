@@ -5,7 +5,6 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import functools
-import logging
 import traceback
 from typing import Any, Dict
 
@@ -34,9 +33,9 @@ from ..types.request import RequestListType, RequestType
 from .file import resolve_file_list
 from .quote import resolve_quote_list
 from .utils import (
-    _validate_batch_exists,
-    _validate_item_exists,
-    _validate_provider_item_exists,
+    validate_batch_exists,
+    validate_item_exists,
+    validate_provider_item_exists,
 )
 
 
@@ -139,15 +138,6 @@ def purge_cache():
         return wrapper_function
 
     return actual_decorator
-
-
-def create_request_table(logger: logging.Logger) -> bool:
-    """Create the Request table if it doesn't exist."""
-    if not RequestModel.exists():
-        # Create with on-demand billing (PAY_PER_REQUEST)
-        RequestModel.create_table(billing_mode="PAY_PER_REQUEST", wait=True)
-        logger.info("The Request table has been created.")
-    return True
 
 
 @retry(
@@ -266,7 +256,7 @@ def _validate_request_items(partition_key: str, items: list) -> None:
     for idx, item in enumerate(items):
         # Validate item_uuid if provided
         if "item_uuid" in item and item["item_uuid"]:
-            if not _validate_item_exists(partition_key, item["item_uuid"]):
+            if not validate_item_exists(partition_key, item["item_uuid"]):
                 raise ValueError(
                     f"Item at index {idx}: item_uuid '{item['item_uuid']}' does not exist"
                 )
@@ -279,7 +269,7 @@ def _validate_request_items(partition_key: str, items: list) -> None:
                     "provider_item_uuid" in provider_item
                     and provider_item["provider_item_uuid"]
                 ):
-                    if not _validate_provider_item_exists(
+                    if not validate_provider_item_exists(
                         partition_key, provider_item["provider_item_uuid"]
                     ):
                         raise ValueError(
@@ -289,7 +279,7 @@ def _validate_request_items(partition_key: str, items: list) -> None:
 
                     # Validate batch_no if provided
                     if "batch_no" in provider_item and provider_item["batch_no"]:
-                        if not _validate_batch_exists(
+                        if not validate_batch_exists(
                             provider_item["provider_item_uuid"],
                             provider_item["batch_no"],
                         ):

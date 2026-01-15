@@ -5,7 +5,6 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import functools
-import logging
 import traceback
 from typing import Any, Dict
 
@@ -151,15 +150,6 @@ def purge_cache():
         return wrapper_function
 
     return actual_decorator
-
-
-def create_provider_item_batch_table(logger: logging.Logger) -> bool:
-    """Create the ProviderItemBatch table if it doesn't exist."""
-    if not ProviderItemBatchModel.exists():
-        # Create with on-demand billing (PAY_PER_REQUEST)
-        ProviderItemBatchModel.create_table(billing_mode="PAY_PER_REQUEST", wait=True)
-        logger.info("The ProviderItemBatch table has been created.")
-    return True
 
 
 @retry(

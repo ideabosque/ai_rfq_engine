@@ -5,7 +5,6 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import functools
-import logging
 import traceback
 from typing import Any, Dict
 
@@ -18,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -29,6 +26,7 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import method_cache
 from silvaengine_utility.serializer import Serializer
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.provider_item import ProviderItemListType, ProviderItemType
@@ -184,15 +182,6 @@ def purge_cache():
         return wrapper_function
 
     return actual_decorator
-
-
-def create_provider_item_table(logger: logging.Logger) -> bool:
-    """Create the ProviderItem table if it doesn't exist."""
-    if not ProviderItemModel.exists():
-        # Create with on-demand billing (PAY_PER_REQUEST)
-        ProviderItemModel.create_table(billing_mode="PAY_PER_REQUEST", wait=True)
-        logger.info("The ProviderItem table has been created.")
-    return True
 
 
 @retry(
