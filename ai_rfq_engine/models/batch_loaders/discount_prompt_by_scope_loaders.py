@@ -4,9 +4,10 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 from promise import Promise
+
 from silvaengine_utility.cache import HybridCacheEngine
 
 from ...handlers.config import Config
@@ -88,8 +89,6 @@ class DiscountPromptGlobalLoader(SafeDataLoader):
                 # Load GLOBAL prompts for this partition
                 global_prompts = get_global_discount_prompts(partition_key)
                 normalized = [normalize_model(p) for p in global_prompts]
-                # if self.cache_enabled:
-                #     self.set_cache_data(partition_key, normalized)
                 key_map[partition_key] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
