@@ -142,6 +142,7 @@ def create_installment_table(logger: logging.Logger) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "installment"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_installment(quote_uuid: str, installment_uuid: str) -> InstallmentModel:
     return InstallmentModel.get(quote_uuid, installment_uuid)
@@ -397,6 +398,7 @@ def delete_installment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "installment"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_installments_by_quote(quote_uuid: str) -> Any:
     installments = []

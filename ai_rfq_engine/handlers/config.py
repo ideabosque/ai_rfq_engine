@@ -7,6 +7,7 @@ import logging
 from typing import Any, Dict, List
 
 import boto3
+
 from silvaengine_utility import Utility
 
 from ..models import utils
@@ -247,6 +248,10 @@ class Config:
             setting (Dict[str, Any]): Configuration dictionary.
         """
         cls.source_email = setting.get("source_email")
+
+        # Set cache enabled flag (defaults to True if not specified)
+        if "cache_enabled" in setting:
+            cls.CACHE_ENABLED = setting.get("cache_enabled", True)
 
     @classmethod
     def _initialize_aws_services(cls, setting: Dict[str, Any]) -> None:

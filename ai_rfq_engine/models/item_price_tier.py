@@ -233,6 +233,7 @@ def create_item_price_tier_table(logger: logging.Logger) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "item_price_tier"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_item_price_tier(
     item_uuid: str, item_price_tier_uuid: str
@@ -582,6 +583,7 @@ def delete_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "item_price_tier"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_item_price_tiers_by_item(item_uuid: str) -> Any:
     return ItemPriceTierModel.query(item_uuid)
@@ -595,6 +597,7 @@ def get_item_price_tiers_by_item(item_uuid: str) -> Any:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "item_price_tier"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_item_price_tiers_by_provider_item(
     item_uuid: str, provider_item_uuid: str, segment_uuid: str = None

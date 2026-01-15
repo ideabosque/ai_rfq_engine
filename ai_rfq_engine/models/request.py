@@ -156,7 +156,9 @@ def create_request_table(logger: logging.Logger) -> bool:
     stop=stop_after_attempt(5),
 )
 @method_cache(
-    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "request")
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "request"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_request(partition_key: str, request_uuid: str) -> RequestModel:
     return RequestModel.get(partition_key, request_uuid)

@@ -7,6 +7,7 @@ __author__ = "bibow"
 from typing import Any, Dict, List
 
 from graphene import ResolveInfo
+
 from silvaengine_utility import method_cache
 
 from ..handlers.config import Config
@@ -24,6 +25,7 @@ def resolve_discount_prompt(
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("queries", "discount_prompt"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def resolve_discount_prompt_list(
     info: ResolveInfo, **kwargs: Dict[str, Any]
@@ -34,6 +36,7 @@ def resolve_discount_prompt_list(
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("queries", "discount_prompt"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def resolve_discount_prompts(
     info: ResolveInfo, **kwargs: Dict[str, Any]

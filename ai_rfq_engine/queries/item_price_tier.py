@@ -17,13 +17,14 @@ from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
 
 def resolve_item_price_tier(
     info: ResolveInfo, **kwargs: Dict[str, Any]
-) -> ItemPriceTierType:
+) -> ItemPriceTierType | None:
     return item_price_tier.resolve_item_price_tier(info, **kwargs)
 
 
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("queries", "item_price_tier"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def resolve_item_price_tier_list(
     info: ResolveInfo, **kwargs: Dict[str, Any]
@@ -34,6 +35,7 @@ def resolve_item_price_tier_list(
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("queries", "item_price_tier"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def resolve_item_price_tiers(
     info: ResolveInfo, **kwargs: Dict[str, Any]
@@ -52,8 +54,8 @@ def resolve_item_price_tiers(
     Returns:
         Promise that resolves to list of ItemPriceTierType objects with price tier information
     """
-    from ..models.utils import _combine_all_item_price_tiers
     from ..models.item_price_tier import get_item_price_tier_type
+    from ..models.utils import _combine_all_item_price_tiers
 
     loaders = get_loaders(info.context)
     partition_key = info.context.get("partition_key")
@@ -63,7 +65,9 @@ def resolve_item_price_tiers(
     # Get tier models from utility function, then convert to types
     def convert_to_types(tier_models):
         """Convert ItemPriceTierModel instances to ItemPriceTierType."""
-        return [get_item_price_tier_type(info, tier_model) for tier_model in tier_models]
+        return [
+            get_item_price_tier_type(info, tier_model) for tier_model in tier_models
+        ]
 
     return _combine_all_item_price_tiers(
         partition_key, email, quote_items, loaders
