@@ -7,7 +7,6 @@ __author__ = "bibow"
 from typing import Any, Dict, List
 
 from promise import Promise
-
 from silvaengine_utility.cache import HybridCacheEngine
 
 from ...handlers.config import Config
@@ -353,10 +352,6 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
 
                 # Combine GLOBAL + PROVIDER_ITEM prompts
                 normalized = [normalize_model(p) for p in provider_item_prompts]
-                # if self.cache_enabled:
-                #     self.set_cache_data(
-                #         (partition_key, item_uuid, provider_item_uuid), normalized
-                #     )
                 key_map[(partition_key, item_uuid, provider_item_uuid)] = normalized
             except Exception as exc:  # pragma: no cover - defensive
                 if self.logger:
