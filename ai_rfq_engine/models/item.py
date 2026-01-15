@@ -142,7 +142,9 @@ def create_item_table(logger: logging.Logger) -> bool:
     stop=stop_after_attempt(5),
 )
 @method_cache(
-    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "item")
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "item"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_item(partition_key: str, item_uuid: str) -> ItemModel:
     return ItemModel.get(partition_key, item_uuid)

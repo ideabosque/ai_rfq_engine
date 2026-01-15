@@ -53,7 +53,10 @@ class DiscountPromptGlobalLoader(SafeDataLoader):
             return None
         if isinstance(cached_item, list):
             # Check if items are already dicts (from cache) or models
-            return [item if isinstance(item, dict) else normalize_model(item) for item in cached_item]
+            return [
+                item if isinstance(item, dict) else normalize_model(item)
+                for item in cached_item
+            ]
         # Single item case
         if isinstance(cached_item, dict):
             return [cached_item]
@@ -136,7 +139,10 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
             return None
         if isinstance(cached_item, list):
             # Check if items are already dicts (from cache) or models
-            return [item if isinstance(item, dict) else normalize_model(item) for item in cached_item]
+            return [
+                item if isinstance(item, dict) else normalize_model(item)
+                for item in cached_item
+            ]
         # Single item case
         if isinstance(cached_item, dict):
             return [cached_item]
@@ -166,7 +172,9 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
         for partition_key, segment_uuid in uncached_keys:
             try:
                 # Load SEGMENT-specific prompts
-                segment_prompts = get_discount_prompts_by_segment(partition_key, segment_uuid)
+                segment_prompts = get_discount_prompts_by_segment(
+                    partition_key, segment_uuid
+                )
                 normalized = [normalize_model(p) for p in segment_prompts]
                 # if self.cache_enabled:
                 #     self.set_cache_data((partition_key, segment_uuid), normalized)
@@ -177,7 +185,6 @@ class DiscountPromptBySegmentLoader(SafeDataLoader):
                 key_map[(partition_key, segment_uuid)] = []
 
         return Promise.resolve([key_map.get(key, []) for key in keys])
-
 
 
 class DiscountPromptByItemLoader(SafeDataLoader):
@@ -220,7 +227,10 @@ class DiscountPromptByItemLoader(SafeDataLoader):
             return None
         if isinstance(cached_item, list):
             # Check if items are already dicts (from cache) or models
-            return [item if isinstance(item, dict) else normalize_model(item) for item in cached_item]
+            return [
+                item if isinstance(item, dict) else normalize_model(item)
+                for item in cached_item
+            ]
         # Single item case
         if isinstance(cached_item, dict):
             return [cached_item]
@@ -305,7 +315,10 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
             return None
         if isinstance(cached_item, list):
             # Check if items are already dicts (from cache) or models
-            return [item if isinstance(item, dict) else normalize_model(item) for item in cached_item]
+            return [
+                item if isinstance(item, dict) else normalize_model(item)
+                for item in cached_item
+            ]
         # Single item case
         if isinstance(cached_item, dict):
             return [cached_item]
@@ -331,7 +344,6 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
                     uncached_keys.append(key)
         else:
             uncached_keys = unique_keys
-
 
         for partition_key, item_uuid, provider_item_uuid in uncached_keys:
             try:

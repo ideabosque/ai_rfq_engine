@@ -271,7 +271,9 @@ def create_quote_item_table(logger: logging.Logger) -> bool:
     stop=stop_after_attempt(5),
 )
 @method_cache(
-    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "quote_item")
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "quote_item"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_quote_item(quote_uuid: str, quote_item_uuid: str) -> QuoteItemModel:
     return QuoteItemModel.get(quote_uuid, quote_item_uuid)
@@ -589,7 +591,9 @@ def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     stop=stop_after_attempt(5),
 )
 @method_cache(
-    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "quote_item")
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "quote_item"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_quote_items_by_quote(quote_uuid: str) -> Any:
     quote_items = []

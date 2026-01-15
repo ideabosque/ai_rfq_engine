@@ -169,7 +169,9 @@ def create_quote_table(logger: logging.Logger) -> bool:
     stop=stop_after_attempt(5),
 )
 @method_cache(
-    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "quote")
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "quote"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_quote(request_uuid: str, quote_uuid: str) -> QuoteModel:
     return QuoteModel.get(request_uuid, quote_uuid)
@@ -491,7 +493,9 @@ def delete_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     stop=stop_after_attempt(5),
 )
 @method_cache(
-    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "quote")
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "quote"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_quotes_by_request(request_uuid: str) -> Any:
     quotes = []

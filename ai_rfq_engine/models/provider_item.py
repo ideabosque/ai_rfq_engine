@@ -203,6 +203,7 @@ def create_provider_item_table(logger: logging.Logger) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "provider_item"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_provider_item(partition_key: str, provider_item_uuid: str) -> ProviderItemModel:
     return ProviderItemModel.get(partition_key, provider_item_uuid)
@@ -476,6 +477,7 @@ def delete_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "provider_item"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_provider_items_by_item(partition_key: str, item_uuid: str) -> Any:
     provider_items = []

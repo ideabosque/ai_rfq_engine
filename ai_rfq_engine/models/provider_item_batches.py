@@ -170,6 +170,7 @@ def create_provider_item_batch_table(logger: logging.Logger) -> bool:
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "provider_item_batch"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_provider_item_batch(
     provider_item_uuid: str, batch_no: str
@@ -438,6 +439,7 @@ def delete_provider_item_batch(info: ResolveInfo, **kwargs: Dict[str, Any]) -> b
 @method_cache(
     ttl=Config.get_cache_ttl(),
     cache_name=Config.get_cache_name("models", "provider_item_batch"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_provider_item_batches_by_provider_item(provider_item_uuid: str) -> Any:
     provider_item_batches = []

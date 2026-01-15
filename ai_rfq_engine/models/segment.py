@@ -139,7 +139,9 @@ def create_segment_table(logger: logging.Logger) -> bool:
     stop=stop_after_attempt(5),
 )
 @method_cache(
-    ttl=Config.get_cache_ttl(), cache_name=Config.get_cache_name("models", "segment")
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "segment"),
+    cache_enabled=Config.is_cache_enabled,
 )
 def get_segment(partition_key: str, segment_uuid: str) -> SegmentModel:
     return SegmentModel.get(partition_key, segment_uuid)
