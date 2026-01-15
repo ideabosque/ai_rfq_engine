@@ -5,7 +5,6 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import functools
-import logging
 import traceback
 from typing import Any, Dict
 
@@ -130,15 +129,6 @@ def purge_cache():
         return wrapper_function
 
     return actual_decorator
-
-
-def create_file_table(logger: logging.Logger) -> bool:
-    """Create the File table if it doesn't exist."""
-    if not FileModel.exists():
-        # Create with on-demand billing (PAY_PER_REQUEST)
-        FileModel.create_table(billing_mode="PAY_PER_REQUEST", wait=True)
-        logger.info("The File table has been created.")
-    return True
 
 
 @retry(

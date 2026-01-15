@@ -8,8 +8,6 @@ from typing import Any, Dict, List
 
 import boto3
 
-from silvaengine_utility import Utility
-
 from ..models import utils
 
 
@@ -283,10 +281,10 @@ class Config:
     @classmethod
     def _initialize_tables(cls, logger: logging.Logger) -> None:
         """
-        Initialize database tables by calling the utils._initialize_tables() method.
+        Initialize database tables by calling the utils.initialize_tables() method.
         This is an internal method used during configuration setup.
         """
-        utils._initialize_tables(logger)
+        utils.initialize_tables(logger)
 
     @classmethod
     def get_cache_name(cls, module_type: str, model_name: str) -> str:
