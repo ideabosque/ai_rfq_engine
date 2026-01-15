@@ -18,6 +18,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,7 +29,6 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import convert_decimal_to_number, method_cache
 from silvaengine_utility.serializer import Serializer
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.quote_item import QuoteItemListType, QuoteItemType
@@ -226,7 +227,7 @@ def purge_cache():
 
                 purge_entity_cascading_cache(
                     args[0].context.get("logger"),
-                    entity_type="quote",
+                    entity_type="quote_item",
                     context_keys=context_keys,
                     entity_keys=entity_keys if entity_keys else None,
                     cascade_depth=3,
@@ -235,7 +236,7 @@ def purge_cache():
                 if kwargs.get("quote_uuid"):
                     purge_entity_cascading_cache(
                         args[0].context.get("logger"),
-                        entity_type="provider_item",
+                        entity_type="quote_item",
                         context_keys=context_keys,
                         entity_keys={"quote_uuid": kwargs.get("quote_uuid")},
                         cascade_depth=3,
