@@ -11,6 +11,8 @@ import uuid
 from functools import wraps
 from typing import Any, Dict, Optional, Tuple
 
+from silvaengine_utility.serializer import Serializer
+
 logger = logging.getLogger("test_ai_rfq_engine")
 
 
@@ -51,11 +53,12 @@ def call_method(
 
     try:
         result = method(**arguments)
+        result = Serializer.json_loads(result["body"]) if "body" in result else result
 
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
         logger.info(
             f"Method response: cid={cid} op={op} elapsed_ms={elapsed_ms} "
-            f"success=True result={result}"
+            f"success=True result={Serializer.json_dumps(result)}"
         )
 
         # Parse JSON string response if needed (graphql_execute returns JSON string)
@@ -73,7 +76,7 @@ def call_method(
         elapsed_ms = round((time.perf_counter() - t0) * 1000, 2)
         logger.info(
             f"Method response: cid={cid} op={op} elapsed_ms={elapsed_ms} "
-            f"success=False error={str(exc)}"
+            f"success=False error={str(exc)})"
         )
         return None, exc
 
