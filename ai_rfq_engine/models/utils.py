@@ -158,10 +158,10 @@ def _combine_all_discount_prompts(
     # We'll use these to determine which ITEM and PROVIDER_ITEM prompts to load
     item_promises = []
     provider_item_promises = []
-    if quote_items:
-        unique_item_uuids = set()
-        unique_provider_items = set()
+    unique_item_uuids = set()
+    unique_provider_items = set()
 
+    if quote_items:
         # Single pass through quote items to collect unique identifiers
         for qi in quote_items:
             item_uuid = qi.get("item_uuid")
