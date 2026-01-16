@@ -282,9 +282,9 @@ class AIRFQEngine(Graphql):
                 self.logger.error(
                     f"Missing endpoint_id or part_id: endpoint_id={endpoint_id}, part_id={part_id}"
                 )
-                # Only create partition key if both values are present
-                if endpoint_id and part_id:
-                    params["context"]["partition_key"] = f"{endpoint_id}#{part_id}"
+                raise ValueError(
+                    "Both 'endpoint_id' and 'part_id' are required to generate 'partition_key'."
+                )
             else:
                 params["context"]["partition_key"] = f"{endpoint_id}#{part_id}"
 
