@@ -18,6 +18,8 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_constants import DiscountPromptScope, DiscountPromptStatus
 from silvaengine_dynamodb_base import (
     BaseModel,
@@ -28,7 +30,6 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import method_cache
 from silvaengine_utility.serializer import Serializer
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.discount_prompt import DiscountPromptListType, DiscountPromptType
@@ -274,11 +275,11 @@ def get_discount_prompts_by_segment(partition_key: str, segment_uuid: str) -> An
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-@method_cache(
-    ttl=Config.get_cache_ttl(),
-    cache_name=Config.get_cache_name("models", "discount_prompt"),
-    cache_enabled=Config.is_cache_enabled,
-)
+# @method_cache(
+#     ttl=Config.get_cache_ttl(),
+#     cache_name=Config.get_cache_name("models", "discount_prompt"),
+#     cache_enabled=Config.is_cache_enabled,
+# )
 def get_discount_prompts_by_item(partition_key: str, item_uuid: str) -> Any:
     """
     Get all ACTIVE discount prompts with scope='item' for an item.
@@ -304,11 +305,11 @@ def get_discount_prompts_by_item(partition_key: str, item_uuid: str) -> Any:
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-@method_cache(
-    ttl=Config.get_cache_ttl(),
-    cache_name=Config.get_cache_name("models", "discount_prompt"),
-    cache_enabled=Config.is_cache_enabled,
-)
+# @method_cache(
+#     ttl=Config.get_cache_ttl(),
+#     cache_name=Config.get_cache_name("models", "discount_prompt"),
+#     cache_enabled=Config.is_cache_enabled,
+# )
 def get_discount_prompts_by_provider_item(
     partition_key: str, provider_item_uuid: str
 ) -> Any:
