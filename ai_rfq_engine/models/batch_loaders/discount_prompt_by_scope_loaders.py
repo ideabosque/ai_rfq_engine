@@ -7,6 +7,8 @@ __author__ = "bibow"
 from typing import Any, Dict, List
 
 from promise import Promise
+
+from silvaengine_utility import Debugger
 from silvaengine_utility.cache import HybridCacheEngine
 
 from ...handlers.config import Config
@@ -259,6 +261,10 @@ class DiscountPromptByItemLoader(SafeDataLoader):
             try:
                 # Load ITEM-specific prompts
                 item_prompts = get_discount_prompts_by_item(partition_key, item_uuid)
+                Debugger.info(
+                    variable=item_prompts,
+                    stage=__name__,
+                )
 
                 # Combine GLOBAL + ITEM prompts
                 normalized = [normalize_model(p) for p in item_prompts]
@@ -348,6 +354,10 @@ class DiscountPromptByProviderItemLoader(SafeDataLoader):
                 # Load PROVIDER_ITEM-specific prompts
                 provider_item_prompts = get_discount_prompts_by_provider_item(
                     partition_key, provider_item_uuid
+                )
+                Debugger.info(
+                    variable=provider_item_prompts,
+                    stage=__name__,
                 )
 
                 # Combine GLOBAL + PROVIDER_ITEM prompts
