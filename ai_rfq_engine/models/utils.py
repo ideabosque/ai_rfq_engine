@@ -7,6 +7,7 @@ import logging
 from typing import Any, Dict, List
 
 from promise import Promise
+from silvaengine_utility import Debugger
 
 from ..utils.normalization import normalize_to_json
 
@@ -146,6 +147,10 @@ def combine_all_discount_prompts(
     Returns:
         Promise that resolves to combined list of discount prompts
     """
+    Debugger.info(
+        variable=f"{__name__}:combine_all_discount_prompts",
+        stage=__name__,
+    )
 
     # Track which prompts we've already added to prevent duplicates
     # (same prompt might be returned by multiple loaders due to hierarchical nature)

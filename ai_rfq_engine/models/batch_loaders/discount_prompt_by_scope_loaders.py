@@ -7,7 +7,6 @@ __author__ = "bibow"
 from typing import Any, Dict, List
 
 from promise import Promise
-
 from silvaengine_utility import Debugger
 from silvaengine_utility.cache import HybridCacheEngine
 
@@ -242,6 +241,11 @@ class DiscountPromptByItemLoader(SafeDataLoader):
 
     def batch_load_fn(self, keys: List[tuple]) -> Promise:
         from ..discount_prompt import get_discount_prompts_by_item
+
+        Debugger.info(
+            variable=f"{__name__}:batch_load_fn",
+            stage=__name__,
+        )
 
         unique_keys = list(dict.fromkeys(keys))
         key_map: Dict[tuple, List[Dict[str, Any]]] = {}

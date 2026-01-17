@@ -7,7 +7,7 @@ __author__ = "bibow"
 from typing import Any, Dict, List
 
 from graphene import ResolveInfo
-from silvaengine_utility import method_cache
+from silvaengine_utility import Debugger, method_cache
 
 from ..handlers.config import Config
 from ..models import discount_prompt
@@ -41,6 +41,11 @@ def resolve_discount_prompts(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> List[DiscountPromptType]:
     from ..models.utils import combine_all_discount_prompts
+
+    Debugger.info(
+        variable=f"{__name__}:resolve_discount_prompts",
+        stage=__name__,
+    )
 
     loaders = get_loaders(info.context)
     partition_key = info.context.get("partition_key")
