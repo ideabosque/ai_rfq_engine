@@ -159,11 +159,11 @@ def purge_cache():
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-# @method_cache(
-#     ttl=Config.get_cache_ttl(),
-#     cache_name=Config.get_cache_name("models", "quote"),
-#     cache_enabled=Config.is_cache_enabled,
-# )
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "quote"),
+    cache_enabled=Config.is_cache_enabled,
+)
 def get_quote(request_uuid: str, quote_uuid: str) -> QuoteModel:
     return QuoteModel.get(request_uuid, quote_uuid)
 

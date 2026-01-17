@@ -19,10 +19,10 @@ def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType | No
     return quote.resolve_quote(info, **kwargs)
 
 
-# @method_cache(
-#     ttl=Config.get_cache_ttl(),
-#     cache_name=Config.get_cache_name("queries", "quote"),
-#     cache_enabled=Config.is_cache_enabled,
-# )
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("queries", "quote"),
+    cache_enabled=Config.is_cache_enabled,
+)
 def resolve_quote_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteListType:
     return quote.resolve_quote_list(info, **kwargs)
