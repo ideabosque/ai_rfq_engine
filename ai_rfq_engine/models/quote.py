@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -21,7 +23,6 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import method_cache
 from silvaengine_utility.serializer import Serializer
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.quote import QuoteListType, QuoteType
@@ -158,11 +159,11 @@ def purge_cache():
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-@method_cache(
-    ttl=Config.get_cache_ttl(),
-    cache_name=Config.get_cache_name("models", "quote"),
-    cache_enabled=Config.is_cache_enabled,
-)
+# @method_cache(
+#     ttl=Config.get_cache_ttl(),
+#     cache_name=Config.get_cache_name("models", "quote"),
+#     cache_enabled=Config.is_cache_enabled,
+# )
 def get_quote(request_uuid: str, quote_uuid: str) -> QuoteModel:
     return QuoteModel.get(request_uuid, quote_uuid)
 
