@@ -237,7 +237,7 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -
 
     # Add shipping amount to final total
     shipping_amount = quote.shipping_amount if quote.shipping_amount is not None else 0
-    final_total_quote_amount = items_final_total + shipping_amount
+    final_total_quote_amount = float(items_final_total) + float(shipping_amount)
     actions = [
         QuoteModel.total_quote_amount.set(float(total_quote_amount)),
         QuoteModel.total_quote_discount.set(
