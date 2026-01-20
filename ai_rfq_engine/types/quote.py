@@ -6,7 +6,7 @@ __author__ = "bibow"
 
 from graphene import DateTime, Field, Int, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON
+from silvaengine_utility import JSON, Debugger
 
 from ..models.batch_loaders import get_loaders
 from ..utils.normalization import normalize_to_json
@@ -112,6 +112,11 @@ class QuoteType(ObjectType):
         """
         from promise import Promise
 
+        Debugger.info(
+            variable=f"{__name__}:resolve_discount_prompts",
+            stage=__name__,
+        )
+
         # Check if already embedded
         existing = getattr(parent, "discount_prompts", None)
         if isinstance(existing, list):
@@ -144,6 +149,11 @@ class QuoteType(ObjectType):
                 Promise that resolves to combined list of discount prompts
             """
             from ..models.utils import combine_all_discount_prompts
+
+            Debugger.info(
+                variable=f"{__name__}:combine_prompts_wrapper",
+                stage=__name__,
+            )
 
             request_dict, quote_items = results
             email = request_dict.get("email") if request_dict else None

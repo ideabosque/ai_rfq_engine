@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -21,7 +23,6 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import method_cache
 from silvaengine_utility.serializer import Serializer
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.quote import QuoteListType, QuoteType
@@ -236,7 +237,7 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -
 
     # Add shipping amount to final total
     shipping_amount = quote.shipping_amount if quote.shipping_amount is not None else 0
-    final_total_quote_amount = items_final_total + shipping_amount
+    final_total_quote_amount = float(items_final_total) + float(shipping_amount)
     actions = [
         QuoteModel.total_quote_amount.set(float(total_quote_amount)),
         QuoteModel.total_quote_discount.set(
