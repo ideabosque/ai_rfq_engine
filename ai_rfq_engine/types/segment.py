@@ -6,7 +6,7 @@ __author__ = "bibow"
 
 from graphene import DateTime, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON
+from silvaengine_utility import JSONCamelCase
 
 from ..models.batch_loaders import get_loaders
 
@@ -27,7 +27,7 @@ class SegmentType(ObjectType):
     updated_at = DateTime()
 
     # Nested resolvers: strongly-typed nested relationships
-    contacts = List(JSON)
+    contacts = List(JSONCamelCase)
 
     # ------- Nested resolvers -------
 

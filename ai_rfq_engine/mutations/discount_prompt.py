@@ -7,8 +7,7 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, Field, Int, List, Mutation, String
-from silvaengine_utility import JSON
-
+from silvaengine_utility import JSONCamelCase
 from ..models.discount_prompt import (
     delete_discount_prompt,
     insert_update_discount_prompt,
@@ -25,7 +24,7 @@ class InsertUpdateDiscountPrompt(Mutation):
         tags = List(String, required=False)  # List of tags for filtering
         discount_prompt = String(required=False)  # AI prompt text
         conditions = List(String, required=False)  # List of conditional criteria
-        discount_rules = List(JSON, required=False)  # List of discount rule tiers
+        discount_rules = List(JSONCamelCase, required=False)  # List of discount rule tiers
         priority = Int(required=False)  # Priority for conflict resolution
         status = String(required=False)  # in_review, active, inactive
         updated_by = String(required=True)

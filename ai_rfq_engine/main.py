@@ -288,11 +288,6 @@ class AIRFQEngine(Graphql):
             else:
                 params["context"]["partition_key"] = f"{endpoint_id}#{part_id}"
 
-        if "logger" in params:
-            params.pop("logger")
-
-        if "setting" in params:
-            params.pop("setting")
 
     def ai_rfq_graphql(self, **params: Dict[str, Any]) -> Any:
 

@@ -6,8 +6,7 @@ __author__ = "bibow"
 
 from graphene import Boolean, DateTime, Field, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON
-
+from silvaengine_utility import JSONCamelCase
 from ..models.batch_loaders import get_loaders
 
 

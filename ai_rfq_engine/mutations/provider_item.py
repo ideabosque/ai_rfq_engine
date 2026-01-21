@@ -7,8 +7,7 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, Field, Float, Mutation, String
-from silvaengine_utility import JSON
-
+from silvaengine_utility import JSONCamelCase
 from ..models.provider_item import delete_provider_item, insert_update_provider_item
 from ..types.provider_item import ProviderItemType
 
@@ -22,7 +21,7 @@ class InsertUpdateProviderItem(Mutation):
         provider_corp_external_id = String(required=False)
         provider_item_external_id = String(required=False)
         base_price_per_uom = Float(required=False)
-        item_spec = JSON(required=False)
+        item_spec = JSONCamelCase(required=False)
         updated_by = String(required=True)
 
     @staticmethod
