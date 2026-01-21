@@ -159,11 +159,11 @@ def purge_cache():
     wait=wait_exponential(multiplier=1, max=60),
     stop=stop_after_attempt(5),
 )
-# @method_cache(
-#     ttl=Config.get_cache_ttl(),
-#     cache_name=Config.get_cache_name("models", "quote"),
-#     cache_enabled=Config.is_cache_enabled,
-# )
+@method_cache(
+    ttl=Config.get_cache_ttl(),
+    cache_name=Config.get_cache_name("models", "quote"),
+    cache_enabled=Config.is_cache_enabled,
+)
 def get_quote(request_uuid: str, quote_uuid: str) -> QuoteModel:
     return QuoteModel.get(request_uuid, quote_uuid)
 
@@ -237,7 +237,7 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -
 
     # Add shipping amount to final total
     shipping_amount = quote.shipping_amount if quote.shipping_amount is not None else 0
-    final_total_quote_amount = items_final_total + shipping_amount
+    final_total_quote_amount = float(items_final_total) + float(shipping_amount)
     actions = [
         QuoteModel.total_quote_amount.set(float(total_quote_amount)),
         QuoteModel.total_quote_discount.set(
