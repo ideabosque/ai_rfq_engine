@@ -25,7 +25,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from silvaengine_utility.serializer import Serializer
+from ..utils.normalization import normalize_to_json
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -226,7 +226,7 @@ def get_provider_item_type(
     _ = info  # Keep for signature compatibility with decorators
     pi_dict = provider_item.__dict__["attribute_values"].copy()
     # Keep all fields including FKs - nested resolvers will handle lazy loading
-    return ProviderItemType(**Serializer.json_normalize(pi_dict))
+    return ProviderItemType(**normalize_to_json(pi_dict))
 
 
 def resolve_provider_item(

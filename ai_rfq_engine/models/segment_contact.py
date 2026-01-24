@@ -22,7 +22,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from silvaengine_utility.serializer import Serializer
+from ..utils.normalization import normalize_to_json
 
 from ..handlers.config import Config
 from ..types.segment_contact import SegmentContactListType, SegmentContactType
@@ -197,7 +197,7 @@ def get_segment_contact_type(
     _ = info  # Keep for signature compatibility with decorators
     sc_dict = segment_contact.__dict__["attribute_values"].copy()
     # Keep all fields including FKs - nested resolvers will handle lazy loading
-    return SegmentContactType(**Serializer.json_normalize(sc_dict))
+    return SegmentContactType(**normalize_to_json(sc_dict))
 
 
 def resolve_segment_contact(
