@@ -21,6 +21,7 @@ from graphene import (
 )
 
 from silvaengine_utility import JSONCamelCase
+
 from .mutations.discount_prompt import DeleteDiscountPrompt, InsertUpdateDiscountPrompt
 from .mutations.file import DeleteFile, InsertUpdateFile
 from .mutations.installment import DeleteInstallment, InsertUpdateInstallment
@@ -143,7 +144,7 @@ class Query(ObjectType):
 
     segment_contact = Field(
         SegmentContactType,
-        segment_uuid=String(required=True),
+        segment_uuid=String(required=False),
         email=String(required=True),
     )
 
