@@ -12,6 +12,8 @@ import pendulum
 from graphene import ResolveInfo
 from pynamodb.attributes import UnicodeAttribute, UTCDateTimeAttribute
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -21,7 +23,6 @@ from silvaengine_dynamodb_base import (
 )
 from silvaengine_utility import method_cache
 from silvaengine_utility.serializer import Serializer
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.segment_contact import SegmentContactListType, SegmentContactType
@@ -270,10 +271,7 @@ def resolve_segment_contact_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
             inquiry_funct = SegmentContactModel.segment_uuid_index.query
 
     the_filters = None  # We can add filters for the query
-    if email and (
-        inquiry_funct == SegmentContactModel.consumer_corp_external_id_index.query
-        or inquiry_funct == SegmentContactModel.segment_uuid_index.query
-    ):
+    if email:
         the_filters &= SegmentContactModel.email == email
     if contact_uuid:
         the_filters &= SegmentContactModel.contact_uuid == contact_uuid
