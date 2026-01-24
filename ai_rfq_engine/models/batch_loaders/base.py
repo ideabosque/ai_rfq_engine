@@ -7,9 +7,9 @@ __author__ = "bibow"
 from typing import Any, Dict, Tuple
 
 from promise.dataloader import DataLoader
-from silvaengine_utility.serializer import Serializer
 
 from ...handlers.config import Config
+from ...utils.normalization import normalize_to_json
 
 # Type aliases for readability
 Key = Tuple[str, str]
@@ -17,7 +17,7 @@ Key = Tuple[str, str]
 
 def normalize_model(model: Any) -> Dict[str, Any]:
     """Safely convert a Pynamo model into a plain dict."""
-    return Serializer.json_normalize(model.__dict__["attribute_values"])
+    return normalize_to_json(model.__dict__["attribute_values"])
 
 
 class SafeDataLoader(DataLoader):

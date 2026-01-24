@@ -22,7 +22,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from silvaengine_utility.serializer import Serializer
+from ..utils.normalization import normalize_to_json
 
 from ..handlers.config import Config
 from ..types.quote import QuoteListType, QuoteType
@@ -260,7 +260,7 @@ def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
     _ = info  # Keep for signature compatibility with decorators
     quote_dict = quote.__dict__["attribute_values"].copy()
     # Keep all fields including FKs - nested resolvers will handle lazy loading
-    return QuoteType(**Serializer.json_normalize(quote_dict))
+    return QuoteType(**normalize_to_json(quote_dict))
 
 
 def resolve_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType | None:

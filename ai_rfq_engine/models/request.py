@@ -25,7 +25,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from silvaengine_utility.serializer import Serializer
+from ..utils.normalization import normalize_to_json
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -175,7 +175,7 @@ def get_request_type(info: ResolveInfo, request: RequestModel) -> RequestType:
     _ = info  # Keep for signature compatibility with decorators
     request_dict = request.__dict__["attribute_values"].copy()
     # Keep all fields including FKs - nested resolvers will handle lazy loading
-    return RequestType(**Serializer.json_normalize(request_dict))
+    return RequestType(**normalize_to_json(request_dict))
 
 
 def resolve_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> RequestType | None:
