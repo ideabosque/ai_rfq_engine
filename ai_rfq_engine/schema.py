@@ -20,8 +20,7 @@ from graphene import (
     String,
 )
 
-from silvaengine_utility import JSON
-
+from silvaengine_utility import JSONCamelCase
 from .mutations.discount_prompt import DeleteDiscountPrompt, InsertUpdateDiscountPrompt
 from .mutations.file import DeleteFile, InsertUpdateFile
 from .mutations.installment import DeleteInstallment, InsertUpdateInstallment
@@ -223,7 +222,7 @@ class Query(ObjectType):
     item_price_tiers = List(
         ItemPriceTierType,
         email=String(required=True),
-        quote_items=List(JSON, required=False),
+        quote_items=List(JSONCamelCase, required=False),
     )
 
     discount_prompt = Field(
@@ -245,7 +244,7 @@ class Query(ObjectType):
     discount_prompts = List(
         DiscountPromptType,
         email=String(required=True),
-        quote_items=List(JSON, required=False),
+        quote_items=List(JSONCamelCase, required=False),
     )
 
     request = Field(

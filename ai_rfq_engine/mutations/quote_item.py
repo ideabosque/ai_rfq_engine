@@ -8,8 +8,7 @@ from typing import Any, Dict
 
 from graphene import Boolean, Field, Float, Mutation, String
 
-from silvaengine_utility import JSON
-
+from silvaengine_utility import JSONCamelCase
 from ..models.quote_item import delete_quote_item, insert_update_quote_item
 from ..types.quote_item import QuoteItemType
 
@@ -25,7 +24,7 @@ class InsertUpdateQuoteItem(Mutation):
         segment_uuid = String(required=False)
         batch_no = String(required=False)
         request_uuid = String(required=False)
-        request_data = JSON(required=False)
+        request_data = JSONCamelCase(required=False)
         qty = Float(required=False)
         subtotal_discount = Float(required=False)
         updated_by = String(required=True)

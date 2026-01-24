@@ -7,7 +7,7 @@ __author__ = "bibow"
 
 from graphene import DateTime, Field, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON
+from silvaengine_utility import JSONCamelCase
 
 from ..models.batch_loaders import get_loaders
 
@@ -18,7 +18,7 @@ class ProviderItemType(ObjectType):
     provider_corp_external_id = String()
     provider_item_external_id = String()
     base_price_per_uom = String()
-    item_spec = JSON()  # Keep as JSON since it's a MapAttribute
+    item_spec = JSONCamelCase()  # Keep as JSON since it's a MapAttribute
 
     # Nested resolver: strongly-typed nested relationship
     item_uuid = String()  # keep raw id

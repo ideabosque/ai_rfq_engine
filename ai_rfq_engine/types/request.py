@@ -6,7 +6,7 @@ __author__ = "bibow"
 
 from graphene import DateTime, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON
+from silvaengine_utility import JSONCamelCase
 
 from ..models.batch_loaders import get_loaders
 
@@ -22,9 +22,9 @@ class RequestType(ObjectType):
     email = String()
     request_title = String()
     request_description = String()
-    billing_address = JSON()
-    shipping_address = JSON()
-    items = List(JSON)
+    billing_address = JSONCamelCase()
+    shipping_address = JSONCamelCase()
+    items = List(JSONCamelCase)
     notes = String()
     status = String()
     expired_at = DateTime()
@@ -33,8 +33,8 @@ class RequestType(ObjectType):
     updated_at = DateTime()
 
     # Nested resolvers: strongly-typed nested relationships
-    quotes = List(JSON)
-    files = List(JSON)
+    quotes = List(JSONCamelCase)
+    files = List(JSONCamelCase)
     # ------- Nested resolvers -------
 
     def resolve_quotes(parent, info):

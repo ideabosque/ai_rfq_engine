@@ -6,8 +6,7 @@ __author__ = "bibow"
 
 from graphene import DateTime, Int, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON
-
+from silvaengine_utility import JSONCamelCase
 
 class DiscountPromptType(ObjectType):
     partition_key = String()
@@ -16,7 +15,7 @@ class DiscountPromptType(ObjectType):
     tags = List(String)  # Flexible tagging for matching
     discount_prompt = String()  # AI prompt text
     conditions = List(String)  # List of conditional criteria (stored as JSON)
-    discount_rules = List(JSON)  # Embedded discount rule tiers
+    discount_rules = List(JSONCamelCase)  # Embedded discount rule tiers
     priority = Int()  # Priority for conflict resolution
     status = String()  # in_review, active, inactive
 

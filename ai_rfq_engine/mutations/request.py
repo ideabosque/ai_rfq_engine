@@ -7,8 +7,7 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, DateTime, Field, Float, List, Mutation, String
-from silvaengine_utility import JSON
-
+from silvaengine_utility import JSONCamelCase
 from ..models.request import delete_request, insert_update_request
 from ..types.request import RequestType
 
@@ -21,9 +20,9 @@ class InsertUpdateRequest(Mutation):
         email = String(required=False)
         request_title = String(required=False)
         request_description = String(required=False)
-        billing_address = JSON(required=False)
-        shipping_address = JSON(required=False)
-        items = List(JSON, required=False)
+        billing_address = JSONCamelCase(required=False)
+        shipping_address = JSONCamelCase(required=False)
+        items = List(JSONCamelCase, required=False)
         notes = String(required=False)
         status = String(required=False)
         expired_at = DateTime(required=False)

@@ -6,7 +6,7 @@ __author__ = "bibow"
 
 from graphene import DateTime, Field, Int, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON, Debugger
+from silvaengine_utility import JSONCamelCase, Debugger
 
 from ..models.batch_loaders import get_loaders
 from ..utils.normalization import normalize_to_json
@@ -32,10 +32,10 @@ class QuoteType(ObjectType):
     request = Field(lambda: RequestType)
 
     # Nested resolvers: strongly-typed nested relationships
-    quote_items = List(JSON)
-    installments = List(JSON)
+    quote_items = List(JSONCamelCase)
+    installments = List(JSONCamelCase)
 
-    discount_prompts = List(JSON)
+    discount_prompts = List(JSONCamelCase)
 
     updated_by = String()
     created_at = DateTime()

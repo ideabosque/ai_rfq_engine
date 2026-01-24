@@ -6,8 +6,7 @@ __author__ = "bibow"
 
 from graphene import DateTime, Field, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSON
-
+from silvaengine_utility import JSONCamelCase
 from ..models.batch_loaders import get_loaders
 from ..utils.normalization import normalize_to_json
 
@@ -27,7 +26,7 @@ class ItemPriceTierType(ObjectType):
     # Nested resolvers: strongly-typed nested relationships
     provider_item = Field(lambda: ProviderItemType)
     segment = Field(lambda: SegmentType)
-    provider_item_batches = List(JSON)
+    provider_item_batches = List(JSONCamelCase)
 
     updated_by = String()
     created_at = DateTime()
