@@ -32,9 +32,8 @@ sys.path.insert(0, os.path.join(base_dir, "silvaengine_utility"))
 sys.path.insert(1, os.path.join(base_dir, "silvaengine_dynamodb_base"))
 sys.path.insert(2, os.path.join(base_dir, "ai_rfq_engine"))
 
-from silvaengine_utility.graphql import Graphql
-
 from ai_rfq_engine import AIRFQEngine
+from silvaengine_utility.graphql import Graphql
 
 # Test settings
 SETTING = {
@@ -80,10 +79,12 @@ def schema(ai_rfq_engine):
     Depends on ai_rfq_engine fixture.
     """
     endpoint_id = SETTING.get("endpoint_id")
+    part_id = SETTING.get("part_id")
 
     try:
         context = {
             "endpoint_id": endpoint_id,
+            "part_id": part_id,
             "setting": SETTING,
             "logger": logger,
         }
