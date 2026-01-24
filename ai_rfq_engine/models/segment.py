@@ -21,7 +21,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from silvaengine_utility.serializer import Serializer
+from ..utils.normalization import normalize_to_json
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -159,7 +159,7 @@ def get_segment_type(info: ResolveInfo, segment: SegmentModel) -> SegmentType:
     _ = info  # Keep for signature compatibility with decorators
     segment_dict = segment.__dict__["attribute_values"].copy()
     # Keep all fields including FKs - nested resolvers will handle lazy loading
-    return SegmentType(**Serializer.json_normalize(segment_dict))
+    return SegmentType(**normalize_to_json(segment_dict))
 
 
 def resolve_segment(info: ResolveInfo, **kwargs: Dict[str, Any]) -> SegmentType | None:

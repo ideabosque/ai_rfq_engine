@@ -29,7 +29,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from silvaengine_utility.serializer import Serializer
+from ..utils.normalization import normalize_to_json
 
 from ..handlers.config import Config
 from ..types.discount_prompt import DiscountPromptListType, DiscountPromptType
@@ -386,7 +386,7 @@ def get_discount_prompt_type(
     _ = info  # Keep for signature compatibility with decorators
     discount_prompt_dict = discount_prompt.__dict__["attribute_values"].copy()
     # Keep all fields including FKs - nested resolvers will handle lazy loading
-    return DiscountPromptType(**Serializer.json_normalize(discount_prompt_dict))
+    return DiscountPromptType(**normalize_to_json(discount_prompt_dict))
 
 
 def resolve_discount_prompt(

@@ -20,7 +20,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from silvaengine_utility.serializer import Serializer
+from ..utils.normalization import normalize_to_json
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -167,7 +167,7 @@ def get_file_type(info: ResolveInfo, file: FileModel) -> FileType:
     _ = info  # Keep for signature compatibility with decorators
     file_dict = file.__dict__["attribute_values"].copy()
     # Keep all fields including FKs - nested resolvers will handle lazy loading
-    return FileType(**Serializer.json_normalize(file_dict))
+    return FileType(**normalize_to_json(file_dict))
 
 
 def resolve_file(info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType | None:

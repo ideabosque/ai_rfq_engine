@@ -25,7 +25,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import convert_decimal_to_number, method_cache
-from silvaengine_utility.serializer import Serializer
+from ..utils.normalization import normalize_to_json
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
@@ -291,7 +291,7 @@ def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteI
     """
     _ = info  # Keep for signature compatibility with decorators
     quote_item_dict = quote_item.__dict__["attribute_values"].copy()
-    return QuoteItemType(**Serializer.json_normalize(quote_item_dict))
+    return QuoteItemType(**normalize_to_json(quote_item_dict))
 
 
 def resolve_quote_item(
