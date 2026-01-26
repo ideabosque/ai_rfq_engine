@@ -7,6 +7,7 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, Field, Float, Mutation, String
+from silvaengine_utility import SafeFloat
 
 from ..models.quote import delete_quote, insert_update_quote
 from ..types.quote import QuoteType
@@ -21,7 +22,7 @@ class InsertUpdateQuote(Mutation):
         provider_corp_external_id = String(required=False)
         sales_rep_email = String(required=False)
         shipping_method = String(required=False)
-        shipping_amount = Float(required=False)
+        shipping_amount = SafeFloat(required=False)
         notes = String(required=False)
         status = String(required=False)
         updated_by = String(required=True)
