@@ -6,8 +6,10 @@ __author__ = "bibow"
 import traceback
 from typing import Any, Dict
 
-from graphene import Boolean, Field, Float, Mutation, String
+from graphene import Boolean, Field, Mutation, String
 from silvaengine_utility import JSONCamelCase
+from silvaengine_utility import SafeFloat as Float
+
 from ..models.provider_item import delete_provider_item, insert_update_provider_item
 from ..types.provider_item import ProviderItemType
 

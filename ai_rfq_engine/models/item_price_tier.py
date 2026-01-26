@@ -20,11 +20,11 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from ..utils.normalization import normalize_to_json
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.item_price_tier import ItemPriceTierListType, ItemPriceTierType
+from ..utils.normalization import normalize_to_json
 
 
 def _get_provider_item(partition_key: str, provider_item_uuid: str) -> Dict[str, Any]:

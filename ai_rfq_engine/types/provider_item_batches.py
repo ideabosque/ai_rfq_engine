@@ -4,8 +4,9 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from graphene import Boolean, DateTime, Field, Float, List, ObjectType, String
+from graphene import Boolean, DateTime, Field, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
+from silvaengine_utility import SafeFloat as Float
 
 from ..models.batch_loaders import get_loaders
 
@@ -16,12 +17,12 @@ class ProviderItemBatchType(ObjectType):
     item_uuid = String()  # keep raw id
     partition_key = String()
     partition_key = String()
-    cost_per_uom = String()
-    freight_cost_per_uom = String()
-    additional_cost_per_uom = String()
-    total_cost_per_uom = String()
-    guardrail_margin_per_uom = String()
-    guardrail_price_per_uom = String()
+    cost_per_uom = Float()
+    freight_cost_per_uom = Float()
+    additional_cost_per_uom = Float()
+    total_cost_per_uom = Float()
+    guardrail_margin_per_uom = Float()
+    guardrail_price_per_uom = Float()
     in_stock = Boolean()
     slow_move_item = Boolean()
     expired_at = DateTime()

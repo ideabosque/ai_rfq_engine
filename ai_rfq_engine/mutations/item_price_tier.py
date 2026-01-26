@@ -6,7 +6,8 @@ __author__ = "bibow"
 import traceback
 from typing import Any, Dict
 
-from graphene import Boolean, Field, Float, Mutation, String
+from graphene import Boolean, Field, Mutation, String
+from silvaengine_utility import SafeFloat as Float
 
 from ..models.item_price_tier import (
     delete_item_price_tier,

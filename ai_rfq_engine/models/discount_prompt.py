@@ -18,8 +18,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_constants import DiscountPromptScope, DiscountPromptStatus
 from silvaengine_dynamodb_base import (
     BaseModel,
@@ -29,10 +27,11 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from ..utils.normalization import normalize_to_json
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.discount_prompt import DiscountPromptListType, DiscountPromptType
+from ..utils.normalization import normalize_to_json
 
 
 def validate_and_normalize_discount_rules(discount_rules):

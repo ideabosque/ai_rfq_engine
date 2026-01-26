@@ -12,15 +12,14 @@ from graphene import (
     Boolean,
     DateTime,
     Field,
-    Float,
     Int,
     List,
     ObjectType,
     ResolveInfo,
     String,
 )
-
 from silvaengine_utility import JSONCamelCase
+from silvaengine_utility import SafeFloat as Float
 
 from .mutations.discount_prompt import DeleteDiscountPrompt, InsertUpdateDiscountPrompt
 from .mutations.file import DeleteFile, InsertUpdateFile
@@ -356,7 +355,9 @@ class Query(ObjectType):
     def resolve_ping(self, info: ResolveInfo) -> str:
         return f"Hello at {time.strftime('%X')}!!"
 
-    def resolve_item(self, info: ResolveInfo, **kwargs: Dict[str, Any]) -> ItemType:
+    def resolve_item(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ItemType | None:
         return resolve_item(info, **kwargs)
 
     def resolve_item_list(
@@ -366,7 +367,7 @@ class Query(ObjectType):
 
     def resolve_segment(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> SegmentType:
+    ) -> SegmentType | None:
         return resolve_segment(info, **kwargs)
 
     def resolve_segment_list(
@@ -376,7 +377,7 @@ class Query(ObjectType):
 
     def resolve_segment_contact(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> SegmentContactType:
+    ) -> SegmentContactType | None:
         return resolve_segment_contact(info, **kwargs)
 
     def resolve_segment_contact_list(
@@ -386,7 +387,7 @@ class Query(ObjectType):
 
     def resolve_provider_item(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ProviderItemType:
+    ) -> ProviderItemType | None:
         return resolve_provider_item(info, **kwargs)
 
     def resolve_provider_item_list(
@@ -396,7 +397,7 @@ class Query(ObjectType):
 
     def resolve_provider_item_batch(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ProviderItemBatchType:
+    ) -> ProviderItemBatchType | None:
         return resolve_provider_item_batch(info, **kwargs)
 
     def resolve_provider_item_batch_list(
@@ -406,7 +407,7 @@ class Query(ObjectType):
 
     def resolve_item_price_tier(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ItemPriceTierType:
+    ) -> ItemPriceTierType | None:
         return resolve_item_price_tier(info, **kwargs)
 
     def resolve_item_price_tier_list(
@@ -421,7 +422,7 @@ class Query(ObjectType):
 
     def resolve_discount_prompt(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> DiscountPromptType:
+    ) -> DiscountPromptType | None:
         return resolve_discount_prompt(info, **kwargs)
 
     def resolve_discount_prompt_list(
@@ -436,7 +437,7 @@ class Query(ObjectType):
 
     def resolve_request(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> RequestType:
+    ) -> RequestType | None:
         return resolve_request(info, **kwargs)
 
     def resolve_request_list(
@@ -444,7 +445,9 @@ class Query(ObjectType):
     ) -> RequestListType:
         return resolve_request_list(info, **kwargs)
 
-    def resolve_quote(self, info: ResolveInfo, **kwargs: Dict[str, Any]) -> QuoteType:
+    def resolve_quote(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> QuoteType | None:
         return resolve_quote(info, **kwargs)
 
     def resolve_quote_list(
@@ -454,7 +457,7 @@ class Query(ObjectType):
 
     def resolve_quote_item(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> QuoteItemType:
+    ) -> QuoteItemType | None:
         return resolve_quote_item(info, **kwargs)
 
     def resolve_quote_item_list(
@@ -464,7 +467,7 @@ class Query(ObjectType):
 
     def resolve_installment(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> InstallmentType:
+    ) -> InstallmentType | None:
         return resolve_installment(info, **kwargs)
 
     def resolve_installment_list(
@@ -472,7 +475,9 @@ class Query(ObjectType):
     ) -> InstallmentListType:
         return resolve_installment_list(info, **kwargs)
 
-    def resolve_file(self, info: ResolveInfo, **kwargs: Dict[str, Any]) -> FileType:
+    def resolve_file(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> FileType | None:
         return resolve_file(info, **kwargs)
 
     def resolve_file_list(

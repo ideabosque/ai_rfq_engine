@@ -7,6 +7,8 @@ __author__ = "bibow"
 from graphene import DateTime, Field, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSONCamelCase
+from silvaengine_utility import SafeFloat as Float
+
 from ..models.batch_loaders import get_loaders
 from ..utils.normalization import normalize_to_json
 
@@ -17,10 +19,10 @@ class ItemPriceTierType(ObjectType):
     item_price_tier_uuid = String()
     provider_item_uuid = String()  # keep raw id
     segment_uuid = String()  # keep raw id
-    quantity_greater_then = String()
-    quantity_less_then = String()
-    margin_per_uom = String()
-    price_per_uom = String()
+    quantity_greater_then = Float()
+    quantity_less_then = Float()
+    margin_per_uom = Float()
+    price_per_uom = Float()
     status = String()
 
     # Nested resolvers: strongly-typed nested relationships

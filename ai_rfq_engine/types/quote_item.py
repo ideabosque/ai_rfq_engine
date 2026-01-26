@@ -6,7 +6,8 @@ __author__ = "bibow"
 
 from graphene import Boolean, DateTime, Field, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSONCamelCase
+from silvaengine_utility import SafeFloat as Float
+
 from ..models.batch_loaders import get_loaders
 
 
@@ -18,12 +19,12 @@ class QuoteItemType(ObjectType):
     partition_key = String()
     batch_no = String()
     request_uuid = String()
-    qty = String()
-    price_per_uom = String()
-    subtotal = String()
-    subtotal_discount = String()
-    final_subtotal = String()
-    guardrail_price_per_uom = String()
+    qty = Float()
+    price_per_uom = Float()
+    subtotal = Float()
+    subtotal_discount = Float()
+    final_subtotal = Float()
+    guardrail_price_per_uom = Float()
     slow_move_item = Boolean()
 
     # Nested resolver: strongly-typed nested relationships
@@ -46,20 +47,34 @@ class QuoteItemType(ObjectType):
         # Case 1: need to fetch using DataLoader
         provider_item_uuid = getattr(parent, "provider_item_uuid", None)
         batch_no = getattr(parent, "batch_no", None)
-        partition_key =  getattr(parent, "partition_key", None) #info.context.get("partition_key")
+        partition_key = getattr(
+            parent, "partition_key", None
+        )  # info.context.get("partition_key")
         if not provider_item_uuid:
             return None
-        
+
         loaders = get_loaders(info.context)
         if batch_no:
-            return loaders.provider_item_batch_loader.load((provider_item_uuid, batch_no)).then(
-                lambda provider_item_batch: provider_item_batch.get("guardrail_price_per_uom", None) if provider_item_batch else None
+            return loaders.provider_item_batch_loader.load(
+                (provider_item_uuid, batch_no)
+            ).then(
+                lambda provider_item_batch: (
+                    provider_item_batch.get("guardrail_price_per_uom", None)
+                    if provider_item_batch
+                    else None
+                )
             )
         else:
-            return loaders.provider_item_loader.load((partition_key, provider_item_uuid)).then(
-                lambda provider_item: provider_item.get("base_price_per_uom", None) if provider_item else None
+            return loaders.provider_item_loader.load(
+                (partition_key, provider_item_uuid)
+            ).then(
+                lambda provider_item: (
+                    provider_item.get("base_price_per_uom", None)
+                    if provider_item
+                    else None
+                )
             )
-    
+
     def resolve_slow_move_item(parent, info):
         """Resolve nested Quote for this quote item using DataLoader."""
         # Case 2: already embedded
@@ -74,10 +89,16 @@ class QuoteItemType(ObjectType):
             return None
 
         loaders = get_loaders(info.context)
-        return loaders.provider_item_batch_loader.load((provider_item_uuid, batch_no)).then(
-            lambda provider_item_batch: provider_item_batch.get("slow_move_item", None) if provider_item_batch else None
+        return loaders.provider_item_batch_loader.load(
+            (provider_item_uuid, batch_no)
+        ).then(
+            lambda provider_item_batch: (
+                provider_item_batch.get("slow_move_item", None)
+                if provider_item_batch
+                else None
+            )
         )
-    
+
     # ------- Nested resolvers -------
     def resolve_quote(parent, info):
         """Resolve nested Quote for this quote item using DataLoader."""

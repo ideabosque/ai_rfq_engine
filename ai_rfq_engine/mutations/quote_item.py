@@ -6,9 +6,10 @@ __author__ = "bibow"
 import traceback
 from typing import Any, Dict
 
-from graphene import Boolean, Field, Float, Mutation, String
-
+from graphene import Boolean, Field, Mutation, String
 from silvaengine_utility import JSONCamelCase
+from silvaengine_utility import SafeFloat as Float
+
 from ..models.quote_item import delete_quote_item, insert_update_quote_item
 from ..types.quote_item import QuoteItemType
 

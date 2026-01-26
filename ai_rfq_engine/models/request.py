@@ -25,11 +25,11 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import method_cache
-from ..utils.normalization import normalize_to_json
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.request import RequestListType, RequestType
+from ..utils.normalization import normalize_to_json
 from .file import resolve_file_list
 from .quote import resolve_quote_list
 from .utils import (

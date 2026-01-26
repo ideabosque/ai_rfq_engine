@@ -6,7 +6,8 @@ __author__ = "bibow"
 
 from graphene import DateTime, Field, Int, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
-from silvaengine_utility import JSONCamelCase, Debugger
+from silvaengine_utility import Debugger, JSONCamelCase
+from silvaengine_utility import SafeFloat as Float
 
 from ..models.batch_loaders import get_loaders
 from ..utils.normalization import normalize_to_json
@@ -20,10 +21,10 @@ class QuoteType(ObjectType):
     sales_rep_email = String()
     rounds = Int()
     shipping_method = String()
-    shipping_amount = String()
-    total_quote_amount = String()
-    total_quote_discount = String()
-    final_total_quote_amount = String()
+    shipping_amount = Float()
+    total_quote_amount = Float()
+    total_quote_discount = Float()
+    final_total_quote_amount = Float()
     notes = String()
     status = String()
     expired_at = DateTime()

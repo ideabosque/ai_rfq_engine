@@ -6,6 +6,7 @@ __author__ = "bibow"
 
 from graphene import DateTime, Field, Int, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
+from silvaengine_utility import SafeFloat as Float
 
 from ..models.batch_loaders import get_loaders
 
@@ -16,8 +17,8 @@ class InstallmentType(ObjectType):
     request_uuid = String()  # keep raw id for convenience
     priority = Int()
     partition_key = String()
-    installment_amount = String()
-    installment_ratio = String()
+    installment_amount = Float()
+    installment_ratio = Float()
     salesorder_no = String()
     scheduled_date = DateTime()
     payment_method = String()

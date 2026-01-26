@@ -5,7 +5,7 @@ __author__ = "bibow"
 
 import logging
 from functools import lru_cache
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 
 from silvaengine_dynamodb_base.cache_utils import (
     CacheConfigResolvers,
@@ -42,5 +42,5 @@ def purge_entity_cascading_cache(
         context_keys=context_keys,
         entity_keys=entity_keys,
         cascade_depth=cascade_depth,
-        custom_options=custom_options
+        custom_options=custom_options,
     )
