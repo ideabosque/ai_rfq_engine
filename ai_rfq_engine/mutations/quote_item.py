@@ -7,6 +7,7 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, Field, Mutation, String
+
 from silvaengine_utility import JSONCamelCase
 from silvaengine_utility import SafeFloat as Float
 
@@ -28,6 +29,7 @@ class InsertUpdateQuoteItem(Mutation):
         request_data = JSONCamelCase(required=False)
         qty = Float(required=False)
         subtotal_discount = Float(required=False)
+        notes = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod

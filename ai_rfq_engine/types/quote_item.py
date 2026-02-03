@@ -5,6 +5,7 @@ from __future__ import print_function
 __author__ = "bibow"
 
 from graphene import Boolean, DateTime, Field, List, ObjectType, String
+
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import SafeFloat as Float
 
@@ -24,6 +25,7 @@ class QuoteItemType(ObjectType):
     subtotal = Float()
     subtotal_discount = Float()
     final_subtotal = Float()
+    notes = String()
     guardrail_price_per_uom = Float()
     slow_move_item = Boolean()
 
