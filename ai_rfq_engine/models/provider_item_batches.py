@@ -345,7 +345,7 @@ def insert_update_provider_item_batch(
             + cols.get("additional_cost_per_uom", 0)
         )
         cols["guardrail_price_per_uom"] = cols["total_cost_per_uom"] * (
-            100 + cols.get("guardrail_margin_per_uom", 0) / 100
+            1 + cols.get("guardrail_margin_per_uom", 0)
         )
 
         ProviderItemBatchModel(
