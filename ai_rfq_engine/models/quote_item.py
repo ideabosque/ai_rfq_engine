@@ -17,8 +17,6 @@ from pynamodb.attributes import (
     UTCDateTimeAttribute,
 )
 from pynamodb.indexes import AllProjection, GlobalSecondaryIndex, LocalSecondaryIndex
-from tenacity import retry, stop_after_attempt, wait_exponential
-
 from silvaengine_dynamodb_base import (
     BaseModel,
     delete_decorator,
@@ -27,6 +25,7 @@ from silvaengine_dynamodb_base import (
     resolve_list_decorator,
 )
 from silvaengine_utility import convert_decimal_to_number, method_cache
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from ..handlers.config import Config
 from ..types.quote_item import QuoteItemListType, QuoteItemType
@@ -91,8 +90,19 @@ def get_price_per_uom(
         from .provider_item_batches import get_provider_item_batches_by_provider_item
 
         for batch in get_provider_item_batches_by_provider_item(provider_item_uuid):
-            cost = batch.total_cost_per_uom or 0
-            price = cost * (1 + float(tier.margin_per_uom))
+
+            # Slow-moving items use a fixed guardrail price to ensure minimum margins,
+            # while regular items calculate price from cost plus the tier's margin percentage.
+            if (
+                hasattr(batch, "slow_move_item")
+                and hasattr(batch, "guardrail_price_per_uom")
+                and batch.slow_move_item is True
+            ):
+                price = batch.guardrail_price_per_uom
+            else:
+                cost = batch.total_cost_per_uom or 0
+                price = cost * (1 + float(tier.margin_per_uom))
+
             provider_item_batches.append(
                 {"batch_no": batch.batch_no, "price_per_uom": price}
             )
