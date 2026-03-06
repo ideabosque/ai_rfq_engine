@@ -32,9 +32,10 @@ import os
 import sys
 
 import pytest
+from test_helpers import call_method, log_test_result
+
 from silvaengine_utility.graphql import Graphql
 from silvaengine_utility.serializer import Serializer
-from test_helpers import call_method, log_test_result
 
 logger = logging.getLogger("test_ai_rfq_engine")
 
@@ -1230,7 +1231,7 @@ def test_graphql_item_price_tiers(ai_rfq_engine, schema, test_data):
     # Build GraphQL query (use camelCase for GraphQL field names and JSON type)
     # query = Graphql.generate_graphql_operation("itemPriceTiers", "Query", schema)
     query = """
-    query GetItemPriceTiers($email: String!, $quote_items: [JSON]) {
+    query GetItemPriceTiers($email: String!, $quote_items: [JSONCamelCase]) {
         itemPriceTiers(email: $email, quoteItems: $quote_items) {
             itemUuid
             providerItemUuid
