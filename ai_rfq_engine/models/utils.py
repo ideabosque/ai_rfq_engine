@@ -356,7 +356,7 @@ def combine_all_item_price_tiers(
 
                 # Process each item instance for this key
                 for item in items_for_key:
-                    item_qty = item.get("qty", 0)
+                    item_qty = float(item.get("qty", 0))
 
                     # STEP 4: Filter tiers by quantity
                     # The segment_uuid filtering is now handled by the batch loader
