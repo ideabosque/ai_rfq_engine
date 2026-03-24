@@ -49,7 +49,7 @@ SETTING = {
     "endpoint_id": os.getenv("endpoint_id"),
     "part_id": os.getenv("part_id"),
     "execute_mode": os.getenv("execute_mode", "local"),
-    "initialize_tables": os.getenv("initialize_tables", 0),
+    "initialize_tables": os.getenv("initialize_tables", "0") == "1",
     "cache_enabled": os.getenv("cache_enabled", "0") == "1",
 }
 
