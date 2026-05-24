@@ -1,6 +1,6 @@
 # AI RFQ Engine → Hospitality Business: Gap Closure Plan
 
-> **Status**: Revised draft, aligned to current `ai_rfq_engine` source | **Last Updated**: 2026-05-23
+> **Status**: Revised draft, aligned to current `ai_rfq_engine` source | **Last Updated**: 2026-05-24
 >
 > **Related docs**: [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) · [PRICING_CALCULATION.md](PRICING_CALCULATION.md) · [DISCOUNT_PROMOTION_PROMPT.md](DISCOUNT_PROMOTION_PROMPT.md)
 >
@@ -143,9 +143,9 @@ Phases run sequentially because each phase's tests assume the previous phase is 
                      |  G7a: external catalog identity      |
                      |       bridge (in-engine, generic)    |
                      |      |                               |
-                     |  G7b: inquiry contract + pilot       |
-                     |       adapter boundary selected      |
-                     |       by ADR (Neo4j first)           |
+                     |  G7b: inquiry contract + adapters    |
+                     |       (Stub + Neo4j implemented;     |
+                     |       menu/PMS/ERP are follow-ons)   |
                      |      |                               |
                      |  G7c: external_system_configs table  |
                      |       (tenant / namespace / provider |
@@ -269,9 +269,16 @@ The term **PAX** (originating from "passengers", now used industry-wide for head
     class ItemPriceTierModel(BaseModel):
         ...
    +    pax_type = UnicodeAttribute(null=True)   # configured guest/participant category
+   +    # G2 occupancy mode: pax_type -> count of guests included in the base rate
+   +    base_occupancy = MapAttribute(null=True)
+   +    # G2 occupancy mode: pax_type -> surcharge per extra guest beyond base
+   +    extra_pax_surcharges = MapAttribute(null=True)
    ```
 
-3. **Pricing calculation**: extend `get_price_per_uom()` and `insert_update_quote_item()` only after pricing-mode rules are defined. A `per_pax_type` item may sum `price(pax_type) * count(pax_type)`, while a lodging item may retain room-night pricing with occupancy surcharges. `qty * price_per_uom` remains the existing path for unit-priced items.
+3. **Pricing calculation** — three modes, each implemented in `insert_update_quote_item`:
+   - `unit`: `subtotal = qty * price_per_uom` (default; unchanged behavior for legacy procurement tenants).
+   - `per_pax_type`: `subtotal = Σ (pax_breakdown[t] * price_per_uom_for_tier(t))`; one tier row per `pax_type`; `qty` must equal `sum(pax_breakdown.values())`.
+   - `occupancy`: one base tier per `(item, provider_item, segment, qty)` carries the base rate plus `base_occupancy` (pax_type → free headcount) and `extra_pax_surcharges` (pax_type → per-extra-guest surcharge). Math: `extras_t = max(0, pax_breakdown[t] - base_occupancy[t])`; `subtotal = qty * (price_per_uom + Σ extras_t * extra_pax_surcharges[t])`. An over-base pax_type without a configured surcharge is a tier-configuration error (raised, not silently zeroed).
 
 4. **Tier lifecycle**: current tier creation in `_get_previous_tier` finds and closes the preceding open-ended tier using `item_uuid`, `provider_item_uuid`, and `segment_uuid`. If `pax_type` is added, that lookup, the `quantity_greater_then` ordering check, the `purge_cache` decorator's `custom_cache_keys`, and the `get_item_price_tiers_by_provider_item` query must all include `pax_type` so one category does not close another category's price band.
 
@@ -285,6 +292,8 @@ The term **PAX** (originating from "passengers", now used industry-wide for head
 **Acceptance criteria**
 - A per-person attraction quote for "2 adults + 1 child" produces `2 * adult_price + 1 * child_price`.
 - A room-night quote can retain `qty = number_of_room_nights` while recording occupancy in `pax_breakdown`.
+- An occupancy quote for "3 adults" in a base-2 room with `extra_pax_surcharges["adult"] = 50` on a $200 base produces `qty * 250` (one extra adult per night). Within-base headcount adds no surcharge.
+- Over-base headcount for a pax_type missing from `extra_pax_surcharges` raises a tier-configuration error rather than treating the surcharge as zero.
 - Unit-priced items with no hospitality pricing mode continue to use `qty * price_per_uom`.
 - Creating or updating an adult tier does not modify a child or senior tier's open-ended range.
 
@@ -483,7 +492,7 @@ Indexes (defined when this new table is created):
 
 **Workflow (search-first, the actual hospitality flow):**
 
-Module / function names are written as they appear in this repository's source unless explicitly labeled planned. The implemented adapter boundary currently includes `StubCatalogHandler`; a real `Neo4jCatalogHandler` is a follow-on adapter. The end-to-end sequence diagram later in this section expands the inquiry step through `external_system_config`, the registry, and the selected handler.
+Module / function names are written as they appear in this repository's source unless explicitly labeled planned. The implemented adapter boundary currently includes both `StubCatalogHandler` (fixture-driven, for tests and local development) and `Neo4jCatalogHandler` (real graph queries via the official `neo4j` Python driver); both are registered at package-import time. Additional vendor adapters (menu API, PMS, ERP/PIM) are the remaining follow-on work. The end-to-end sequence diagram later in this section expands the inquiry step through `external_system_config`, the registry, and the selected handler.
 
 ```
 AI Agent: "Find Tokyo hotels with onsen"
@@ -495,7 +504,7 @@ AI Agent -> schema:                inquire_catalog(
                                        query=...)
    schema dispatches via the G7b registry to the configured handler
    current pilot/test adapter: adapter_id="stub" -> StubCatalogHandler
-   planned adapter: adapter_id="neo4j" -> Neo4jCatalogHandler
+   live adapter implementation: adapter_id="neo4j" -> Neo4jCatalogHandler
    | returns [node_id_a, node_id_b, ...]
    v
 AI Agent -> schema:                item_catalog_refs(
@@ -552,7 +561,7 @@ ai_rfq_engine/
         ├── base.py                # CatalogHandler ABC + shared types
         ├── registry.py            # register_handler / dispatch_inquire
         ├── stub_handler.py        # implemented deterministic adapter
-        └── neo4j_handler.py       # planned real adapter, not yet implemented
+        └── neo4j_handler.py       # implemented Neo4j real adapter (G7b)
 ```
 
 A small registry resolves the configured adapter implementation. Current bootstrap is explicit and import-time:
@@ -560,8 +569,10 @@ A small registry resolves the configured adapter implementation. Current bootstr
 ```python
 # ai_rfq_engine/handlers/catalog/__init__.py
 from .stub_handler import StubCatalogHandler
+from .neo4j_handler import Neo4jCatalogHandler
 
 register_handler("stub", StubCatalogHandler)
+register_handler("neo4j", Neo4jCatalogHandler)
 ```
 
 At dispatch time, [ai_rfq_engine/handlers/catalog/registry.py](../ai_rfq_engine/handlers/catalog/registry.py) applies:
@@ -571,7 +582,7 @@ adapter_id = getattr(config, "adapter_id", None) or system_code
 handler_cls = get_handler(adapter_id)
 ```
 
-Therefore a configured row with `adapter_id="stub"` uses the implemented fixture-backed handler. A row with `adapter_id="neo4j"` does **not** work yet because there is no `neo4j_handler.py` and no `register_handler("neo4j", ...)` bootstrap. When implemented, the registration point should be adjacent to the stub registration in `handlers/catalog/__init__.py`.
+Therefore a configured row with `adapter_id="stub"` uses the implemented fixture-backed handler. A row with `adapter_id="neo4j"` now works: `Neo4jCatalogHandler` is implemented and registered as `register_handler("neo4j", Neo4jCatalogHandler)`.
 
 The dispatcher orchestrates the surrounding steps so each handler stays narrow:
 
@@ -602,7 +613,7 @@ G3 availability operations should use the same envelope conventions for system, 
 **Phased adapter rollout** (module location follows the execution-boundary ADR; paths below show the in-engine option):
 
 1. **Stub (implemented)**: `StubCatalogHandler` validates the boundary, registry, query envelope, and error translation using deterministic fixtures.
-2. **Neo4j (planned first real adapter, if confirmed by the pilot consumer)**: a property graph is the richest catalog model in scope. A future handler takes `{graph_id, node_id}`, returns node properties plus bounded relationship data required by the use case, adds a `neo4j` Python driver dependency, and registers itself as `register_handler("neo4j", Neo4jCatalogHandler)`.
+2. **Neo4j (implemented first real adapter)**: `Neo4jCatalogHandler` is implemented and registered under `register_handler("neo4j", Neo4jCatalogHandler)`. It connects via the official `neo4j` Python driver (lazy-imported), supports parameterized custom Cypher via `extra_config.cypher_query`, and handles timeout/error/unknown-node failures with structured errors. A matching `Neo4jAvailabilityHandler` is registered for G3 availability operations, but intentionally requires configured `check_cypher`, `acquire_hold_cypher`, `release_hold_cypher`, and `confirm_hold_cypher` operations because a generic graph query cannot safely enforce service-window capacity. Both handlers accept `auth_strategy="none"` or `"basic"` and normalize responses into the standard envelope; other Neo4j authentication modes require an explicit handler extension.
 3. **Restaurant menu APIs (second real integration)**: typically REST + JSON; validates the contract on non-graph payloads.
 4. **PMS systems (third real integration)**: Opera, Cloudbeds, etc. — typically per-property scoping and supplier-side auth. May warrant one handler file per vendor if APIs diverge significantly.
 5. **ERP item masters / PIM (later)**: serves non-hospitality tenants (procurement, manufacturing), demonstrating the bridge is genuinely generic.
@@ -611,11 +622,11 @@ G3 availability operations should use the same envelope conventions for system, 
 
 **Acceptance criteria**
 - The pilot resolves an external source record through existing `item_external_id` / `provider_item_external_id` *or* the new `ItemCatalogRefModel` (G7a) without ambiguity.
-- The implemented stub adapter is exercised end-to-end for the registry/configuration contract; once Neo4j is selected and implemented, its adapter is exercised against a real graph and registered under `adapter_id="neo4j"`.
+- The implemented stub adapter is exercised end-to-end for the registry/configuration contract; the Neo4j adapter is implemented, registered under `adapter_id="neo4j"`, and exercised with mocked driver tests. Production readiness requires testing against a real Neo4j graph.
 - Adding a second adapter (for example, a restaurant menu API) requires no schema change to G7a or G7c.
 - An adapter that fails (timeout, auth error, system disabled in G7c) returns a structured error to the caller and does not crash the engine.
 
-**Effort**: 2 engineer-weeks for adapter scaffolding, error/timeout discipline, and the Neo4j pilot implementation at the selected execution boundary. Each follow-on adapter is roughly 0.5–1 engineer-week depending on authentication and payload complexity.
+**Effort**: 2 engineer-weeks for adapter scaffolding, error/timeout discipline, and the Neo4j adapter implementation — **delivered**. The scaffolding (`base.py`, `registry.py`), the `StubCatalogHandler`, and the `Neo4jCatalogHandler` are all in place with unit-test coverage. Each remaining vendor adapter (menu API, PMS, ERP/PIM) is roughly 0.5–1 engineer-week depending on authentication and payload complexity.
 
 #### G7c. External system configuration table
 
@@ -707,7 +718,7 @@ Production deployments should set `auth_secret_value = null`, populate `auth_sec
 3. The executor resolves the credential per the order above and invokes the external system, applying timeout/cache rules and returning a normalized response.
 4. The plaintext credential **never** appears in any GraphQL response, query result, or log output.
 
-**Current adapter note**: the configuration table and dispatcher are implemented, and the built-in `stub` adapter uses `extra_config.fixtures`. A real Neo4j endpoint is not callable until a Neo4j handler and its `register_handler("neo4j", ...)` bootstrap are added.
+**Current adapter note**: the configuration table and dispatcher are implemented, and the built-in `stub` adapter uses `extra_config.fixtures`. The `neo4j` adapter is now implemented and registered under both catalog and availability handler registries; it connects via the Neo4j driver (lazy-imported) and supports parameterized Cypher queries from `extra_config`. Availability operations require configured Cypher that evaluates service window, quantity, and hold state; the handler does not supply a capacity-blind fallback query.
 
 **Files touched**
 - New `ai_rfq_engine/models/external_system_config.py`
@@ -730,7 +741,7 @@ Production deployments should set `auth_secret_value = null`, populate `auth_sec
 
 #### End-to-end sequence (G7a + G7b + G7c)
 
-The diagram below traces a single hospitality search-to-quote flow exercising all three G7 pieces plus the existing G2 pricing path. It distinguishes the currently runnable `StubCatalogHandler` path from a future real external-catalog adapter such as Neo4j.
+The diagram below traces a single hospitality search-to-quote flow exercising all three G7 pieces plus the existing G2 pricing path. Both the `StubCatalogHandler` path (for tests and local development) and the `Neo4jCatalogHandler` path (real graph queries) are implemented; the diagram's `alt` branch distinguishes them.
 
 Participants below map to module or function names in this repository where they exist; external participants (human operator, consumer project, third-party services) keep role names because no in-repo module corresponds. Aliases stay short for arrow legibility; the `as` labels are what developers will grep for.
 
@@ -760,7 +771,7 @@ sequenceDiagram
     alt adapter_id is stub
         catalog_registry->>catalog_handler: StubCatalogHandler inquire
         catalog_handler-->>catalog_registry: configured fixture response
-    else future registered real adapter
+    else adapter_id is neo4j (or other real adapter)
         catalog_registry->>catalog_handler: inquire with credential
         catalog_handler->>External_Catalog: external query
         External_Catalog-->>catalog_handler: matching nodes
@@ -792,17 +803,17 @@ sequenceDiagram
 | `schema` | [ai_rfq_engine/schema.py](../ai_rfq_engine/schema.py) — GraphQL queries and mutations |
 | `catalog_registry` | [ai_rfq_engine/handlers/catalog/registry.py](../ai_rfq_engine/handlers/catalog/registry.py) — resolves config-selected handler |
 | `external_system_config` | [ai_rfq_engine/models/external_system_config.py](../ai_rfq_engine/models/external_system_config.py) (G7c) |
-| `catalog_handler` | [ai_rfq_engine/handlers/catalog/stub_handler.py](../ai_rfq_engine/handlers/catalog/stub_handler.py) today; a future `neo4j_handler.py` must be added and registered |
-| `External_Catalog` | a real external catalog system, reached only by a future real adapter |
+| `catalog_handler` | [ai_rfq_engine/handlers/catalog/stub_handler.py](../ai_rfq_engine/handlers/catalog/stub_handler.py) for fixtures; [ai_rfq_engine/handlers/catalog/neo4j_handler.py](../ai_rfq_engine/handlers/catalog/neo4j_handler.py) for real Neo4j queries |
+| `External_Catalog` | a real external catalog system, reached by the `neo4j` adapter rather than by the deterministic stub |
 | `item_catalog_ref` | [ai_rfq_engine/models/item_catalog_ref.py](../ai_rfq_engine/models/item_catalog_ref.py) (G7a) |
 | `quote_item` | existing [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py) — `get_price_per_uom` and `insert_update_quote_item` already implemented |
 
 **Failure-mode notes** (not shown in the diagram to keep the happy path readable):
 
 - **`external_system_config` (G7c)**: if no active row matches the requested `(tenant, system_kind, system_code, namespace, provider_corp_external_id)`, `resolve_external_system_model_for` returns `None` and the dispatcher raises a structured `not_configured` error. The handler is never invoked.
-- **Handler registration**: `StubCatalogHandler` is registered as `"stub"` during `ai_rfq_engine.handlers.catalog` import. Configuring `adapter_id="neo4j"` currently results in `not_configured` because no real Neo4j handler is registered.
+- **Handler registration**: `StubCatalogHandler` is registered as `"stub"` and `Neo4jCatalogHandler` as `"neo4j"` during `ai_rfq_engine.handlers.catalog` import. Configuring `adapter_id="neo4j"` now resolves to the real handler.
 - **Credential resolution**: `resolve_credential_for(config)` resolves a registered `auth_secret_ref` backend first; an inline value is used only under explicit local/test configuration. If no credential is available and `auth_strategy != "none"`, the dispatcher raises `auth_unavailable`.
-- **External catalog**: once a real adapter exists, a timeout per `timeout_seconds` becomes `system_timeout`. The stub has no external network call.
+- **External catalog**: the Neo4j adapter applies `timeout_seconds` as a driver query timeout and converts timeout failures to `system_timeout`. The stub has no external network call.
 - **`item_catalog_ref` (G7a)**: if no row exists for a returned `node_id`, that node is dropped from the response with a structured warning rather than failing the batch. The AI agent presents only the resolvable subset.
 - **`quote_item.get_price_per_uom` (G2)**: standard behavior — if no matching tier exists for the `(item, provider_item, segment, qty, pax_type)` tuple, `insert_update_quote_item` raises before persisting. No partial QuoteItem is created.
 
@@ -858,7 +869,7 @@ sequenceDiagram
 | `catalog_inquiry_query` | [ai_rfq_engine/queries/catalog_inquiry.py](../ai_rfq_engine/queries/catalog_inquiry.py) — `resolve_inquire_catalog`; wraps dispatcher errors into in-band fields |
 | `catalog_registry` | [ai_rfq_engine/handlers/catalog/registry.py](../ai_rfq_engine/handlers/catalog/registry.py) — `dispatch_inquire`, registry lookup |
 | `external_system_config` | [ai_rfq_engine/models/external_system_config.py](../ai_rfq_engine/models/external_system_config.py) — `resolve_external_system_model_for`, `resolve_credential_for` |
-| `catalog_handler` | the registered adapter selected by `adapter_id` or `system_code` (currently `stub_handler`; real Neo4j handler is a follow-on deliverable) |
+| `catalog_handler` | the registered adapter selected by `adapter_id` or `system_code` (`stub_handler` for fixtures; `neo4j_handler` for real Neo4j queries) |
 | `External_Catalog` | external catalog system for a real adapter; omitted by the deterministic stub |
 
 ##### `resolve_check_availability` (G3)
@@ -906,7 +917,7 @@ sequenceDiagram
 | `availability_query` | [ai_rfq_engine/queries/availability.py](../ai_rfq_engine/queries/availability.py) — `resolve_check_availability`; wraps dispatcher errors into in-band fields |
 | `availability_registry` | [ai_rfq_engine/handlers/availability/registry.py](../ai_rfq_engine/handlers/availability/registry.py) — `dispatch_check` (also `dispatch_acquire_hold`, `dispatch_release_hold`, `dispatch_confirm_hold` for the hold lifecycle) |
 | `external_system_config` | same module as G7b — `system_kind="availability"` is the only difference in resolution |
-| `availability_handler` | the registered availability adapter selected by `adapter_id` or `system_code` (currently `stub_handler`; real PMS/GDS handler is a follow-on deliverable) |
+| `availability_handler` | the registered availability adapter selected by `adapter_id` or `system_code` (`stub_handler` for fixtures; `neo4j_handler` for real Neo4j availability queries) |
 | `Reservation_System` | external reservation system for a real adapter; omitted by the deterministic stub |
 
 **Notes on operation symmetry between the two resolvers**
@@ -967,7 +978,7 @@ Nullable fields are safe for storage migration, but behavioral compatibility is 
 | R5 | A persisted bundle parent conflicts with required/priced `QuoteItem` creation and can double-count totals | Use grouped priced components for v1; require an ADR and dedicated aggregate behavior before storing parent lines. |
 | R6 | FX-rate freshness can lock an incorrect customer total | Define rate source, allowed age, rounding, and quote-lock rules before implementing multi-currency quotes. |
 | R7 | Cancellation-policy refund computation is jurisdiction-sensitive | Engine stores the quoted snapshot; refund execution stays in the payment layer. |
-| R8 | The repository now includes in-engine stub adapters and configuration/secret boundaries, but no live Neo4j or PMS/GDS adapter | Lock the first production system, add its dependency and handler registration, and exercise real timeout/auth/failure paths before production use. |
+| R8 | The repository now includes in-engine Neo4j catalog and availability adapters alongside the stub adapters; the Neo4j Python driver is lazy-imported through the `neo4j` optional dependency group | Production readiness requires installing `.[neo4j]` and testing against a real Neo4j instance for timeout/auth/failure paths. |
 | R9 | Hospitality verticals vary in booking lead time and hold lifetime | Make hold expiry part of the external availability contract; configure policy by provider or product as required. |
 | R10 | New query dimensions (`pax_type`, `bundle_uuid`, `service_start_at`) interact with existing `purge_cache` decorators on `ItemPriceTier`, `QuoteItem`, and `ProviderItemBatch`, whose `custom_cache_keys` are fixed | Every phase that adds a query dimension must review the corresponding cache keys and cached getters. Add regression tests that verify invalidation for affected list queries. |
 | R11 | External node IDs and adapter endpoints may only be valid within a graph, property, catalog, or account namespace | Make `namespace` part of both G7a identity keys and G7c configuration resolution; test independent resolution across namespaces. |
@@ -1017,6 +1028,150 @@ Assumes 2 engineers in parallel where the Gantt shows parallel work, 1 engineer 
 
 ---
 
-## 14. Next Action
+## 14. Implementation Status (Phases 0–4)
 
-If this plan is approved, the first implementation step is a Phase 0 test/fixture spike on a single hospitality vertical (recommended: hotel room-night) using the existing GraphQL workflow. Its output is a verified gap log plus ADRs for service windows, pricing mode, availability ownership, and external identifiers before production schema work begins.
+The functional surface of Phases 0 through 4 has been delivered. Per-gap status:
+
+| Gap | Status | Landing files / notes |
+|---|---|---|
+| G1 Service-date inventory | ✅ Delivered | `models/provider_item_batches.py` (`service_start_at` / `service_end_at`, `_validate_service_window`, window-overlap filter); schema query args wired |
+| G2 Guest-type (PAX) pricing | ✅ Delivered (all three modes) | `unit`, `per_pax_type`, and `occupancy` paths in `insert_update_quote_item`; `pricing_mode` on `Item`; `pax_type` + `base_occupancy` + `extra_pax_surcharges` on `ItemPriceTier` |
+| G3 Availability + hold lifecycle | ✅ Delivered | `handlers/availability/{base,registry,stub_handler,neo4j_handler}.py`; four operations (`check` / `acquire_hold` / `release_hold` / `confirm_hold`); GraphQL `check_availability`; `_enforce_availability` + `_release_availability_hold` wired into the quote-item lifecycle |
+| G4 Bundle composition | ✅ Delivered | `bundle_uuid` + `bundle_label` on `QuoteItem`; quote-item list filtering by `bundle_uuid` |
+| G5 Currency / FX | ✅ Delivered | `currency` on batch/tier/quote/quote_item; `Quote.fx_rate` + `fx_rate_locked_at`; `subtotal_native` populated at quote-item creation; FX applied only on currency mismatch |
+| G6 Cancellation policy | ✅ Delivered | `CancellationPolicyModel`; `cancellation_policy_uuid` on `ProviderItemBatch`; immutable snapshot in `QuoteItem.request_data` via `_build_cancellation_snapshot` |
+| G7a Catalog refs table | ✅ Delivered | `ItemCatalogRefModel` with `system_node_index` + `item_lookup_index`; `find_items_by_catalog_refs` |
+| G7b Inquiry handlers | ✅ Delivered | Scaffolding (`base.py`, `registry.py`) + `StubCatalogHandler` + `Neo4jCatalogHandler`; GraphQL `inquire_catalog` |
+| G7c External system config | ✅ Delivered | `ExternalSystemConfigModel` with hybrid `auth_secret_value` (inline, write-only) / `auth_secret_ref` (external backend via `register_secret_resolver`); `resolve_external_system_for` with four-step `system_kind` fallback |
+| Phase 0 pilot test | ✅ Delivered | `tests/test_hospitality_pilot.py` |
+| Phase 4 hardening pilot | 🟡 Partial | `tests/test_hardening_pilot.py` — B2B regression + hotel scenarios complete; restaurant/event + travel-itinerary scenarios documented as placeholders (see §15.1) |
+
+Total test coverage at Phase 4 close: **79 non-integration tests** passing plus **5 integration tests** collected (skip cleanly without DDB).
+
+---
+
+## 15. Next Gap Plan — Phase 5+ Backlog
+
+The functional surface is complete. Phase 5+ work is production-readiness, vendor breadth, and ratifying the §11 decisions that gate full rollout. None of these items block the hospitality pilot's correctness, but each has a clear consumer.
+
+### 15.1 Open hardening pilot scenarios
+
+Two `@pytest.mark.integration` tests in `tests/test_hardening_pilot.py` are documented placeholders awaiting fixture-seeding decisions:
+
+- **`TestRestaurantOrEventHardening`** — exercises G3 hold lifecycle through `StubAvailabilityHandler`. Needs:
+  - A convention for how the stub availability handler accepts fixtures (parallel the catalog stub's `extra_config["fixtures"]` shape).
+  - Seeding of one `ExternalSystemConfig` row with `system_kind="availability"` + `adapter_id="stub"`.
+  - `ProviderItem.availability_mode = "require_hold"` + `availability_system_code = "stub"`.
+- **`TestMultiLegTravelItineraryHardening`** — exercises G4 bundle composition end-to-end. Needs:
+  - Three-Item seeding (hotel + transfer + activity) sharing a `bundle_uuid`.
+  - Quote-total aggregation assertion across the three components.
+  - Two installments (deposit + balance) on the parent quote, not per-component.
+
+**Effort**: ~1 engineer-day each once the fixture strategy is decided. Both scenarios have implementation-pattern comments in the test file.
+
+### 15.2 Vendor adapter backlog
+
+The `CatalogHandler` and `AvailabilityHandler` ABCs are vendor-neutral. Today's adapters: `StubCatalogHandler` + `Neo4jCatalogHandler` (catalog) and `StubAvailabilityHandler` + `Neo4jAvailabilityHandler` (availability). Remaining adapters, each independent of the others:
+
+| Adapter | Vertical | Effort |
+|---|---|---|
+| Restaurant menu API (REST/JSON) | Food & beverage | ~0.5 engineer-week |
+| Opera PMS | Lodging (large chains) | ~1 engineer-week (catalog + availability) |
+| Cloudbeds PMS | Lodging (independent) | ~1 engineer-week (catalog + availability) |
+| Amadeus GDS | Travel agencies | ~1.5 engineer-weeks (availability) |
+| ERP item master (NetSuite, SAP, Oracle, etc.) | Procurement / Manufacturing | ~1 engineer-week per vendor (catalog) |
+
+The first non-Neo4j adapter validates that the contract is genuinely vendor-neutral. Adding any of these requires zero schema or scaffolding changes — only a new handler file plus a `register_handler(...)` call in the corresponding `handlers/<kind>/__init__.py`.
+
+### 15.3 Real-system integration testing
+
+The current Neo4j tests inject a fake `neo4j` module into `sys.modules`. A separate deployment-targeted suite running against a sandbox Neo4j (and eventually sandbox PMS / GDS instances) would validate:
+
+- Cypher query correctness — especially the default node and browse queries.
+- Hold-token lifecycle: `acquire → check → confirm → release` against a real graph.
+- Timeout enforcement under realistic latency (≥1s, not just mocked exceptions).
+- End-to-end auth flow (basic auth today; OAuth2 client credentials when vendor adapters arrive).
+
+**Home**: the consuming application's CI pipeline rather than this engine's repo. The handler contract is what's tested here; deployment-shape validation belongs alongside the deployment.
+
+### 15.4 ADRs gating production
+
+The §11 decisions remain open. Each is a focused 2–4 page doc that ratifies a choice this plan has provisionally made:
+
+| # | Decision | Provisional default |
+|---|---|---|
+| 1 | Tenancy and defaults | `partition_key` matches the existing procurement convention |
+| 2 | Pricing modes and PAX vocabulary | Fixed enum for v1; tenant-configurable backlog |
+| 3 | Bundle representation | Grouped priced components (no persisted parent line) |
+| 4 | FX scope | Tenant-loaded daily rates |
+| 5 | Cancellation policy authoring | In-engine for v1 |
+| 6 | External integration ownership + namespace sentinel | In-engine handlers; `"DEFAULT"` sentinel (revisit if collision observed) |
+| 7 | External secrets-manager backend | Deferred — inline `auth_secret_value` for the pilot, registered `_SECRET_RESOLVER` later |
+| 8 | Pilot vertical | Hotel room-night |
+
+**Effort**: ~0.5 engineer-week to draft all eight; less if the provisional defaults are simply ratified rather than revised.
+
+### 15.5 Observability & operations
+
+The engine already has a `monitor_decorator` that wraps resolvers but does not currently emit per-handler metrics. Production rollout needs:
+
+- **Handler metrics** — latency, success / error rates per adapter, dimensioned by `partition_key` + `system_code` + `adapter_id` + `operation`.
+- **Cache effectiveness** — hit / miss ratios on `purge_cache` decorators.
+- **Tenant-scoped audit log** — structured event per external call: `partition_key`, `system_code`, `adapter_id`, `operation`, `duration_ms`, `error_code`. Critical for tracing failed catalog queries or expired holds back to the originating quote.
+- **Index utilization** — production query patterns inform whether the planned-but-not-yet-added GSIs (service-window queries on `ProviderItemBatch`, bundle queries on `QuoteItem`) become necessary or can stay as filter-time concerns.
+
+**Effort**: ~1 engineer-week to wire metrics through the existing decorators + agree on an emission backend (CloudWatch EMF, OTLP, or similar — itself a small ADR).
+
+### 15.6 Performance & scale
+
+Gated on having representative production data:
+
+- Load-test service-window queries with realistic volumes (10k batches × 200 service-dates per the original plan).
+- Decide on the production index strategy for `ProviderItemBatch.service_start_at`. Adding a GSI to a deployed table is non-trivial — the decision needs measurement.
+- Profile `DataLoader` batch sizes for hospitality flows (more cross-table reads than B2B procurement).
+- Establish per-tenant rate limits on `inquire_catalog` and `check_availability` — external systems have their own limits and a poorly-behaved tenant can exhaust them.
+
+**Effort**: ~1–2 engineer-weeks, data-dependent.
+
+### 15.7 Documentation handoff
+
+- Update [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) to reflect hospitality as a supported workload (currently still procurement-centric).
+- Add a "Hospitality quick-start" doc covering: seeding an occupancy tier, configuring G7c for Neo4j, the availability hold lifecycle in `insert_update_quote_item`.
+- Document the `Config.allow_inline_auth_secret_value()` flag and when each deployment should enable / disable it.
+- Cross-link [PRICING_CALCULATION.md](PRICING_CALCULATION.md) with the G2 occupancy math.
+
+**Effort**: ~3 engineer-days.
+
+### 15.8 Out of scope for this engine (lives elsewhere)
+
+- **MCP processor surface** — `inquire_catalog` and `check_availability` are not yet exposed as MCP tools. Belongs to `mcp_rfq_processor`, not this repo.
+- **AI agent orchestration** — the consumer is the Travel AI Agent project (or any equivalent); it composes catalog inquiry + quote building + payment-link generation.
+- **Email / document delivery** — the engine stores `File` metadata only; document rendering and email transport live in the consuming application.
+
+### 15.9 Effort summary
+
+| Workstream | Estimate | Gating |
+|---|---|---|
+| Complete the two hardening pilot scenarios | 2 engineer-days | Internal |
+| First non-Neo4j adapter (menu API) | 2–3 engineer-days | Consumer demand |
+| ADR drafting (8 ADRs) | 2–3 engineer-days | Production rollout |
+| Observability wiring | 1 engineer-week | Production rollout |
+| Documentation handoff | 3 engineer-days | Production rollout |
+| **Phase 5 minimum (internal readiness)** | **~3 engineer-weeks** | — |
+| Real-system integration suite | external to this repo | Deployment-side CI |
+| Additional vendor adapters | 0.5–1.5 engineer-weeks each | Consumer demand |
+| Performance & scale work | 1–2 engineer-weeks | Representative production data |
+
+Phase 5 minimum (the first five rows) completes production readiness. Everything below depends on either a specific consumer onboarding or actual traffic data to make sensible decisions against.
+
+### 15.10 Suggested next bounded chunk
+
+If picking up Phase 5+ from a cold start, the recommended order is:
+
+1. **Finish the two hardening pilot scenarios** (~2 days) — closes the test surface and pins down the stub availability fixture convention, which is also the precondition for adding any real availability adapter.
+2. **Draft the eight ADRs** (~3 days) — cheap to write while the design rationale is still fresh; expensive to reconstruct later.
+3. **Wire observability** (~1 week) — needed before the engine sees real traffic.
+4. **Documentation handoff** (~3 days).
+5. **First vendor adapter on demand**.
+
+Each step is independently deliverable and unblocks subsequent work without forcing a fixed sequence.

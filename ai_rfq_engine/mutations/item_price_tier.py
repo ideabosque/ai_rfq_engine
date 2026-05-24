@@ -7,6 +7,7 @@ import traceback
 from typing import Any, Dict
 
 from graphene import Boolean, Field, Mutation, String
+from silvaengine_utility import JSONCamelCase
 from silvaengine_utility import SafeFloat as Float
 
 from ..models.item_price_tier import (
@@ -29,6 +30,10 @@ class InsertUpdateItemPriceTier(Mutation):
         currency = String(required=False)
         margin_per_uom = Float(required=False)
         price_per_uom = Float(required=False)
+        # G2 occupancy mode: pax_type -> included headcount (e.g. {"adult": 2})
+        base_occupancy = JSONCamelCase(required=False)
+        # G2 occupancy mode: pax_type -> surcharge per extra guest
+        extra_pax_surcharges = JSONCamelCase(required=False)
         status = String(required=False)
         updated_by = String(required=True)
 

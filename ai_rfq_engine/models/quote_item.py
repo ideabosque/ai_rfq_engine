@@ -188,6 +188,63 @@ def _release_availability_hold(info: ResolveInfo, quote_item: Any) -> None:
     )
 
 
+def _get_occupancy_pricing_tier(
+    info: ResolveInfo,
+    *,
+    item_uuid: str,
+    qty: float,
+    segment_uuid: str,
+    provider_item_uuid: str,
+) -> Any:
+    """
+    Look up the single base tier used for G2 occupancy-mode pricing.
+
+    Mirrors ``get_price_per_uom``'s tier-selection rules (segment + provider +
+    quantity-band match, no ``pax_type``) but returns the matched tier itself
+    so callers can read ``base_occupancy`` and ``extra_pax_surcharges`` in
+    addition to ``price_per_uom``. Returns ``None`` when no tier matches.
+    """
+    from .item_price_tier import resolve_item_price_tier_list
+
+    price_tier_list = resolve_item_price_tier_list(
+        info,
+        item_uuid=item_uuid,
+        segment_uuid=segment_uuid,
+        provider_item_uuid=provider_item_uuid,
+        quantity_value=qty,
+        status="active",
+        legacy_pax_only=True,
+    )
+    if price_tier_list.total == 0:
+        return None
+    return price_tier_list.item_price_tier_list[0]
+
+
+def _coerce_occupancy_map(value: Any) -> Dict[str, float]:
+    """
+    Normalise a ``MapAttribute`` (or plain dict) into ``{pax_type: float}``.
+    Returns an empty dict for ``None`` / unrecognised shapes so the caller
+    can treat absent surcharges as zero without special-casing.
+    """
+    if value is None:
+        return {}
+    as_dict = getattr(value, "as_dict", None)
+    if callable(as_dict):
+        try:
+            value = as_dict()
+        except Exception:
+            return {}
+    if not isinstance(value, dict):
+        return {}
+    out: Dict[str, float] = {}
+    for key, raw in value.items():
+        try:
+            out[str(key)] = float(raw)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def get_price_per_uom(
     info: ResolveInfo,
     item_uuid: str,
@@ -692,6 +749,59 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
                     f"segment_uuid={segment_uuid}, provider_item_uuid={provider_item_uuid}"
                 )
             subtotal = float(price_per_uom) * float(qty)
+        elif pricing_mode == "occupancy":
+            # Lodging-style: one base tier covers up to ``base_occupancy``
+            # guests per pax_type; each guest beyond that adds a surcharge.
+            # ``qty`` is the number of UOM units (room-nights, table-seatings,
+            # etc.); ``pax_breakdown`` is who's staying / attending.
+            if not isinstance(pax_breakdown, dict) or not pax_breakdown:
+                raise ValueError(
+                    "pax_breakdown is required for occupancy pricing"
+                )
+            tier = _get_occupancy_pricing_tier(
+                info,
+                item_uuid=item_uuid,
+                qty=qty,
+                segment_uuid=segment_uuid,
+                provider_item_uuid=provider_item_uuid,
+            )
+            if tier is None or tier.price_per_uom is None:
+                raise ValueError(
+                    f"No occupancy base tier found for item_uuid={item_uuid}, "
+                    f"qty={qty}, segment_uuid={segment_uuid}, "
+                    f"provider_item_uuid={provider_item_uuid}"
+                )
+            base_rate = float(tier.price_per_uom)
+            base_occupancy = _coerce_occupancy_map(
+                getattr(tier, "base_occupancy", None)
+            )
+            extra_surcharges = _coerce_occupancy_map(
+                getattr(tier, "extra_pax_surcharges", None)
+            )
+
+            per_uom_surcharge = 0.0
+            for pt, raw_count in pax_breakdown.items():
+                try:
+                    count = float(raw_count)
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"pax_breakdown counts must be numeric, got {pt}={raw_count!r}"
+                    )
+                if count < 0:
+                    raise ValueError(
+                        f"pax_breakdown counts must be non-negative, got {pt}={count}"
+                    )
+                included = base_occupancy.get(pt, 0.0)
+                extras = max(0.0, count - included)
+                if extras and pt not in extra_surcharges:
+                    raise ValueError(
+                        f"Occupancy tier missing extra_pax_surcharges entry for "
+                        f"over-base pax_type={pt!r}"
+                    )
+                per_uom_surcharge += extras * extra_surcharges.get(pt, 0.0)
+
+            price_per_uom = base_rate + per_uom_surcharge
+            subtotal = price_per_uom * float(qty)
         else:
             raise ValueError(f"Unsupported pricing_mode: {pricing_mode}")
 

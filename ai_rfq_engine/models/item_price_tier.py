@@ -10,7 +10,12 @@ from typing import Any, Dict
 
 import pendulum
 from graphene import ResolveInfo
-from pynamodb.attributes import NumberAttribute, UnicodeAttribute, UTCDateTimeAttribute
+from pynamodb.attributes import (
+    MapAttribute,
+    NumberAttribute,
+    UnicodeAttribute,
+    UTCDateTimeAttribute,
+)
 from pynamodb.indexes import AllProjection, LocalSecondaryIndex
 from silvaengine_dynamodb_base import (
     BaseModel,
@@ -126,6 +131,15 @@ class ItemPriceTierModel(BaseModel):
     margin_per_uom = NumberAttribute(null=True)
     price_per_uom = NumberAttribute(null=True)
     currency = UnicodeAttribute(null=True)
+    # G2 occupancy mode: pax_type -> count of guests included in the base rate
+    # (e.g. {"adult": 2} means two adults are covered by ``price_per_uom``).
+    # Only consulted when the parent ``Item.pricing_mode == "occupancy"``.
+    base_occupancy = MapAttribute(null=True)
+    # G2 occupancy mode: pax_type -> surcharge per extra guest beyond base.
+    # Same units as ``price_per_uom`` (currency × per-UOM). Surcharge math:
+    # extras = max(0, pax_breakdown[t] - base_occupancy[t]); subtotal adds
+    # qty * extras * extra_pax_surcharges[t] per pax_type.
+    extra_pax_surcharges = MapAttribute(null=True)
     status = UnicodeAttribute(default="in_review")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
@@ -513,6 +527,8 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
             "margin_per_uom",
             "price_per_uom",
             "currency",
+            "base_occupancy",
+            "extra_pax_surcharges",
             "status",
         ]:
             if key in kwargs:
@@ -553,6 +569,8 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
         "margin_per_uom": ItemPriceTierModel.margin_per_uom,
         "price_per_uom": ItemPriceTierModel.price_per_uom,
         "currency": ItemPriceTierModel.currency,
+        "base_occupancy": ItemPriceTierModel.base_occupancy,
+        "extra_pax_surcharges": ItemPriceTierModel.extra_pax_surcharges,
         "status": ItemPriceTierModel.status,
     }
 

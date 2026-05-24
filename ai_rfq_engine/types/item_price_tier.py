@@ -25,6 +25,10 @@ class ItemPriceTierType(ObjectType):
     margin_per_uom = Float()
     price_per_uom = Float()
     currency = String()
+    # G2 occupancy mode: per-pax-type guests included in the base rate
+    base_occupancy = JSONCamelCase()
+    # G2 occupancy mode: per-pax-type surcharge per extra guest
+    extra_pax_surcharges = JSONCamelCase()
     status = String()
 
     # Nested resolvers: strongly-typed nested relationships

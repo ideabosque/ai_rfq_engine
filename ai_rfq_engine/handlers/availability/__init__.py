@@ -27,8 +27,10 @@ from .registry import (
     registered_handlers,
 )
 from .stub_handler import StubAvailabilityHandler
+from .neo4j_handler import Neo4jAvailabilityHandler
 
 register_handler("stub", StubAvailabilityHandler)
+register_handler("neo4j", Neo4jAvailabilityHandler)
 
 __all__ = [
     "AuthUnavailableError",
@@ -40,6 +42,8 @@ __all__ = [
     "OperationUnsupportedError",
     "UnknownHoldError",
     "SystemTimeoutError",
+    "Neo4jAvailabilityHandler",
+    "StubAvailabilityHandler",
     "clear_handlers",
     "dispatch_acquire_hold",
     "dispatch_check",

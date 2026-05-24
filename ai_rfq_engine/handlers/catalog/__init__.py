@@ -42,8 +42,10 @@ from .registry import (
     dispatch_inquire,
 )
 from .stub_handler import StubCatalogHandler
+from .neo4j_handler import Neo4jCatalogHandler
 
 register_handler("stub", StubCatalogHandler)
+register_handler("neo4j", Neo4jCatalogHandler)
 
 __all__ = [
     "CatalogHandler",
@@ -54,6 +56,8 @@ __all__ = [
     "SystemTimeoutError",
     "CatalogSystemError",
     "UnknownNodeError",
+    "Neo4jCatalogHandler",
+    "StubCatalogHandler",
     "register_handler",
     "get_handler",
     "registered_handlers",
