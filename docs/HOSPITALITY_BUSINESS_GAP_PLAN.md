@@ -689,53 +689,57 @@ Participants below map to module or function names in this repository where they
 
 ```mermaid
 sequenceDiagram
-    participant Op as Operator
-    participant Ag as AI Agent
-    participant En as schema
-    participant Cfg as external_system_config
-    participant Hd as neo4j_handler
-    participant Sec as Secrets Manager
-    participant Ne as Neo4j
-    participant Ref as item_catalog_ref
-    participant Pr as quote_item
+    autonumber
+    participant Operator
+    participant AI_Agent
+    participant schema
+    participant external_system_config
+    participant neo4j_handler
+    participant Secrets_Manager
+    participant Neo4j
+    participant item_catalog_ref
+    participant quote_item
 
-    Op->>Ag: Find Tokyo hotels
-    Ag->>En: inquire_catalog
-    En->>Cfg: resolve_external_system_for
-    Cfg-->>En: endpoint and secret_ref
-    En->>Hd: dispatch
-    Hd->>Sec: resolve auth_secret_ref
-    Sec-->>Hd: credentials in memory
-    Hd->>Ne: external query
-    Ne-->>Hd: matching nodes
-    Hd-->>En: response envelope
-    En-->>Ag: node_ids
+    Note over Operator,Neo4j: Phase 1 — discover external catalog nodes
+    Operator->>AI_Agent: Find Tokyo hotels
+    AI_Agent->>schema: inquire_catalog
+    schema->>external_system_config: resolve_external_system_for
+    external_system_config-->>schema: endpoint and secret_ref
+    schema->>neo4j_handler: dispatch
+    neo4j_handler->>Secrets_Manager: resolve auth_secret_ref
+    Secrets_Manager-->>neo4j_handler: credentials in memory
+    neo4j_handler->>Neo4j: external query
+    Neo4j-->>neo4j_handler: matching nodes
+    neo4j_handler-->>schema: response envelope
+    schema-->>AI_Agent: node_ids
 
-    Ag->>En: find_items_by_catalog_refs
-    En->>Ref: query system_node_index
-    Ref-->>En: item_uuid and provider_item_uuid
-    En-->>Ag: linked items
+    Note over AI_Agent,item_catalog_ref: Phase 2 — resolve nodes to internal Items
+    AI_Agent->>schema: find_items_by_catalog_refs
+    schema->>item_catalog_ref: query system_node_index
+    item_catalog_ref-->>schema: item_uuid and provider_item_uuid
+    schema-->>AI_Agent: linked items
 
-    Ag->>En: insert_update_quote_item
-    En->>Pr: get_price_per_uom
-    Pr-->>En: price and tier
-    En-->>Ag: QuoteItem and totals
-    Ag-->>Op: quote presented
+    Note over AI_Agent,quote_item: Phase 3 — build the priced QuoteItem
+    AI_Agent->>schema: insert_update_quote_item
+    schema->>quote_item: get_price_per_uom
+    quote_item-->>schema: price and tier
+    schema-->>AI_Agent: QuoteItem and totals
+    AI_Agent-->>Operator: quote presented
 ```
 
-**Participant key** (alias → repo location):
+**Participant key** (name → repo location):
 
-| Alias | Label | Resolves to |
-|---|---|---|
-| `Op` | Operator | external human actor |
-| `Ag` | AI Agent | external orchestrator project (e.g. [travel_ai_agent](../../../project_drafts/travel_ai_agent/DEVELOPMENT_PLAN.md)) |
-| `En` | `schema` | [ai_rfq_engine/schema.py](../ai_rfq_engine/schema.py) — GraphQL queries and mutations |
-| `Cfg` | `external_system_config` | new `ai_rfq_engine/models/external_system_config.py` (G7c) |
-| `Hd` | `neo4j_handler` | new `ai_rfq_engine/handlers/catalog/neo4j_handler.py` (G7b pilot; module path depends on the execution-boundary ADR) |
-| `Sec` | Secrets Manager | external service (AWS Secrets Manager / SSM / equivalent) |
-| `Ne` | Neo4j | external catalog system |
-| `Ref` | `item_catalog_ref` | new `ai_rfq_engine/models/item_catalog_ref.py` (G7a) |
-| `Pr` | `quote_item` | existing [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py) — `get_price_per_uom` and `insert_update_quote_item` already implemented |
+| Participant | Resolves to |
+|---|---|
+| `Operator` | external human actor |
+| `AI_Agent` | external orchestrator project (e.g. [travel_ai_agent](../../../project_drafts/travel_ai_agent/DEVELOPMENT_PLAN.md)) |
+| `schema` | [ai_rfq_engine/schema.py](../ai_rfq_engine/schema.py) — GraphQL queries and mutations |
+| `external_system_config` | new `ai_rfq_engine/models/external_system_config.py` (G7c) |
+| `neo4j_handler` | new `ai_rfq_engine/handlers/catalog/neo4j_handler.py` (G7b pilot; module path depends on the execution-boundary ADR) |
+| `Secrets_Manager` | external service (AWS Secrets Manager / SSM / equivalent) |
+| `Neo4j` | external catalog system |
+| `item_catalog_ref` | new `ai_rfq_engine/models/item_catalog_ref.py` (G7a) |
+| `quote_item` | existing [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py) — `get_price_per_uom` and `insert_update_quote_item` already implemented |
 
 **Failure-mode notes** (not shown in the diagram to keep the happy path readable):
 
