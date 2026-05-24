@@ -483,21 +483,23 @@ Indexes (defined when this new table is created):
 
 **Workflow (search-first, the actual hospitality flow):**
 
-Module / function names are written as they appear (or will appear) in this repository's source. The end-to-end sequence diagram later in §8 expands the inquiry step with explicit hops through `external_system_config` and `neo4j_handler`; the sketch below stays at the call-site level to show what the G7a table itself unlocks.
+Module / function names are written as they appear in this repository's source unless explicitly labeled planned. The implemented adapter boundary currently includes `StubCatalogHandler`; a real `Neo4jCatalogHandler` is a follow-on adapter. The end-to-end sequence diagram later in this section expands the inquiry step through `external_system_config`, the registry, and the selected handler.
 
 ```
 AI Agent: "Find Tokyo hotels with onsen"
    |
    v
 AI Agent -> schema:                inquire_catalog(
-                                       system_code="neo4j",
+                                       system_code="catalog-system",
                                        namespace="travel-prod",
                                        query=...)
-   schema dispatches via the G7b handler registry to neo4j_handler
+   schema dispatches via the G7b registry to the configured handler
+   current pilot/test adapter: adapter_id="stub" -> StubCatalogHandler
+   planned adapter: adapter_id="neo4j" -> Neo4jCatalogHandler
    | returns [node_id_a, node_id_b, ...]
    v
-AI Agent -> schema:                find_items_by_catalog_refs(
-                                       system_code="neo4j",
+AI Agent -> schema:                item_catalog_refs(
+                                       system_code="catalog-system",
                                        namespace="travel-prod",
                                        node_ids=[...])
    schema queries item_catalog_ref via system_node_index
@@ -520,7 +522,7 @@ Quote built using the existing G2 pricing path
 **Files touched**
 - New `ai_rfq_engine/models/item_catalog_ref.py` (CRUD modeled on existing models)
 - New `ai_rfq_engine/types/item_catalog_ref.py`
-- [ai_rfq_engine/schema.py](../ai_rfq_engine/schema.py): standard `item_catalog_ref` / `item_catalog_ref_list` / `insert_update_item_catalog_ref` / `delete_item_catalog_ref`, plus a batched `find_items_by_catalog_refs(system_code, namespace, node_ids)` for the search-first flow
+- [ai_rfq_engine/schema.py](../ai_rfq_engine/schema.py): standard `item_catalog_ref` / `item_catalog_ref_list` / `insert_update_item_catalog_ref` / `delete_item_catalog_ref`, plus the batched `item_catalog_refs(system_code, namespace, node_ids)` query backed by `find_item_catalog_refs(...)` for the search-first flow
 - `ai_rfq_engine/types/item.py`: optional nested resolver exposing `catalog_refs` on `ItemType` for the reverse direction (lazy-loaded, like the existing nested resolvers)
 - Tests covering multi-system refs per Item, provider-scoped pinning, `deprecated` filtering, and end-to-end search-then-resolve
 
@@ -540,26 +542,44 @@ Storing a reference is half the bridge. The other half is *querying* the externa
 
 **Execution boundary**: the implementation estimate below assumes a pilot catalog adapter runs in-engine behind an explicit top-level query. Before adopting vendor libraries and secret-resolution responsibilities in this package, record an ADR comparing that approach with a separately deployed integration service. The identity table and request/response contract are required under either decision.
 
-**In-engine layout:**
+**Implemented in-engine layout and planned extension:**
 
 ```
 ai_rfq_engine/
-├── handlers/
+└── handlers/
     └── catalog/
-        ├── __init__.py            # handler registry / dispatcher
+        ├── __init__.py            # exports registry API; auto-registers stub
         ├── base.py                # CatalogHandler ABC + shared types
-        ├── neo4j_handler.py       # Phase 4 pilot
-        ├── menu_api_handler.py    # follow-on
-        ├── pms_handler.py         # follow-on (one file per PMS vendor if APIs diverge)
-        └── erp_pim_handler.py     # follow-on, serves non-hospitality tenants
+        ├── registry.py            # register_handler / dispatch_inquire
+        ├── stub_handler.py        # implemented deterministic adapter
+        └── neo4j_handler.py       # planned real adapter, not yet implemented
 ```
 
-A small registry resolves `system_code` (from the G7a `ItemCatalogRefModel` or directly from the caller) to the adapter implementation when the in-engine boundary is selected. The dispatcher orchestrates the surrounding steps so each handler stays narrow:
+A small registry resolves the configured adapter implementation. Current bootstrap is explicit and import-time:
+
+```python
+# ai_rfq_engine/handlers/catalog/__init__.py
+from .stub_handler import StubCatalogHandler
+
+register_handler("stub", StubCatalogHandler)
+```
+
+At dispatch time, [ai_rfq_engine/handlers/catalog/registry.py](../ai_rfq_engine/handlers/catalog/registry.py) applies:
+
+```python
+adapter_id = getattr(config, "adapter_id", None) or system_code
+handler_cls = get_handler(adapter_id)
+```
+
+Therefore a configured row with `adapter_id="stub"` uses the implemented fixture-backed handler. A row with `adapter_id="neo4j"` does **not** work yet because there is no `neo4j_handler.py` and no `register_handler("neo4j", ...)` bootstrap. When implemented, the registration point should be adjacent to the stub registration in `handlers/catalog/__init__.py`.
+
+The dispatcher orchestrates the surrounding steps so each handler stays narrow:
 
 1. Dispatcher reads the `ExternalSystemConfigModel` row via G7c (`endpoint_url`, `auth_strategy`, `auth_secret_value` / `auth_secret_ref`, `extra_config`, `timeout_seconds`, `cache_ttl_seconds`).
-2. Dispatcher resolves the credential via `resolve_credential_for(config)`: inline `auth_secret_value` first; external-backend resolution of `auth_secret_ref` second (when a backend is registered); `None` otherwise. The Phase 4 pilot ships with no external backend, so this step is a direct in-memory read.
-3. Dispatcher invokes the handler with the reference, the config (read-only), the credential, and the opaque query.
-4. The handler calls the external system, normalizes the response to the shared payload shape, and returns. It must not log or persist the credential.
+2. Dispatcher resolves `handler_cls` using `config.adapter_id` when set, or `system_code` otherwise; a missing registration raises `not_configured`.
+3. Dispatcher resolves the credential via `resolve_credential_for(config)`: resolve `auth_secret_ref` through a registered backend first; permit `auth_secret_value` only when `Config.allow_inline_auth_secret_value()` is explicitly enabled for local/test execution; return `None` otherwise.
+4. Dispatcher invokes the handler with the reference, the config (read-only), the credential, and the opaque query.
+5. A real adapter calls its external system and normalizes the response; `StubCatalogHandler` returns deterministic configured fixtures without a network call. Neither may log or persist the credential.
 
 **Shared catalog response envelope** (the ABC, not per-handler):
 
@@ -581,16 +601,17 @@ G3 availability operations should use the same envelope conventions for system, 
 
 **Phased adapter rollout** (module location follows the execution-boundary ADR; paths below show the in-engine option):
 
-1. **Neo4j (first, if confirmed by the pilot consumer)**: a property graph is the richest catalog model in scope. Handler takes `{graph_id, node_id}`, returns node properties plus bounded relationship data required by the use case. An in-engine implementation adds a `neo4j` Python driver dependency.
-2. **Restaurant menu APIs (second)**: typically REST + JSON; validates the contract on non-graph payloads.
-3. **PMS systems (third)**: Opera, Cloudbeds, etc. — typically per-property scoping and supplier-side auth. May warrant one handler file per vendor if APIs diverge significantly.
-4. **ERP item masters / PIM (later)**: serves non-hospitality tenants (procurement, manufacturing), demonstrating the bridge is genuinely generic.
+1. **Stub (implemented)**: `StubCatalogHandler` validates the boundary, registry, query envelope, and error translation using deterministic fixtures.
+2. **Neo4j (planned first real adapter, if confirmed by the pilot consumer)**: a property graph is the richest catalog model in scope. A future handler takes `{graph_id, node_id}`, returns node properties plus bounded relationship data required by the use case, adds a `neo4j` Python driver dependency, and registers itself as `register_handler("neo4j", Neo4jCatalogHandler)`.
+3. **Restaurant menu APIs (second real integration)**: typically REST + JSON; validates the contract on non-graph payloads.
+4. **PMS systems (third real integration)**: Opera, Cloudbeds, etc. — typically per-property scoping and supplier-side auth. May warrant one handler file per vendor if APIs diverge significantly.
+5. **ERP item masters / PIM (later)**: serves non-hospitality tenants (procurement, manufacturing), demonstrating the bridge is genuinely generic.
 
 **Trade-off to decide**: putting adapters in-engine adds external-API dependencies (Neo4j driver, HTTP clients, vendor SDKs) and secret-resolution responsibility to this repository; a misbehaving external system can affect request latency. Mitigations are explicit timeouts, dedicated top-level operations rather than nested resolver fan-out, structured errors, and tenant-scoped configuration. A separate adapter service adds operational and cross-repository coordination overhead but isolates network dependencies and secrets access.
 
 **Acceptance criteria**
 - The pilot resolves an external source record through existing `item_external_id` / `provider_item_external_id` *or* the new `ItemCatalogRefModel` (G7a) without ambiguity.
-- The ADR-selected Neo4j adapter is exercised end-to-end by the Phase 4 hardening pilot and reads configuration through G7c unless its documented single-tenant deferral is used; if the in-engine option is selected, it exists at `ai_rfq_engine/handlers/catalog/neo4j_handler.py`.
+- The implemented stub adapter is exercised end-to-end for the registry/configuration contract; once Neo4j is selected and implemented, its adapter is exercised against a real graph and registered under `adapter_id="neo4j"`.
 - Adding a second adapter (for example, a restaurant menu API) requires no schema change to G7a or G7c.
 - An adapter that fails (timeout, auth error, system disabled in G7c) returns a structured error to the caller and does not crash the engine.
 
@@ -651,34 +672,34 @@ Indexes (defined when this new table is created):
 3. If no operation-specific row exists, repeat steps 1-2 using `system_kind = "both"` so a shared configuration row can serve both capability types.
 4. If no matching active row exists, the adapter call returns a structured `not_configured` error rather than silently succeeding.
 
-**Credential storage — hybrid model**:
+**Credential storage — secret-reference production model**:
 
-The table supports **two credential storage modes**, chosen per-row:
+The table retains two credential fields, but production behavior is intentionally asymmetric:
 
-- **Inline (`auth_secret_value`)**: plaintext credential stored directly in DynamoDB. Simpler to operate; appropriate for small teams, single-tenant deployments, low-stakes credentials, and the Phase 4 pilot. The credential is **write-only via GraphQL** — accepted on `InsertUpdateExternalSystemConfig` but **omitted from every GraphQL output type** (`ExternalSystemConfigType` and any list variant). The mutation never echoes the value back.
-- **External (`auth_secret_ref`)**: a pointer to a real secrets manager — `arn:aws:secretsmanager:...`, `ssm:/path/to/param`, or vault-style URI. The handler resolves the ref through a pluggable secrets backend at call time. Appropriate for production multi-tenant SaaS, compliance environments (SOC 2 / PCI / HIPAA), or any case where DynamoDB read access must not equal credential access.
+- **External (`auth_secret_ref`)**: the production mode. The value is a pointer to a real secrets manager — `arn:aws:secretsmanager:...`, `ssm:/path/to/param`, or vault-style URI. The handler resolves the ref through a registered backend at call time.
+- **Inline (`auth_secret_value`)**: supported only when `allow_inline_auth_secret_value=True` is explicitly supplied for local/test execution. By default mutation attempts to write a non-empty inline value are rejected. The credential remains omitted from every GraphQL output type.
 
 **Resolution at handler call time** (in this exact order):
 
-1. If `auth_secret_value` is set, use it directly.
-2. Else if `auth_secret_ref` is set, resolve via the configured secrets backend.
-3. Else return `auth_unavailable` error.
+1. If `auth_secret_ref` is set and a backend resolver is registered, resolve it.
+2. Else if `auth_secret_value` is set and inline values are explicitly enabled for local/test execution, use it.
+3. Else return no credential; a dispatcher requiring auth raises `auth_unavailable`.
 
-**Load-bearing invariants** (these are what make the inline mode safe):
+**Load-bearing invariants**:
 
 - `auth_secret_value` is **never** present on any GraphQL output type. Code review must catch any accidental re-exposure.
 - `auth_secret_value` is **never** included in `attributes_to_get` for list resolvers — fetching a list of configs reads everything except the credential.
-- Logs (engine, CloudWatch, MCP) **never** print full row contents from `ExternalSystemConfigModel`. Any debug log of a config row strips both credential fields before output.
+- Logs do not emit credential values; `AUTH_SECRET_VALUE_KEYS` redaction is installed during configuration initialization as defense in depth.
 - Backups of `are-external_system_configs` are encrypted at rest (DynamoDB default) and access-controlled separately from the live table.
 
-**Risks accepted under the inline mode** (versus a real secrets manager):
+**Risks when local/test inline mode is deliberately enabled**:
 
 - A DynamoDB-read IAM permission equals credential access. Engineers debugging via the AWS console see plaintext.
 - No per-credential audit trail (CloudTrail tells you the table was read, not which credential was used).
 - Manual rotation only (no automatic credential cycling).
 - Backups contain plaintext credentials.
 
-If any of these become unacceptable, the upgrade path is to set `auth_secret_value = null`, populate `auth_secret_ref`, and ensure a secrets-backend resolver is registered. No schema change required.
+Production deployments should set `auth_secret_value = null`, populate `auth_secret_ref`, and register a secrets-backend resolver. No schema change is required.
 
 **Invocation flow**:
 1. Caller requests a catalog inquiry or availability operation.
@@ -686,21 +707,21 @@ If any of these become unacceptable, the upgrade path is to set `auth_secret_val
 3. The executor resolves the credential per the order above and invokes the external system, applying timeout/cache rules and returning a normalized response.
 4. The plaintext credential **never** appears in any GraphQL response, query result, or log output.
 
-**Phase 4 deferral option**: for a single-tenant Neo4j pilot only, deployment configuration may substitute for this table. Defer it until a second adapter or second tenant is introduced, whichever comes first, and record that limitation explicitly.
+**Current adapter note**: the configuration table and dispatcher are implemented, and the built-in `stub` adapter uses `extra_config.fixtures`. A real Neo4j endpoint is not callable until a Neo4j handler and its `register_handler("neo4j", ...)` bootstrap are added.
 
 **Files touched**
 - New `ai_rfq_engine/models/external_system_config.py`
 - New `ai_rfq_engine/types/external_system_config.py`
 - `ai_rfq_engine/schema.py`: query, list, insert/update, delete
-- Resolution helper: `resolve_external_system_for(partition_key, system_kind, system_code, namespace="DEFAULT", provider_corp_external_id=None) -> config`
+- Resolution helper: `resolve_external_system_for(info, system_kind, system_code, namespace="DEFAULT", provider_corp_external_id=None) -> config`
 - Tests covering provider-scoped override of tenant-wide default and `not_configured` error path
 
 **Acceptance criteria**
-- An admin can register a Neo4j config for a tenant via GraphQL mutation.
+- An admin can register a stub catalog config for a tenant via GraphQL mutation; a Neo4j configuration becomes actionable only after the real handler is registered.
 - A provider-scoped PMS config overrides the tenant-wide default when resolving for that provider.
 - Two configs for the same external system but different namespaces resolve independently.
 - A `system_kind = "both"` config is used only when no active operation-specific config is found.
-- The configuration API may **accept** `auth_secret_value` via mutation, but it **never returns** the value through any output type or list resolver. The handler is the only call site that reads it.
+- The configuration API rejects inline `auth_secret_value` by default, may accept it only under an explicit local/test setting, and never returns it through any output type or list resolver.
 - Disabling a config (`status = "disabled"`) blocks adapter calls without deleting the row, preserving audit history.
 
 **Effort**: 1 engineer-week. CRUD-shaped work modeled on existing entities (`Item`, `ProviderItem`); no novel schema patterns.
@@ -709,11 +730,11 @@ If any of these become unacceptable, the upgrade path is to set `auth_secret_val
 
 #### End-to-end sequence (G7a + G7b + G7c)
 
-The diagram below traces a single hospitality search-to-quote flow exercising all three G7 pieces plus the existing G2 pricing path. This is the scenario the Phase 4 hardening pilot will run against the Neo4j pilot adapter.
+The diagram below traces a single hospitality search-to-quote flow exercising all three G7 pieces plus the existing G2 pricing path. It distinguishes the currently runnable `StubCatalogHandler` path from a future real external-catalog adapter such as Neo4j.
 
 Participants below map to module or function names in this repository where they exist; external participants (human operator, consumer project, third-party services) keep role names because no in-repo module corresponds. Aliases stay short for arrow legibility; the `as` labels are what developers will grep for.
 
-The diagram reflects the **inline-credential pilot mode** (the dispatcher reads `auth_secret_value` directly from the G7c config row via `resolve_credential_for` and passes it to the handler). The external secrets-manager path is preserved as an upgrade and is documented in the §8 G7c "Credential storage — hybrid model" section; when adopted, an extra participant (the secrets backend) appears between `external_system_config` and `neo4j_handler`.
+The diagram reflects the implemented secret policy: a resolvable `auth_secret_ref` is the production path; inline credentials work only when explicitly enabled for local/test execution.
 
 ```mermaid
 sequenceDiagram
@@ -721,26 +742,35 @@ sequenceDiagram
     participant Operator
     participant AI_Agent
     participant schema
+    participant catalog_registry
     participant external_system_config
-    participant neo4j_handler
-    participant Neo4j
+    participant catalog_handler
+    participant External_Catalog
     participant item_catalog_ref
     participant quote_item
 
-    Note over Operator,Neo4j: Phase 1 — discover external catalog nodes
+    Note over Operator,External_Catalog: Phase 1 - discover external catalog nodes
     Operator->>AI_Agent: Find Tokyo hotels
-    AI_Agent->>schema: inquire_catalog
-    schema->>external_system_config: resolve_external_system_for
-    external_system_config-->>schema: config row including auth_secret_value
-    Note over schema: resolve_credential_for(config) reads<br/>auth_secret_value inline (no external call)
-    schema->>neo4j_handler: dispatch with credential
-    neo4j_handler->>Neo4j: external query
-    Neo4j-->>neo4j_handler: matching nodes
-    neo4j_handler-->>schema: response envelope
+    AI_Agent->>schema: inquireCatalog
+    schema->>catalog_registry: dispatch_inquire
+    catalog_registry->>external_system_config: resolve catalog inquiry config
+    external_system_config-->>catalog_registry: active config row
+    catalog_registry->>catalog_registry: select registered handler
+    catalog_registry->>external_system_config: resolve credential if required
+    alt adapter_id is stub
+        catalog_registry->>catalog_handler: StubCatalogHandler inquire
+        catalog_handler-->>catalog_registry: configured fixture response
+    else future registered real adapter
+        catalog_registry->>catalog_handler: inquire with credential
+        catalog_handler->>External_Catalog: external query
+        External_Catalog-->>catalog_handler: matching nodes
+        catalog_handler-->>catalog_registry: response envelope
+    end
+    catalog_registry-->>schema: response envelope
     schema-->>AI_Agent: node_ids
 
     Note over AI_Agent,item_catalog_ref: Phase 2 — resolve nodes to internal Items
-    AI_Agent->>schema: find_items_by_catalog_refs
+    AI_Agent->>schema: itemCatalogRefs
     schema->>item_catalog_ref: query system_node_index
     item_catalog_ref-->>schema: item_uuid and provider_item_uuid
     schema-->>AI_Agent: linked items
@@ -760,17 +790,19 @@ sequenceDiagram
 | `Operator` | external human actor |
 | `AI_Agent` | external orchestrator project (e.g. [travel_ai_agent](../../../project_drafts/travel_ai_agent/DEVELOPMENT_PLAN.md)) |
 | `schema` | [ai_rfq_engine/schema.py](../ai_rfq_engine/schema.py) — GraphQL queries and mutations |
-| `external_system_config` | new `ai_rfq_engine/models/external_system_config.py` (G7c) |
-| `neo4j_handler` | new `ai_rfq_engine/handlers/catalog/neo4j_handler.py` (G7b pilot; module path depends on the execution-boundary ADR) |
-| `Neo4j` | external catalog system |
-| `item_catalog_ref` | new `ai_rfq_engine/models/item_catalog_ref.py` (G7a) |
+| `catalog_registry` | [ai_rfq_engine/handlers/catalog/registry.py](../ai_rfq_engine/handlers/catalog/registry.py) — resolves config-selected handler |
+| `external_system_config` | [ai_rfq_engine/models/external_system_config.py](../ai_rfq_engine/models/external_system_config.py) (G7c) |
+| `catalog_handler` | [ai_rfq_engine/handlers/catalog/stub_handler.py](../ai_rfq_engine/handlers/catalog/stub_handler.py) today; a future `neo4j_handler.py` must be added and registered |
+| `External_Catalog` | a real external catalog system, reached only by a future real adapter |
+| `item_catalog_ref` | [ai_rfq_engine/models/item_catalog_ref.py](../ai_rfq_engine/models/item_catalog_ref.py) (G7a) |
 | `quote_item` | existing [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py) — `get_price_per_uom` and `insert_update_quote_item` already implemented |
 
 **Failure-mode notes** (not shown in the diagram to keep the happy path readable):
 
 - **`external_system_config` (G7c)**: if no active row matches the requested `(tenant, system_kind, system_code, namespace, provider_corp_external_id)`, `resolve_external_system_model_for` returns `None` and the dispatcher raises a structured `not_configured` error. The handler is never invoked.
-- **Credential resolution**: `resolve_credential_for(config)` reads `auth_secret_value` first; if absent, falls back to `auth_secret_ref` resolution; if neither is available **and** `auth_strategy != "none"`, the dispatcher raises `auth_unavailable`. The plaintext credential never reaches a log line or a GraphQL response.
-- **`Neo4j`** (or any external system): if the system times out per `timeout_seconds`, the handler returns `system_timeout`. No partial state is written to `request_data` or the catalog cache.
+- **Handler registration**: `StubCatalogHandler` is registered as `"stub"` during `ai_rfq_engine.handlers.catalog` import. Configuring `adapter_id="neo4j"` currently results in `not_configured` because no real Neo4j handler is registered.
+- **Credential resolution**: `resolve_credential_for(config)` resolves a registered `auth_secret_ref` backend first; an inline value is used only under explicit local/test configuration. If no credential is available and `auth_strategy != "none"`, the dispatcher raises `auth_unavailable`.
+- **External catalog**: once a real adapter exists, a timeout per `timeout_seconds` becomes `system_timeout`. The stub has no external network call.
 - **`item_catalog_ref` (G7a)**: if no row exists for a returned `node_id`, that node is dropped from the response with a structured warning rather than failing the batch. The AI agent presents only the resolvable subset.
 - **`quote_item.get_price_per_uom` (G2)**: standard behavior — if no matching tier exists for the `(item, provider_item, segment, qty, pax_type)` tuple, `insert_update_quote_item` raises before persisting. No partial QuoteItem is created.
 
@@ -935,7 +967,7 @@ Nullable fields are safe for storage migration, but behavioral compatibility is 
 | R5 | A persisted bundle parent conflicts with required/priced `QuoteItem` creation and can double-count totals | Use grouped priced components for v1; require an ADR and dedicated aggregate behavior before storing parent lines. |
 | R6 | FX-rate freshness can lock an incorrect customer total | Define rate source, allowed age, rounding, and quote-lock rules before implementing multi-currency quotes. |
 | R7 | Cancellation-policy refund computation is jurisdiction-sensitive | Engine stores the quoted snapshot; refund execution stays in the payment layer. |
-| R8 | Adapter execution ownership is unresolved and this repository does not currently include catalog or availability adapters | Decide the boundary by ADR before adding vendor dependencies, configuration tables, or secret-resolution logic. |
+| R8 | The repository now includes in-engine stub adapters and configuration/secret boundaries, but no live Neo4j or PMS/GDS adapter | Lock the first production system, add its dependency and handler registration, and exercise real timeout/auth/failure paths before production use. |
 | R9 | Hospitality verticals vary in booking lead time and hold lifetime | Make hold expiry part of the external availability contract; configure policy by provider or product as required. |
 | R10 | New query dimensions (`pax_type`, `bundle_uuid`, `service_start_at`) interact with existing `purge_cache` decorators on `ItemPriceTier`, `QuoteItem`, and `ProviderItemBatch`, whose `custom_cache_keys` are fixed | Every phase that adds a query dimension must review the corresponding cache keys and cached getters. Add regression tests that verify invalidation for affected list queries. |
 | R11 | External node IDs and adapter endpoints may only be valid within a graph, property, catalog, or account namespace | Make `namespace` part of both G7a identity keys and G7c configuration resolution; test independent resolution across namespaces. |
