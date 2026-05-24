@@ -16,7 +16,6 @@ class ProviderItemBatchType(ObjectType):
     batch_no = String()
     item_uuid = String()  # keep raw id
     partition_key = String()
-    partition_key = String()
     cost_per_uom = Float()
     freight_cost_per_uom = Float()
     additional_cost_per_uom = Float()
@@ -27,6 +26,10 @@ class ProviderItemBatchType(ObjectType):
     slow_move_item = Boolean()
     expired_at = DateTime()
     produced_at = DateTime()
+    service_start_at = DateTime()
+    service_end_at = DateTime()
+    currency = String()
+    cancellation_policy_uuid = String()
 
     # Nested resolvers: strongly-typed nested relationships
     item = Field(lambda: ItemType)

@@ -20,6 +20,7 @@ class InsertUpdateItem(Mutation):
         item_type = String(required=False)
         item_name = String(required=False)
         item_description = String(required=False)
+        pricing_mode = String(required=False)
         uom = String(required=False)
         item_external_id = String(required=False)
         updated_by = String(required=True)

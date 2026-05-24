@@ -21,8 +21,10 @@ class ItemPriceTierType(ObjectType):
     segment_uuid = String()  # keep raw id
     quantity_greater_then = Float()
     quantity_less_then = Float()
+    pax_type = String()
     margin_per_uom = Float()
     price_per_uom = Float()
+    currency = String()
     status = String()
 
     # Nested resolvers: strongly-typed nested relationships

@@ -75,6 +75,8 @@ class ProviderItemBatchModel(BaseModel):
     partition_key = UnicodeAttribute()
     expired_at = UTCDateTimeAttribute()
     produced_at = UTCDateTimeAttribute()
+    service_start_at = UTCDateTimeAttribute(null=True)
+    service_end_at = UTCDateTimeAttribute(null=True)
     cost_per_uom = NumberAttribute()
     freight_cost_per_uom = NumberAttribute()
     additional_cost_per_uom = NumberAttribute()
@@ -83,11 +85,20 @@ class ProviderItemBatchModel(BaseModel):
     guardrail_price_per_uom = NumberAttribute()
     slow_move_item = BooleanAttribute(default=False)
     in_stock = BooleanAttribute(default=True)
+    currency = UnicodeAttribute(null=True)
+    cancellation_policy_uuid = UnicodeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
     item_uuid_index = ItemUuidIndex()
     updated_at_index = UpdateAtIndex()
+
+
+def _validate_service_window(service_start_at: Any, service_end_at: Any) -> None:
+    if service_start_at in (None, "null") or service_end_at in (None, "null"):
+        return
+    if service_end_at <= service_start_at:
+        raise ValueError("service_end_at must be later than service_start_at")
 
 
 def purge_cache():
@@ -241,8 +252,20 @@ def resolve_provider_item_batch_list(
     max_total_cost_per_uom = kwargs.get("max_total_cost_per_uom")
     slow_move_item = kwargs.get("slow_move_item")
     in_stock = kwargs.get("in_stock")
+    service_start_at_gt = kwargs.get("service_start_at_gt")
+    service_start_at_lt = kwargs.get("service_start_at_lt")
+    service_end_at_gt = kwargs.get("service_end_at_gt")
+    service_end_at_lt = kwargs.get("service_end_at_lt")
+    service_window_start = kwargs.get("service_window_start")
+    service_window_end = kwargs.get("service_window_end")
     updated_at_gt = kwargs.get("updated_at_gt")
     updated_at_lt = kwargs.get("updated_at_lt")
+
+    if (service_window_start is None) != (service_window_end is None):
+        raise ValueError(
+            "service_window_start and service_window_end must be provided together"
+        )
+    _validate_service_window(service_window_start, service_window_end)
 
     args = []
     inquiry_funct = ProviderItemBatchModel.scan
@@ -295,8 +318,31 @@ def resolve_provider_item_batch_list(
         )
     if slow_move_item is not None:
         the_filters &= ProviderItemBatchModel.slow_move_item == slow_move_item
-    if in_stock:
+    if in_stock is not None:
         the_filters &= ProviderItemBatchModel.in_stock == in_stock
+    if service_start_at_gt:
+        the_filters &= (
+            ProviderItemBatchModel.service_start_at >= service_start_at_gt
+        )
+    if service_start_at_lt:
+        the_filters &= (
+            ProviderItemBatchModel.service_start_at < service_start_at_lt
+        )
+    if service_end_at_gt:
+        the_filters &= (
+            ProviderItemBatchModel.service_end_at >= service_end_at_gt
+        )
+    if service_end_at_lt:
+        the_filters &= (
+            ProviderItemBatchModel.service_end_at < service_end_at_lt
+        )
+    if service_window_start is not None:
+        the_filters &= (
+            ProviderItemBatchModel.service_start_at < service_window_end
+        )
+        the_filters &= (
+            ProviderItemBatchModel.service_end_at > service_window_start
+        )
     if the_filters is not None:
         args.append(the_filters)
 
@@ -320,6 +366,9 @@ def insert_update_provider_item_batch(
     provider_item_uuid = kwargs.get("provider_item_uuid")
     batch_no = kwargs.get("batch_no")
     if kwargs.get("entity") is None:
+        _validate_service_window(
+            kwargs.get("service_start_at"), kwargs.get("service_end_at")
+        )
         cols = {
             "partition_key": info.context.get("partition_key"),
             "updated_by": kwargs["updated_by"],
@@ -330,12 +379,16 @@ def insert_update_provider_item_batch(
             "item_uuid",
             "expired_at",
             "produced_at",
+            "service_start_at",
+            "service_end_at",
             "cost_per_uom",
             "freight_cost_per_uom",
             "additional_cost_per_uom",
             "guardrail_margin_per_uom",
             "slow_move_item",
             "in_stock",
+            "currency",
+            "cancellation_policy_uuid",
         ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
@@ -356,6 +409,10 @@ def insert_update_provider_item_batch(
         return
 
     provider_item_batch = kwargs.get("entity")
+    _validate_service_window(
+        kwargs.get("service_start_at", provider_item_batch.service_start_at),
+        kwargs.get("service_end_at", provider_item_batch.service_end_at),
+    )
     actions = [
         ProviderItemBatchModel.updated_by.set(kwargs["updated_by"]),
         ProviderItemBatchModel.updated_at.set(pendulum.now("UTC")),
@@ -366,6 +423,8 @@ def insert_update_provider_item_batch(
         "item_uuid": ProviderItemBatchModel.item_uuid,
         "expired_at": ProviderItemBatchModel.expired_at,
         "produced_at": ProviderItemBatchModel.produced_at,
+        "service_start_at": ProviderItemBatchModel.service_start_at,
+        "service_end_at": ProviderItemBatchModel.service_end_at,
         "cost_per_uom": ProviderItemBatchModel.cost_per_uom,
         "freight_cost_per_uom": ProviderItemBatchModel.freight_cost_per_uom,
         "additional_cost_per_uom": ProviderItemBatchModel.additional_cost_per_uom,
@@ -374,6 +433,8 @@ def insert_update_provider_item_batch(
         "guardrail_price_per_uom": ProviderItemBatchModel.guardrail_price_per_uom,
         "slow_move_item": ProviderItemBatchModel.slow_move_item,
         "in_stock": ProviderItemBatchModel.in_stock,
+        "currency": ProviderItemBatchModel.currency,
+        "cancellation_policy_uuid": ProviderItemBatchModel.cancellation_policy_uuid,
     }
 
     cost_per_uom: float = provider_item_batch.cost_per_uom

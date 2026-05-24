@@ -86,6 +86,10 @@ class QuoteModel(BaseModel):
     total_quote_amount = NumberAttribute(default=0)
     total_quote_discount = NumberAttribute(default=0)
     final_total_quote_amount = NumberAttribute(default=0)
+    currency = UnicodeAttribute(null=True)
+    display_currency = UnicodeAttribute(null=True)
+    fx_rate = NumberAttribute(null=True)
+    fx_rate_locked_at = UTCDateTimeAttribute(null=True)
     rounds = NumberAttribute(default=0)
     notes = UnicodeAttribute(null=True)
     status = UnicodeAttribute(default="initial")
@@ -248,6 +252,34 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str) -
     quote.update(actions=actions)
 
 
+def _confirm_quote_item_holds(info: ResolveInfo, quote: Any) -> None:
+    from ..handlers.availability import dispatch_confirm_hold
+    from .provider_item import get_provider_item
+    from .quote_item import get_quote_items_by_quote
+
+    for quote_item in get_quote_items_by_quote(quote.quote_uuid):
+        hold_token = getattr(quote_item, "hold_token", None)
+        if not hold_token:
+            continue
+        provider_item = get_provider_item(
+            getattr(quote_item, "partition_key", info.context.get("partition_key")),
+            quote_item.provider_item_uuid,
+        )
+        if (getattr(provider_item, "availability_mode", None) or "none") != "require_hold":
+            continue
+        dispatch_confirm_hold(
+            info,
+            system_code=provider_item.availability_system_code,
+            namespace=getattr(provider_item, "availability_namespace", None) or "DEFAULT",
+            provider_corp_external_id=getattr(
+                provider_item, "provider_corp_external_id", None
+            ),
+            provider_item_uuid=quote_item.provider_item_uuid,
+            batch_no=getattr(quote_item, "batch_no", None),
+            hold_token=hold_token,
+        )
+
+
 def get_quote_type(info: ResolveInfo, quote: QuoteModel) -> QuoteType:
     """
     Nested resolver approach: return minimal quote data.
@@ -398,6 +430,12 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "provider_corp_external_id",
             "sales_rep_email",
             "rounds",
+            "shipping_method",
+            "shipping_amount",
+            "currency",
+            "display_currency",
+            "fx_rate",
+            "fx_rate_locked_at",
             "notes",
             "status",
         ]:
@@ -411,6 +449,12 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         return
 
     quote = kwargs.get("entity")
+    requested_status = kwargs.get("status")
+    if (
+        requested_status == "accepted"
+        and getattr(quote, "status", None) != "accepted"
+    ):
+        _confirm_quote_item_holds(info, quote)
     actions = [
         QuoteModel.updated_by.set(kwargs["updated_by"]),
         QuoteModel.updated_at.set(pendulum.now("UTC")),
@@ -422,6 +466,10 @@ def insert_update_quote(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         "sales_rep_email": QuoteModel.sales_rep_email,
         "shipping_method": QuoteModel.shipping_method,
         "shipping_amount": QuoteModel.shipping_amount,
+        "currency": QuoteModel.currency,
+        "display_currency": QuoteModel.display_currency,
+        "fx_rate": QuoteModel.fx_rate,
+        "fx_rate_locked_at": QuoteModel.fx_rate_locked_at,
         "notes": QuoteModel.notes,
         "status": QuoteModel.status,
     }

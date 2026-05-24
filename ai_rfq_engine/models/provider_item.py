@@ -105,6 +105,9 @@ class ProviderItemModel(BaseModel):
     provider_item_external_id = UnicodeAttribute(null=True)
     base_price_per_uom = NumberAttribute()
     item_spec = MapAttribute(null=True)
+    availability_mode = UnicodeAttribute(default="none")
+    availability_system_code = UnicodeAttribute(null=True)
+    availability_namespace = UnicodeAttribute(default="DEFAULT")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -366,6 +369,22 @@ def resolve_provider_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> A
 def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     partition_key = info.context.get("partition_key")
     provider_item_uuid = kwargs.get("provider_item_uuid")
+    availability_mode = kwargs.get(
+        "availability_mode",
+        getattr(kwargs.get("entity"), "availability_mode", "none") or "none",
+    )
+    if availability_mode not in {"none", "check_only", "require_hold"}:
+        raise ValueError(
+            "availability_mode must be one of: none, check_only, require_hold"
+        )
+    availability_system_code = kwargs.get(
+        "availability_system_code",
+        getattr(kwargs.get("entity"), "availability_system_code", None),
+    )
+    if availability_mode != "none" and not availability_system_code:
+        raise ValueError(
+            "availability_system_code is required when availability_mode enables availability"
+        )
     if kwargs.get("entity") is None:
         cols = {
             "item_spec": {},
@@ -379,6 +398,9 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
             "provider_item_external_id",
             "base_price_per_uom",
             "item_spec",
+            "availability_mode",
+            "availability_system_code",
+            "availability_namespace",
         ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
@@ -402,6 +424,9 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
         "provider_item_external_id": ProviderItemModel.provider_item_external_id,
         "base_price_per_uom": ProviderItemModel.base_price_per_uom,
         "item_spec": ProviderItemModel.item_spec,
+        "availability_mode": ProviderItemModel.availability_mode,
+        "availability_system_code": ProviderItemModel.availability_system_code,
+        "availability_namespace": ProviderItemModel.availability_namespace,
     }
 
     # Add actions dynamically based on the presence of keys in kwargs

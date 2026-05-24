@@ -7,6 +7,7 @@ __author__ = "bibow"
 from graphene import Boolean, DateTime, Field, List, ObjectType, String
 
 from silvaengine_dynamodb_base import ListObjectType
+from silvaengine_utility import JSONCamelCase
 from silvaengine_utility import SafeFloat as Float
 
 from ..models.batch_loaders import get_loaders
@@ -21,11 +22,18 @@ class QuoteItemType(ObjectType):
     batch_no = String()
     request_uuid = String()
     qty = Float()
+    pax_breakdown = JSONCamelCase()
+    bundle_uuid = String()
+    bundle_label = String()
     price_per_uom = Float()
     subtotal = Float()
     subtotal_discount = Float()
     final_subtotal = Float()
+    currency = String()
+    subtotal_native = Float()
     notes = String()
+    hold_token = String()
+    hold_expires_at = DateTime()
     guardrail_price_per_uom = Float()
     slow_move_item = Boolean()
 

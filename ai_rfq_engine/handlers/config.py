@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 import boto3
 
 from ..models import utils
+from ..utils.logging_filters import install_sensitive_value_filter
 
 
 class Config:
@@ -26,6 +27,7 @@ class Config:
     # Cache Configuration
     CACHE_TTL = 1800  # 30 minutes default TTL
     CACHE_ENABLED = True
+    ALLOW_INLINE_AUTH_SECRET_VALUE = False
 
     # Cache name patterns for different modules
     CACHE_NAMES = {
@@ -118,6 +120,34 @@ class Config:
             "getter": "get_discount_prompt",
             "list_resolver": "ai_rfq_engine.queries.discount_prompt.resolve_discount_prompt_list",
             "cache_keys": ["context:partition_key", "key:discount_prompt_uuid"],
+        },
+        "fx_rate": {
+            "module": "ai_rfq_engine.models.fx_rate",
+            "model_class": "FxRateModel",
+            "getter": "get_fx_rate",
+            "list_resolver": "ai_rfq_engine.queries.fx_rate.resolve_fx_rate_list",
+            "cache_keys": ["context:partition_key", "key:fx_rate_uuid"],
+        },
+        "cancellation_policy": {
+            "module": "ai_rfq_engine.models.cancellation_policy",
+            "model_class": "CancellationPolicyModel",
+            "getter": "get_cancellation_policy",
+            "list_resolver": "ai_rfq_engine.queries.cancellation_policy.resolve_cancellation_policy_list",
+            "cache_keys": ["context:partition_key", "key:policy_uuid"],
+        },
+        "item_catalog_ref": {
+            "module": "ai_rfq_engine.models.item_catalog_ref",
+            "model_class": "ItemCatalogRefModel",
+            "getter": "get_item_catalog_ref",
+            "list_resolver": "ai_rfq_engine.queries.item_catalog_ref.resolve_item_catalog_ref_list",
+            "cache_keys": ["context:partition_key", "key:catalog_ref_uuid"],
+        },
+        "external_system_config": {
+            "module": "ai_rfq_engine.models.external_system_config",
+            "model_class": "ExternalSystemConfigModel",
+            "getter": "get_external_system_config",
+            "list_resolver": "ai_rfq_engine.queries.external_system_config.resolve_external_system_config_list",
+            "cache_keys": ["context:partition_key", "key:config_uuid"],
         },
     }
 
@@ -227,6 +257,7 @@ class Config:
             logger (logging.Logger): Logger instance for logging.
             **setting (Dict[str, Any]): Configuration dictionary.
         """
+        install_sensitive_value_filter(logger)
         try:
             cls._set_parameters(setting)
             cls._initialize_aws_services(setting)
@@ -250,6 +281,13 @@ class Config:
         # Set cache enabled flag (defaults to True if not specified)
         if "cache_enabled" in setting:
             cls.CACHE_ENABLED = setting.get("cache_enabled", True)
+        cls.ALLOW_INLINE_AUTH_SECRET_VALUE = bool(
+            setting.get("allow_inline_auth_secret_value", False)
+        )
+
+    @classmethod
+    def allow_inline_auth_secret_value(cls) -> bool:
+        return cls.ALLOW_INLINE_AUTH_SECRET_VALUE
 
     @classmethod
     def _initialize_aws_services(cls, setting: Dict[str, Any]) -> None:

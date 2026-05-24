@@ -122,8 +122,10 @@ class ItemPriceTierModel(BaseModel):
     partition_key = UnicodeAttribute()
     quantity_greater_then = NumberAttribute()
     quantity_less_then = NumberAttribute(null=True)
+    pax_type = UnicodeAttribute(null=True)
     margin_per_uom = NumberAttribute(null=True)
     price_per_uom = NumberAttribute(null=True)
+    currency = UnicodeAttribute(null=True)
     status = UnicodeAttribute(default="in_review")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
@@ -304,6 +306,7 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
     updated_at_lt = kwargs.get("updated_at_lt")
     status = kwargs.get("status")
     is_it_last_tier = kwargs.get("is_it_last_tier", False)
+    legacy_pax_only = kwargs.get("legacy_pax_only", False)
 
     args = []
     inquiry_funct = ItemPriceTierModel.scan
@@ -361,6 +364,10 @@ def resolve_item_price_tier_list(info: ResolveInfo, **kwargs: Dict[str, Any]) ->
         the_filters &= ItemPriceTierModel.price_per_uom.between(min_price, max_price)
     if status:
         the_filters &= ItemPriceTierModel.status == status
+    if kwargs.get("pax_type"):
+        the_filters &= ItemPriceTierModel.pax_type == kwargs.get("pax_type")
+    elif legacy_pax_only:
+        the_filters &= ItemPriceTierModel.pax_type.does_not_exist()
 
     # Filter for tiers where quantity_less_then is None or doesn't exist
     if is_it_last_tier:
@@ -401,6 +408,7 @@ def _get_previous_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     quantity_greater_then = float(kwargs.get("quantity_greater_then", 0))
     provider_item_uuid = kwargs.get("provider_item_uuid")
     segment_uuid = kwargs.get("segment_uuid")
+    pax_type = kwargs.get("pax_type")
 
     # Validate required fields
     if quantity_greater_then is None:
@@ -416,15 +424,17 @@ def _get_previous_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         raise ValueError("segment_uuid is required for new price tier")
 
     # Use the same query logic as resolve_item_price_tier_list to find the current last tier
-    item_price_tier_list = resolve_item_price_tier_list(
-        info,
-        **{
-            "item_uuid": item_uuid,
-            "provider_item_uuid": provider_item_uuid,
-            "segment_uuid": segment_uuid,
-            "is_it_last_tier": True,
-        },
-    )
+    query_params = {
+        "item_uuid": item_uuid,
+        "provider_item_uuid": provider_item_uuid,
+        "segment_uuid": segment_uuid,
+        "is_it_last_tier": True,
+        "legacy_pax_only": pax_type is None,
+    }
+    if pax_type:
+        query_params["pax_type"] = pax_type
+
+    item_price_tier_list = resolve_item_price_tier_list(info, **query_params)
 
     # Check if there's a previous tier and validate ordering
     if item_price_tier_list.total == 0:
@@ -499,8 +509,10 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
             "provider_item_uuid",
             "segment_uuid",
             "quantity_greater_then",
+            "pax_type",
             "margin_per_uom",
             "price_per_uom",
+            "currency",
             "status",
         ]:
             if key in kwargs:
@@ -537,8 +549,10 @@ def insert_update_item_price_tier(info: ResolveInfo, **kwargs: Dict[str, Any]) -
         "segment_uuid": ItemPriceTierModel.segment_uuid,
         "quantity_greater_then": ItemPriceTierModel.quantity_greater_then,
         "quantity_less_then": ItemPriceTierModel.quantity_less_then,
+        "pax_type": ItemPriceTierModel.pax_type,
         "margin_per_uom": ItemPriceTierModel.margin_per_uom,
         "price_per_uom": ItemPriceTierModel.price_per_uom,
+        "currency": ItemPriceTierModel.currency,
         "status": ItemPriceTierModel.status,
     }
 

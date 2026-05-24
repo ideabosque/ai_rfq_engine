@@ -21,7 +21,19 @@ from graphene import (
 from silvaengine_utility import JSONCamelCase
 from silvaengine_utility import SafeFloat as Float
 
-from .mutations.discount_prompt import DeleteDiscountPrompt, InsertUpdateDiscountPrompt
+from .mutations.cancellation_policy import (
+    DeleteCancellationPolicy,
+    InsertUpdateCancellationPolicy,
+)
+from .mutations.external_system_config import (
+    DeleteExternalSystemConfig,
+    InsertUpdateExternalSystemConfig,
+)
+from .mutations.fx_rate import DeleteFxRate, InsertUpdateFxRate
+from .mutations.item_catalog_ref import (
+    DeleteItemCatalogRef,
+    InsertUpdateItemCatalogRef,
+)
 from .mutations.file import DeleteFile, InsertUpdateFile
 from .mutations.installment import DeleteInstallment, InsertUpdateInstallment
 from .mutations.item import DeleteItem, InsertUpdateItem
@@ -36,12 +48,35 @@ from .mutations.quote_item import DeleteQuoteItem, InsertUpdateQuoteItem
 from .mutations.request import DeleteRequest, InsertUpdateRequest
 from .mutations.segment import DeleteSegment, InsertUpdateSegment
 from .mutations.segment_contact import DeleteSegmentContact, InsertUpdateSegmentContact
+from .mutations.discount_prompt import InsertUpdateDiscountPrompt, DeleteDiscountPrompt
+from .queries.cancellation_policy import (
+    resolve_cancellation_policy,
+    resolve_cancellation_policy_list,
+)
+from .mutations.availability import (
+    AcquireAvailabilityHold,
+    ConfirmAvailabilityHold,
+    ReleaseAvailabilityHold,
+)
+from .queries.availability import resolve_check_availability
 from .queries.discount_prompt import (
     resolve_discount_prompt,
     resolve_discount_prompt_list,
     resolve_discount_prompts,
 )
 from .queries.file import resolve_file, resolve_file_list
+from .queries.catalog_inquiry import resolve_inquire_catalog
+from .queries.external_system_config import (
+    resolve_external_system_config,
+    resolve_external_system_config_list,
+    resolve_external_system_for,
+)
+from .queries.fx_rate import resolve_fx_rate, resolve_fx_rate_list
+from .queries.item_catalog_ref import (
+    find_item_catalog_refs,
+    resolve_item_catalog_ref,
+    resolve_item_catalog_ref_list,
+)
 from .queries.installment import resolve_installment, resolve_installment_list
 from .queries.item import resolve_item, resolve_item_list
 from .queries.item_price_tier import (
@@ -62,7 +97,19 @@ from .queries.segment_contact import (
     resolve_segment_contact,
     resolve_segment_contact_list,
 )
+from .types.cancellation_policy import (
+    CancellationPolicyListType,
+    CancellationPolicyType,
+)
+from .types.availability import AvailabilityResultType
+from .types.catalog_inquiry import CatalogInquiryResultType
 from .types.discount_prompt import DiscountPromptListType, DiscountPromptType
+from .types.external_system_config import (
+    ExternalSystemConfigListType,
+    ExternalSystemConfigType,
+)
+from .types.fx_rate import FxRateListType, FxRateType
+from .types.item_catalog_ref import ItemCatalogRefListType, ItemCatalogRefType
 from .types.file import FileListType, FileType
 from .types.installment import InstallmentListType, InstallmentType
 from .types.item import ItemListType, ItemType
@@ -81,8 +128,18 @@ from .types.segment_contact import SegmentContactListType, SegmentContactType
 
 def type_class():
     return [
+        AvailabilityResultType,
+        CancellationPolicyType,
+        CancellationPolicyListType,
+        CatalogInquiryResultType,
         DiscountPromptType,
         DiscountPromptListType,
+        ExternalSystemConfigType,
+        ExternalSystemConfigListType,
+        FxRateType,
+        FxRateListType,
+        ItemCatalogRefType,
+        ItemCatalogRefListType,
         FileType,
         FileListType,
         InstallmentType,
@@ -124,6 +181,7 @@ class Query(ObjectType):
         item_type=String(required=False),
         item_name=String(required=False),
         item_description=String(required=False),
+        pricing_mode=String(required=False),
         uoms=List(String, required=False),
     )
 
@@ -196,6 +254,12 @@ class Query(ObjectType):
         max_total_cost_per_uom=Float(required=False),
         slow_move_item=Boolean(required=False),
         in_stock=Boolean(required=False),
+        service_start_at_gt=DateTime(required=False),
+        service_start_at_lt=DateTime(required=False),
+        service_end_at_gt=DateTime(required=False),
+        service_end_at_lt=DateTime(required=False),
+        service_window_start=DateTime(required=False),
+        service_window_end=DateTime(required=False),
         updated_at_gt=DateTime(required=False),
         updated_at_lt=DateTime(required=False),
     )
@@ -216,6 +280,7 @@ class Query(ObjectType):
         quantity_value=Float(required=False),
         min_price=Float(required=False),
         max_price=Float(required=False),
+        pax_type=String(required=False),
         status=String(required=False),
     )
 
@@ -303,6 +368,7 @@ class Query(ObjectType):
         provider_item_uuid=String(required=False),
         item_uuid=String(required=False),
         request_uuid=String(required=False),
+        bundle_uuid=String(required=False),
         min_price_per_uom=Float(required=False),
         max_price_per_uom=Float(required=False),
         min_qty=Float(required=False),
@@ -350,6 +416,101 @@ class Query(ObjectType):
         limit=Int(required=False),
         request_uuid=String(required=False),
         email=String(required=False),
+    )
+
+    fx_rate = Field(
+        FxRateType,
+        fx_rate_uuid=String(required=True),
+    )
+
+    fx_rate_list = Field(
+        FxRateListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        source_currency=String(required=False),
+        target_currency=String(required=False),
+        status=String(required=False),
+    )
+
+    cancellation_policy = Field(
+        CancellationPolicyType,
+        policy_uuid=String(required=True),
+    )
+
+    cancellation_policy_list = Field(
+        CancellationPolicyListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        provider_item_uuid=String(required=False),
+        status=String(required=False),
+    )
+
+    item_catalog_ref = Field(
+        ItemCatalogRefType,
+        catalog_ref_uuid=String(required=True),
+    )
+
+    item_catalog_ref_list = Field(
+        ItemCatalogRefListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        system_code=String(required=False),
+        namespace=String(required=False),
+        item_uuid=String(required=False),
+        status=String(required=False),
+    )
+
+    item_catalog_refs = List(
+        ItemCatalogRefType,
+        system_code=String(required=True),
+        namespace=String(required=False),
+        node_ids=List(String, required=True),
+        status=String(required=False),
+    )
+
+    external_system_config = Field(
+        ExternalSystemConfigType,
+        config_uuid=String(required=True),
+    )
+
+    external_system_config_list = Field(
+        ExternalSystemConfigListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        system_code=String(required=False),
+        system_kind=String(required=False),
+        namespace=String(required=False),
+        status=String(required=False),
+    )
+
+    resolved_external_system_config = Field(
+        ExternalSystemConfigType,
+        system_code=String(required=True),
+        system_kind=String(required=True),
+        namespace=String(required=False),
+        provider_corp_external_id=String(required=False),
+    )
+
+    inquire_catalog = Field(
+        CatalogInquiryResultType,
+        system_code=String(required=True),
+        namespace=String(required=False),
+        node_id=String(required=False),
+        provider_corp_external_id=String(required=False),
+        query=JSONCamelCase(required=False),
+    )
+
+    check_availability = Field(
+        AvailabilityResultType,
+        system_code=String(required=True),
+        namespace=String(required=False),
+        provider_corp_external_id=String(required=False),
+        provider_item_uuid=String(required=True),
+        batch_no=String(required=False),
+        service_start_at=DateTime(required=True),
+        service_end_at=DateTime(required=True),
+        pax_breakdown=JSONCamelCase(required=False),
+        qty=Float(required=False),
     )
 
     def resolve_ping(self, info: ResolveInfo) -> str:
@@ -485,8 +646,73 @@ class Query(ObjectType):
     ) -> FileListType:
         return resolve_file_list(info, **kwargs)
 
+    def resolve_fx_rate(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> FxRateType | None:
+        return resolve_fx_rate(info, **kwargs)
+
+    def resolve_fx_rate_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> FxRateListType:
+        return resolve_fx_rate_list(info, **kwargs)
+
+    def resolve_cancellation_policy(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> CancellationPolicyType | None:
+        return resolve_cancellation_policy(info, **kwargs)
+
+    def resolve_cancellation_policy_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> CancellationPolicyListType:
+        return resolve_cancellation_policy_list(info, **kwargs)
+
+    def resolve_item_catalog_ref(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ItemCatalogRefType | None:
+        return resolve_item_catalog_ref(info, **kwargs)
+
+    def resolve_item_catalog_ref_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ItemCatalogRefListType:
+        return resolve_item_catalog_ref_list(info, **kwargs)
+
+    def resolve_item_catalog_refs(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> List_Type[ItemCatalogRefType]:
+        return find_item_catalog_refs(info, **kwargs)
+
+    def resolve_external_system_config(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ExternalSystemConfigType | None:
+        return resolve_external_system_config(info, **kwargs)
+
+    def resolve_external_system_config_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ExternalSystemConfigListType:
+        return resolve_external_system_config_list(info, **kwargs)
+
+    def resolve_resolved_external_system_config(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> ExternalSystemConfigType | None:
+        return resolve_external_system_for(info, **kwargs)
+
+    def resolve_inquire_catalog(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> CatalogInquiryResultType:
+        return resolve_inquire_catalog(info, **kwargs)
+
+    def resolve_check_availability(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> AvailabilityResultType:
+        return resolve_check_availability(info, **kwargs)
+
 
 class Mutations(ObjectType):
+    acquire_availability_hold = AcquireAvailabilityHold.Field()
+    release_availability_hold = ReleaseAvailabilityHold.Field()
+    confirm_availability_hold = ConfirmAvailabilityHold.Field()
+    insert_update_cancellation_policy = InsertUpdateCancellationPolicy.Field()
+    delete_cancellation_policy = DeleteCancellationPolicy.Field()
     insert_update_item = InsertUpdateItem.Field()
     delete_item = DeleteItem.Field()
     insert_update_segment = InsertUpdateSegment.Field()
@@ -511,3 +737,9 @@ class Mutations(ObjectType):
     delete_installment = DeleteInstallment.Field()
     insert_update_file = InsertUpdateFile.Field()
     delete_file = DeleteFile.Field()
+    insert_update_fx_rate = InsertUpdateFxRate.Field()
+    delete_fx_rate = DeleteFxRate.Field()
+    insert_update_item_catalog_ref = InsertUpdateItemCatalogRef.Field()
+    delete_item_catalog_ref = DeleteItemCatalogRef.Field()
+    insert_update_external_system_config = InsertUpdateExternalSystemConfig.Field()
+    delete_external_system_config = DeleteExternalSystemConfig.Field()

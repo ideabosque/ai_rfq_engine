@@ -25,12 +25,16 @@ class InsertUpdateProviderItemBatch(Mutation):
         item_uuid = String(required=False)
         expired_at = DateTime(required=False)
         produced_at = DateTime(required=False)
+        service_start_at = DateTime(required=False)
+        service_end_at = DateTime(required=False)
         cost_per_uom = Float(required=False)
         freight_cost_per_uom = Float(required=False)
         additional_cost_per_uom = Float(required=False)
         guardrail_margin_per_uom = Float(required=False)
         slow_move_item = Boolean(required=False)
         in_stock = Boolean(required=False)
+        currency = String(required=False)
+        cancellation_policy_uuid = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod

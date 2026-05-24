@@ -483,7 +483,7 @@ Indexes (defined when this new table is created):
 
 **Workflow (search-first, the actual hospitality flow):**
 
-Module / function names are written as they appear (or will appear) in this repository's source. The end-to-end sequence diagram later in §8 expands the inquiry step with explicit hops through `external_system_config`, `neo4j_handler`, and `Secrets Manager`; the sketch below stays at the call-site level to show what the G7a table itself unlocks.
+Module / function names are written as they appear (or will appear) in this repository's source. The end-to-end sequence diagram later in §8 expands the inquiry step with explicit hops through `external_system_config` and `neo4j_handler`; the sketch below stays at the call-site level to show what the G7a table itself unlocks.
 
 ```
 AI Agent: "Find Tokyo hotels with onsen"
@@ -554,11 +554,12 @@ ai_rfq_engine/
         └── erp_pim_handler.py     # follow-on, serves non-hospitality tenants
 ```
 
-A small registry resolves `system_code` (from the G7a `ItemCatalogRefModel` or directly from the caller) to the adapter implementation when the in-engine boundary is selected. Each in-engine adapter:
+A small registry resolves `system_code` (from the G7a `ItemCatalogRefModel` or directly from the caller) to the adapter implementation when the in-engine boundary is selected. The dispatcher orchestrates the surrounding steps so each handler stays narrow:
 
-1. Reads its `ExternalSystemConfigModel` row via G7c (`endpoint_url`, `auth_secret_ref`, `extra_config`, `timeout_seconds`, `cache_ttl_seconds`).
-2. Resolves the credential from the configured secrets manager.
-3. Invokes the external system, normalizes the response to the shared payload shape, and caches per the configured TTL.
+1. Dispatcher reads the `ExternalSystemConfigModel` row via G7c (`endpoint_url`, `auth_strategy`, `auth_secret_value` / `auth_secret_ref`, `extra_config`, `timeout_seconds`, `cache_ttl_seconds`).
+2. Dispatcher resolves the credential via `resolve_credential_for(config)`: inline `auth_secret_value` first; external-backend resolution of `auth_secret_ref` second (when a backend is registered); `None` otherwise. The Phase 4 pilot ships with no external backend, so this step is a direct in-memory read.
+3. Dispatcher invokes the handler with the reference, the config (read-only), the credential, and the opaque query.
+4. The handler calls the external system, normalizes the response to the shared payload shape, and returns. It must not log or persist the credential.
 
 **Shared catalog response envelope** (the ABC, not per-handler):
 
@@ -624,8 +625,9 @@ class ExternalSystemConfigModel(BaseModel):
     endpoint_url       = UnicodeAttribute()        # base URL only; no credentials in this field
     adapter_id         = UnicodeAttribute(null=True)  # registry key when it differs from system_code
 
-    auth_strategy   = UnicodeAttribute()           # 'none' | 'bearer_token' | 'oauth2_client_credentials' | 'api_key' | 'basic'
-    auth_secret_ref = UnicodeAttribute(null=True)  # secrets-manager ARN / SSM path — NEVER the secret itself
+    auth_strategy     = UnicodeAttribute()           # 'none' | 'bearer_token' | 'oauth2_client_credentials' | 'api_key' | 'basic'
+    auth_secret_value = UnicodeAttribute(null=True)  # plaintext credential — WRITE-ONLY in GraphQL, never exposed through any output type
+    auth_secret_ref   = UnicodeAttribute(null=True)  # external secrets-manager ARN / SSM path; used when auth_secret_value is null
 
     timeout_seconds   = NumberAttribute(default=30)
     cache_ttl_seconds = NumberAttribute(default=300)
@@ -649,16 +651,40 @@ Indexes (defined when this new table is created):
 3. If no operation-specific row exists, repeat steps 1-2 using `system_kind = "both"` so a shared configuration row can serve both capability types.
 4. If no matching active row exists, the adapter call returns a structured `not_configured` error rather than silently succeeding.
 
-**Credentials separation** (load-bearing):
-- This table stores only `auth_secret_ref` — for example `arn:aws:secretsmanager:us-east-1:...:secret:rfq/tenant-x/neo4j`.
-- Adapters resolve that ref to a credential at call time via the deployment's secrets-manager client.
-- Consequence: DynamoDB read access does not leak credentials; rotation requires no engine deploy; access auditing is centralized in the secrets manager.
+**Credential storage — hybrid model**:
+
+The table supports **two credential storage modes**, chosen per-row:
+
+- **Inline (`auth_secret_value`)**: plaintext credential stored directly in DynamoDB. Simpler to operate; appropriate for small teams, single-tenant deployments, low-stakes credentials, and the Phase 4 pilot. The credential is **write-only via GraphQL** — accepted on `InsertUpdateExternalSystemConfig` but **omitted from every GraphQL output type** (`ExternalSystemConfigType` and any list variant). The mutation never echoes the value back.
+- **External (`auth_secret_ref`)**: a pointer to a real secrets manager — `arn:aws:secretsmanager:...`, `ssm:/path/to/param`, or vault-style URI. The handler resolves the ref through a pluggable secrets backend at call time. Appropriate for production multi-tenant SaaS, compliance environments (SOC 2 / PCI / HIPAA), or any case where DynamoDB read access must not equal credential access.
+
+**Resolution at handler call time** (in this exact order):
+
+1. If `auth_secret_value` is set, use it directly.
+2. Else if `auth_secret_ref` is set, resolve via the configured secrets backend.
+3. Else return `auth_unavailable` error.
+
+**Load-bearing invariants** (these are what make the inline mode safe):
+
+- `auth_secret_value` is **never** present on any GraphQL output type. Code review must catch any accidental re-exposure.
+- `auth_secret_value` is **never** included in `attributes_to_get` for list resolvers — fetching a list of configs reads everything except the credential.
+- Logs (engine, CloudWatch, MCP) **never** print full row contents from `ExternalSystemConfigModel`. Any debug log of a config row strips both credential fields before output.
+- Backups of `are-external_system_configs` are encrypted at rest (DynamoDB default) and access-controlled separately from the live table.
+
+**Risks accepted under the inline mode** (versus a real secrets manager):
+
+- A DynamoDB-read IAM permission equals credential access. Engineers debugging via the AWS console see plaintext.
+- No per-credential audit trail (CloudTrail tells you the table was read, not which credential was used).
+- Manual rotation only (no automatic credential cycling).
+- Backups contain plaintext credentials.
+
+If any of these become unacceptable, the upgrade path is to set `auth_secret_value = null`, populate `auth_secret_ref`, and ensure a secrets-backend resolver is registered. No schema change required.
 
 **Invocation flow**:
 1. Caller requests a catalog inquiry or availability operation.
 2. The ADR-selected adapter executor resolves the relevant config by tenant, operation kind, system code, namespace, and optional provider.
-3. The executor resolves `auth_secret_ref` at call time, invokes the external system, applies timeout/cache rules, and returns a normalized response.
-4. Plaintext credentials are never persisted in DynamoDB or exposed through the GraphQL response.
+3. The executor resolves the credential per the order above and invokes the external system, applying timeout/cache rules and returning a normalized response.
+4. The plaintext credential **never** appears in any GraphQL response, query result, or log output.
 
 **Phase 4 deferral option**: for a single-tenant Neo4j pilot only, deployment configuration may substitute for this table. Defer it until a second adapter or second tenant is introduced, whichever comes first, and record that limitation explicitly.
 
@@ -674,7 +700,7 @@ Indexes (defined when this new table is created):
 - A provider-scoped PMS config overrides the tenant-wide default when resolving for that provider.
 - Two configs for the same external system but different namespaces resolve independently.
 - A `system_kind = "both"` config is used only when no active operation-specific config is found.
-- The configuration API never accepts or returns plaintext credentials; the selected adapter executor may resolve `auth_secret_ref` at runtime solely to perform the outbound call.
+- The configuration API may **accept** `auth_secret_value` via mutation, but it **never returns** the value through any output type or list resolver. The handler is the only call site that reads it.
 - Disabling a config (`status = "disabled"`) blocks adapter calls without deleting the row, preserving audit history.
 
 **Effort**: 1 engineer-week. CRUD-shaped work modeled on existing entities (`Item`, `ProviderItem`); no novel schema patterns.
@@ -687,6 +713,8 @@ The diagram below traces a single hospitality search-to-quote flow exercising al
 
 Participants below map to module or function names in this repository where they exist; external participants (human operator, consumer project, third-party services) keep role names because no in-repo module corresponds. Aliases stay short for arrow legibility; the `as` labels are what developers will grep for.
 
+The diagram reflects the **inline-credential pilot mode** (the dispatcher reads `auth_secret_value` directly from the G7c config row via `resolve_credential_for` and passes it to the handler). The external secrets-manager path is preserved as an upgrade and is documented in the §8 G7c "Credential storage — hybrid model" section; when adopted, an extra participant (the secrets backend) appears between `external_system_config` and `neo4j_handler`.
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -695,7 +723,6 @@ sequenceDiagram
     participant schema
     participant external_system_config
     participant neo4j_handler
-    participant Secrets_Manager
     participant Neo4j
     participant item_catalog_ref
     participant quote_item
@@ -704,10 +731,9 @@ sequenceDiagram
     Operator->>AI_Agent: Find Tokyo hotels
     AI_Agent->>schema: inquire_catalog
     schema->>external_system_config: resolve_external_system_for
-    external_system_config-->>schema: endpoint and secret_ref
-    schema->>neo4j_handler: dispatch
-    neo4j_handler->>Secrets_Manager: resolve auth_secret_ref
-    Secrets_Manager-->>neo4j_handler: credentials in memory
+    external_system_config-->>schema: config row including auth_secret_value
+    Note over schema: resolve_credential_for(config) reads<br/>auth_secret_value inline (no external call)
+    schema->>neo4j_handler: dispatch with credential
     neo4j_handler->>Neo4j: external query
     Neo4j-->>neo4j_handler: matching nodes
     neo4j_handler-->>schema: response envelope
@@ -736,20 +762,19 @@ sequenceDiagram
 | `schema` | [ai_rfq_engine/schema.py](../ai_rfq_engine/schema.py) — GraphQL queries and mutations |
 | `external_system_config` | new `ai_rfq_engine/models/external_system_config.py` (G7c) |
 | `neo4j_handler` | new `ai_rfq_engine/handlers/catalog/neo4j_handler.py` (G7b pilot; module path depends on the execution-boundary ADR) |
-| `Secrets_Manager` | external service (AWS Secrets Manager / SSM / equivalent) |
 | `Neo4j` | external catalog system |
 | `item_catalog_ref` | new `ai_rfq_engine/models/item_catalog_ref.py` (G7a) |
 | `quote_item` | existing [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py) — `get_price_per_uom` and `insert_update_quote_item` already implemented |
 
 **Failure-mode notes** (not shown in the diagram to keep the happy path readable):
 
-- **`external_system_config` (G7c)**: if no active row matches, `resolve_external_system_for` returns a structured `not_configured` error. The dispatcher (`En -> Hd`) never runs.
-- **`Secrets Manager`**: if credential resolution fails, the handler returns a structured `auth_unavailable` error. Credentials never reach the engine's persistence layer.
+- **`external_system_config` (G7c)**: if no active row matches the requested `(tenant, system_kind, system_code, namespace, provider_corp_external_id)`, `resolve_external_system_model_for` returns `None` and the dispatcher raises a structured `not_configured` error. The handler is never invoked.
+- **Credential resolution**: `resolve_credential_for(config)` reads `auth_secret_value` first; if absent, falls back to `auth_secret_ref` resolution; if neither is available **and** `auth_strategy != "none"`, the dispatcher raises `auth_unavailable`. The plaintext credential never reaches a log line or a GraphQL response.
 - **`Neo4j`** (or any external system): if the system times out per `timeout_seconds`, the handler returns `system_timeout`. No partial state is written to `request_data` or the catalog cache.
 - **`item_catalog_ref` (G7a)**: if no row exists for a returned `node_id`, that node is dropped from the response with a structured warning rather than failing the batch. The AI agent presents only the resolvable subset.
 - **`quote_item.get_price_per_uom` (G2)**: standard behavior — if no matching tier exists for the `(item, provider_item, segment, qty, pax_type)` tuple, `insert_update_quote_item` raises before persisting. No partial QuoteItem is created.
 
-The hardening pilot must exercise the happy path **and** at least one failure mode per boundary (`external_system_config` / `Secrets Manager` / external system / `item_catalog_ref` / `quote_item.get_price_per_uom`).
+The hardening pilot must exercise the happy path **and** at least one failure mode per boundary (`external_system_config` / credential resolution / external system / `item_catalog_ref` / `quote_item.get_price_per_uom`).
 
 ### Hardening + cross-vertical pilot
 
@@ -816,8 +841,9 @@ Nullable fields are safe for storage migration, but behavioral compatibility is 
 3. **Bundle representation**: confirm that v1 may present grouped priced component lines rather than storing a derived parent line. If a persisted package line is mandatory, define its mutation and total-calculation semantics first.
 4. **FX scope**: real-time FX adapter or tenant-loaded daily rates? The pilot suggests daily rates are enough for most hospitality bookings; FX volatility does not dominate at typical hospitality margins.
 5. **Cancellation policy authoring**: managed in this engine, or imported from supplier feeds? The Phase 3 deliverable depends on the answer.
-6. **External integration ownership and configuration**: choose whether G3 and G7b adapters run in-engine under `ai_rfq_engine/handlers/{availability,catalog}/` or in a separate integration service implementing the same contracts. When is the G7c `external_system_configs` table introduced: at first multi-tenant onboarding, at second adapter, or as a Phase 4 deliverable regardless? Which secrets manager does `auth_secret_ref` resolve against at runtime? And confirm the `namespace = "DEFAULT"` convention used in both G7a identity rows and G7c config rows — fine as a starting default, but a tenant whose external systems all use a real namespace called `DEFAULT` would silently collide. Document the convention or pick a less collision-prone sentinel (`__NONE__`, `__TENANT__`).
-7. **Pilot vertical**: confirm hotel room-night as the Phase 0 pilot, or substitute the vertical closest to a production consumer.
+6. **External integration ownership and configuration**: choose whether G3 and G7b adapters run in-engine under `ai_rfq_engine/handlers/{availability,catalog}/` or in a separate integration service implementing the same contracts. When is the G7c `external_system_configs` table introduced: at first multi-tenant onboarding, at second adapter, or as a Phase 4 deliverable regardless? Confirm the `namespace = "DEFAULT"` convention used in both G7a identity rows and G7c config rows — fine as a starting default, but a tenant whose external systems all use a real namespace called `DEFAULT` would silently collide. Document the convention or pick a less collision-prone sentinel (`__NONE__`, `__TENANT__`).
+7. **External secrets-manager backend** (deferrable): the Phase 4 pilot uses inline `auth_secret_value` storage (no external dependency). When a deployment outgrows the inline mode — multi-tenant SaaS, compliance environment, credential rotation requirement — pick a backend (AWS Secrets Manager, SSM Parameter Store, HashiCorp Vault) and register a resolver inside `resolve_credential_for`. The schema doesn't change; only the resolution code path.
+8. **Pilot vertical**: confirm hotel room-night as the Phase 0 pilot, or substitute the vertical closest to a production consumer.
 
 Open these as ADRs in a follow-up before the Phase 0 pilot kicks off.
 

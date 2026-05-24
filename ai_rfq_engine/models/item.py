@@ -69,6 +69,7 @@ class ItemModel(BaseModel):
     item_type = UnicodeAttribute()
     item_name = UnicodeAttribute()
     item_description = UnicodeAttribute(null=True)
+    pricing_mode = UnicodeAttribute(null=True)
     uom = UnicodeAttribute()
     item_external_id = UnicodeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
@@ -204,6 +205,7 @@ def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     item_type = kwargs.get("item_type")
     item_name = kwargs.get("item_name")
     item_description = kwargs.get("item_description")
+    pricing_mode = kwargs.get("pricing_mode")
     uoms = kwargs.get("uoms")
 
     args = []
@@ -223,6 +225,8 @@ def resolve_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         the_filters &= ItemModel.item_name.contains(item_name)
     if item_description:
         the_filters &= ItemModel.item_description.contains(item_description)
+    if pricing_mode:
+        the_filters &= ItemModel.pricing_mode == pricing_mode
     if uoms:
         the_filters &= ItemModel.uom.is_in(*uoms)
     if the_filters is not None:
@@ -256,6 +260,7 @@ def insert_update_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "item_type",
             "item_name",
             "item_description",
+            "pricing_mode",
             "uom",
             "item_external_id",
         ]:
@@ -279,6 +284,7 @@ def insert_update_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         "item_type": ItemModel.item_type,
         "item_name": ItemModel.item_name,
         "item_description": ItemModel.item_description,
+        "pricing_mode": ItemModel.pricing_mode,
         "uom": ItemModel.uom,
         "item_external_id": ItemModel.item_external_id,
     }

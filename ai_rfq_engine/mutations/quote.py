@@ -6,7 +6,7 @@ __author__ = "bibow"
 import traceback
 from typing import Any, Dict
 
-from graphene import Boolean, Field, Mutation, String
+from graphene import Boolean, DateTime, Field, Mutation, String
 from silvaengine_utility import SafeFloat as Float
 
 from ..models.quote import delete_quote, insert_update_quote
@@ -23,6 +23,10 @@ class InsertUpdateQuote(Mutation):
         sales_rep_email = String(required=False)
         shipping_method = String(required=False)
         shipping_amount = Float(required=False)
+        currency = String(required=False)
+        display_currency = String(required=False)
+        fx_rate = Float(required=False)
+        fx_rate_locked_at = DateTime(required=False)
         notes = String(required=False)
         status = String(required=False)
         updated_by = String(required=True)

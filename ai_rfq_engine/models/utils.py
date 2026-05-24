@@ -13,10 +13,14 @@ from ..utils.normalization import normalize_to_json
 
 
 def initialize_tables(logger: logging.Logger) -> None:
+    from .cancellation_policy import CancellationPolicyModel
     from .discount_prompt import DiscountPromptModel
+    from .external_system_config import ExternalSystemConfigModel
     from .file import FileModel
+    from .fx_rate import FxRateModel
     from .installment import InstallmentModel
     from .item import ItemModel
+    from .item_catalog_ref import ItemCatalogRefModel
     from .item_price_tier import ItemPriceTierModel
     from .provider_item import ProviderItemModel
     from .provider_item_batches import ProviderItemBatchModel
@@ -27,10 +31,14 @@ def initialize_tables(logger: logging.Logger) -> None:
     from .segment_contact import SegmentContactModel
 
     models: List = [
+        CancellationPolicyModel,
         DiscountPromptModel,
+        ExternalSystemConfigModel,
         FileModel,
+        FxRateModel,
         InstallmentModel,
         ItemModel,
+        ItemCatalogRefModel,
         ItemPriceTierModel,
         ProviderItemModel,
         ProviderItemBatchModel,

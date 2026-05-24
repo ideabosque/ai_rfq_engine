@@ -20,6 +20,9 @@ class ProviderItemType(ObjectType):
     provider_item_external_id = String()
     base_price_per_uom = Float()
     item_spec = JSONCamelCase()  # Keep as JSON since it's a MapAttribute
+    availability_mode = String()
+    availability_system_code = String()
+    availability_namespace = String()
 
     # Nested resolver: strongly-typed nested relationship
     item_uuid = String()  # keep raw id

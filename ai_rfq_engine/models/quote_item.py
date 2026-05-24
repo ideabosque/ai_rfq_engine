@@ -33,6 +33,161 @@ from ..utils.normalization import normalize_to_json
 from .installment import resolve_installment_list
 
 
+def _build_cancellation_snapshot(
+    partition_key: str,
+    provider_item_uuid: str,
+    batch_no: str | None,
+) -> dict | None:
+    """
+    Build a point-in-time snapshot of the cancellation policy attached to a
+    provider-item batch.
+
+    Returns ``None`` when no batch is pinned, when the batch has no
+    ``cancellation_policy_uuid``, or when the referenced policy cannot be
+    loaded (procurement default — no policy term to display).
+
+    The snapshot is immutable on the quote item; if the supplier later changes
+    the policy, the customer still sees the terms they were quoted.
+    """
+    if not batch_no or not provider_item_uuid:
+        return None
+    try:
+        from .provider_item_batches import get_provider_item_batch
+
+        batch = get_provider_item_batch(provider_item_uuid, batch_no)
+    except Exception:
+        return None
+    policy_uuid = getattr(batch, "cancellation_policy_uuid", None)
+    if not policy_uuid or not partition_key:
+        return None
+    try:
+        from .cancellation_policy import (
+            get_cancellation_policy,
+            get_cancellation_policy_count,
+        )
+
+        if get_cancellation_policy_count(partition_key, policy_uuid) == 0:
+            return None
+        policy = get_cancellation_policy(partition_key, policy_uuid)
+    except Exception:
+        return None
+
+    tiers = getattr(policy, "tiers", None)
+    if hasattr(tiers, "as_dict"):
+        try:
+            tiers = tiers.as_dict()
+        except Exception:
+            tiers = None
+    return {
+        "policy_uuid": getattr(policy, "policy_uuid", policy_uuid),
+        "label": getattr(policy, "label", None),
+        "description": getattr(policy, "description", None),
+        "tiers": tiers,
+        "notes_template_uuid": getattr(policy, "notes_template_uuid", None),
+        "snapshotted_at": pendulum.now("UTC").to_iso8601_string(),
+    }
+
+
+def _enforce_availability(
+    info: ResolveInfo,
+    *,
+    provider_item: Any,
+    provider_item_uuid: str,
+    batch_no: str | None,
+    qty: float,
+    pax_breakdown: dict | None,
+    service_start_at: Any = None,
+    service_end_at: Any = None,
+) -> dict | None:
+    """
+    Check configured reservable capacity before persisting a quote item.
+
+    The provider item owns whether availability is disabled, read-only checked,
+    or protected by a temporary hold. A pinned batch provides its service
+    window when the caller does not supply one explicitly.
+    """
+    availability_mode = getattr(provider_item, "availability_mode", None) or "none"
+    if availability_mode == "none":
+        return None
+    if availability_mode not in {"check_only", "require_hold"}:
+        raise ValueError(f"Unsupported availability_mode: {availability_mode}")
+    availability_system_code = getattr(
+        provider_item, "availability_system_code", None
+    )
+    if not availability_system_code:
+        raise ValueError(
+            "Provider item availability is enabled but availability_system_code is missing"
+        )
+
+    if batch_no and (service_start_at is None or service_end_at is None):
+        from .provider_item_batches import get_provider_item_batch
+
+        batch = get_provider_item_batch(provider_item_uuid, batch_no)
+        service_start_at = service_start_at or getattr(batch, "service_start_at", None)
+        service_end_at = service_end_at or getattr(batch, "service_end_at", None)
+
+    if service_start_at is None or service_end_at is None:
+        raise ValueError(
+            "service_start_at and service_end_at are required for availability checks"
+        )
+    if service_end_at <= service_start_at:
+        raise ValueError("service_end_at must be later than service_start_at")
+
+    from ..handlers.availability import dispatch_acquire_hold, dispatch_check
+
+    dispatch = (
+        dispatch_acquire_hold
+        if availability_mode == "require_hold"
+        else dispatch_check
+    )
+    result = dispatch(
+        info,
+        system_code=availability_system_code,
+        namespace=getattr(provider_item, "availability_namespace", None) or "DEFAULT",
+        provider_corp_external_id=getattr(provider_item, "provider_corp_external_id", None),
+        provider_item_uuid=provider_item_uuid,
+        batch_no=batch_no,
+        service_start_at=service_start_at,
+        service_end_at=service_end_at,
+        pax_breakdown=pax_breakdown,
+        qty=float(qty),
+    )
+    if not result.get("available"):
+        raise ValueError(
+            "Requested provider item is not available for the service window"
+        )
+    if availability_mode == "require_hold" and (
+        not result.get("hold_token") or not result.get("expires_at")
+    ):
+        raise ValueError("Availability handler did not return the required temporary hold")
+    return result
+
+
+def _release_availability_hold(info: ResolveInfo, quote_item: Any) -> None:
+    hold_token = getattr(quote_item, "hold_token", None)
+    if not hold_token:
+        return
+    from .provider_item import get_provider_item
+
+    provider_item = get_provider_item(
+        getattr(quote_item, "partition_key", info.context.get("partition_key")),
+        quote_item.provider_item_uuid,
+    )
+    if (getattr(provider_item, "availability_mode", None) or "none") != "require_hold":
+        return
+    from ..handlers.availability import dispatch_release_hold
+
+    dispatch_release_hold(
+        info,
+        system_code=provider_item.availability_system_code,
+        namespace=getattr(provider_item, "availability_namespace", None) or "DEFAULT",
+        provider_corp_external_id=getattr(provider_item, "provider_corp_external_id", None),
+        provider_item_uuid=quote_item.provider_item_uuid,
+        batch_no=getattr(quote_item, "batch_no", None),
+        hold_token=hold_token,
+    )
+
+
 def get_price_per_uom(
     info: ResolveInfo,
     item_uuid: str,
@@ -40,6 +195,7 @@ def get_price_per_uom(
     segment_uuid: str,
     provider_item_uuid: str,
     batch_no: str = None,
+    pax_type: str = None,
 ) -> float | None:
     """
     Get the price per UOM based on item price tiers for the given quantity.
@@ -68,7 +224,10 @@ def get_price_per_uom(
         "provider_item_uuid": provider_item_uuid,
         "quantity_value": qty,  # Use new efficient tier matching
         "status": "active",
+        "legacy_pax_only": pax_type is None,
     }
+    if pax_type is not None:
+        query_params["pax_type"] = pax_type
 
     # Retrieve price tiers - now filtered by quantity_value at the database level
     price_tier_list = resolve_item_price_tier_list(info, **query_params)
@@ -194,10 +353,17 @@ class QuoteItemModel(BaseModel):
     request_data = MapAttribute(null=True)
     price_per_uom = NumberAttribute()
     qty = NumberAttribute()
+    pax_breakdown = MapAttribute(null=True)
+    bundle_uuid = UnicodeAttribute(null=True)
+    bundle_label = UnicodeAttribute(null=True)
     subtotal = NumberAttribute()
     subtotal_discount = NumberAttribute(null=True)
     final_subtotal = NumberAttribute()
+    currency = UnicodeAttribute(null=True)
+    subtotal_native = NumberAttribute(null=True)
     notes = UnicodeAttribute(null=True)
+    hold_token = UnicodeAttribute(null=True)
+    hold_expires_at = UTCDateTimeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -348,6 +514,7 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     min_final_subtotal = kwargs.get("min_final_subtotal")
     updated_at_gt = kwargs.get("updated_at_gt")
     updated_at_lt = kwargs.get("updated_at_lt")
+    bundle_uuid = kwargs.get("bundle_uuid")
 
     args = []
     inquiry_funct = QuoteItemModel.scan
@@ -418,6 +585,8 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         the_filters &= QuoteItemModel.final_subtotal.between(
             min_final_subtotal, max_final_subtotal
         )
+    if bundle_uuid:
+        the_filters &= QuoteItemModel.bundle_uuid == bundle_uuid
     if the_filters is not None:
         args.append(the_filters)
 
@@ -470,16 +639,61 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         if float(qty) <= 0:
             raise ValueError(f"qty must be greater than 0, got: {qty}")
 
-        # Calculate price_per_uom from tier pricing
-        price_per_uom = get_price_per_uom(
-            info, item_uuid, qty, segment_uuid, provider_item_uuid, batch_no
-        )
+        from .item import get_item
 
-        if price_per_uom is None:
-            raise ValueError(
-                f"No price tier found for item_uuid={item_uuid}, qty={qty}, "
-                f"segment_uuid={segment_uuid}, provider_item_uuid={provider_item_uuid}"
+        item = get_item(info.context.get("partition_key"), item_uuid)
+        pricing_mode = getattr(item, "pricing_mode", None) or "unit"
+        pax_breakdown = kwargs.get("pax_breakdown")
+
+        if pricing_mode == "per_pax_type":
+            if not isinstance(pax_breakdown, dict) or not pax_breakdown:
+                raise ValueError(
+                    "pax_breakdown is required for per_pax_type pricing"
+                )
+
+            pax_total = 0.0
+            subtotal = 0.0
+            for pax_type, pax_qty in pax_breakdown.items():
+                pax_qty = float(pax_qty)
+                if pax_qty <= 0:
+                    raise ValueError(
+                        f"pax_breakdown quantities must be greater than 0, got {pax_type}={pax_qty}"
+                    )
+                pax_price = get_price_per_uom(
+                    info,
+                    item_uuid,
+                    pax_qty,
+                    segment_uuid,
+                    provider_item_uuid,
+                    batch_no,
+                    pax_type=pax_type,
+                )
+                if pax_price is None:
+                    raise ValueError(
+                        f"No price tier found for item_uuid={item_uuid}, pax_type={pax_type}, "
+                        f"qty={pax_qty}, segment_uuid={segment_uuid}, "
+                        f"provider_item_uuid={provider_item_uuid}"
+                    )
+                pax_total += pax_qty
+                subtotal += float(pax_price) * pax_qty
+
+            if float(qty) != pax_total:
+                raise ValueError(
+                    "qty must equal the total pax_breakdown quantity for per_pax_type pricing"
+                )
+            price_per_uom = subtotal / pax_total
+        elif pricing_mode == "unit":
+            price_per_uom = get_price_per_uom(
+                info, item_uuid, qty, segment_uuid, provider_item_uuid, batch_no
             )
+            if price_per_uom is None:
+                raise ValueError(
+                    f"No price tier found for item_uuid={item_uuid}, qty={qty}, "
+                    f"segment_uuid={segment_uuid}, provider_item_uuid={provider_item_uuid}"
+                )
+            subtotal = float(price_per_uom) * float(qty)
+        else:
+            raise ValueError(f"Unsupported pricing_mode: {pricing_mode}")
 
         # Set all required fields
         cols["item_uuid"] = item_uuid
@@ -488,20 +702,95 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         cols["request_uuid"] = request_uuid
         cols["price_per_uom"] = price_per_uom
 
-        # Set optional fields
-        if batch_no:
-            cols["batch_no"] = batch_no
-        if "request_data" in kwargs:
-            cols["request_data"] = kwargs["request_data"]
-        if "subtotal_discount" in kwargs:
-            cols["subtotal_discount"] = kwargs["subtotal_discount"]
-        if "notes" in kwargs:
-            cols["notes"] = kwargs["notes"]
+        for optional_key in ["batch_no", "request_data", "pax_breakdown", "bundle_uuid", "bundle_label", "currency", "subtotal_native", "subtotal_discount", "notes"]:
+            if optional_key in kwargs:
+                cols[optional_key] = kwargs[optional_key]
 
-        # Auto-calculate subtotal and final_subtotal
-        cols["subtotal"] = float(cols["price_per_uom"]) * float(cols["qty"])
+        from .quote import get_quote as _get_parent_quote
+
+        try:
+            quote_model = _get_parent_quote(request_uuid, quote_uuid)
+        except Exception:
+            quote_model = None
+
+        from .provider_item import get_provider_item
+
+        provider_item = get_provider_item(
+            info.context.get("partition_key"), provider_item_uuid
+        )
+        availability = _enforce_availability(
+            info,
+            provider_item=provider_item,
+            provider_item_uuid=provider_item_uuid,
+            batch_no=batch_no,
+            qty=qty,
+            pax_breakdown=pax_breakdown,
+            service_start_at=kwargs.get("service_start_at"),
+            service_end_at=kwargs.get("service_end_at"),
+        )
+        if availability is not None:
+            cols["hold_token"] = availability.get("hold_token")
+            expires_at = availability.get("expires_at")
+            cols["hold_expires_at"] = (
+                pendulum.parse(expires_at) if isinstance(expires_at, str) else expires_at
+            )
+
+        # G5: apply Quote-locked FX rate. ``subtotal`` from tier pricing is in the
+        # native (supplier) currency. If the parent Quote was created with a
+        # ``fx_rate`` and a ``display_currency`` that differs from the native
+        # currency, convert. Otherwise display == native (procurement default).
+        subtotal_native_amount = subtotal
+
+        # Default the native currency from the parent Quote when the caller
+        # didn't provide one explicitly. Keeps existing procurement callers
+        # (no currency configured anywhere) working unchanged.
+        if "currency" not in cols and quote_model is not None:
+            quote_native_currency = getattr(quote_model, "currency", None)
+            if quote_native_currency:
+                cols["currency"] = quote_native_currency
+
+        native_currency = cols.get("currency")
+        subtotal_display = subtotal_native_amount
+
+        if quote_model is not None:
+            fx_rate = getattr(quote_model, "fx_rate", None)
+            display_currency = getattr(quote_model, "display_currency", None)
+            # FX applies only when all three are known and the currencies differ.
+            # Same-currency quotes (USD display + USD supplier) and unconfigured
+            # quotes (no fx_rate) both fall through to subtotal_display == native.
+            if (
+                fx_rate is not None
+                and display_currency
+                and native_currency
+                and display_currency != native_currency
+            ):
+                subtotal_display = subtotal_native_amount * float(fx_rate)
+
+        if "subtotal_native" not in cols:
+            cols["subtotal_native"] = subtotal_native_amount
+
+        # G6: snapshot the cancellation policy onto request_data so the quote
+        # carries the exact terms the customer was shown, even if the supplier
+        # later changes the policy. Skipped when no batch is pinned to the
+        # line, or when the batch has no cancellation_policy_uuid set
+        # (existing procurement behavior).
+        snapshot = _build_cancellation_snapshot(
+            info.context.get("partition_key"),
+            provider_item_uuid,
+            cols.get("batch_no"),
+        )
+        if snapshot is not None:
+            request_data = cols.get("request_data") or {}
+            if isinstance(request_data, dict):
+                # Preserve any caller-provided keys; never clobber existing data.
+                request_data.setdefault("cancellation_policy_snapshot", snapshot)
+                cols["request_data"] = request_data
+
+        # Auto-calculate subtotal and final_subtotal (both in DISPLAY currency)
         subtotal_discount = cols.get("subtotal_discount", 0)
-        cols["final_subtotal"] = cols["subtotal"] - subtotal_discount
+        final_subtotal = subtotal_display - subtotal_discount
+        cols["subtotal"] = subtotal_display
+        cols["final_subtotal"] = final_subtotal
 
         QuoteItemModel(
             quote_uuid,
@@ -529,6 +818,32 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         if "notes" in kwargs:
             actions.append(QuoteItemModel.notes.set(kwargs["notes"]))
 
+        if "bundle_uuid" in kwargs:
+            actions.append(
+                QuoteItemModel.bundle_uuid.set(
+                    None if kwargs["bundle_uuid"] == "null" else kwargs["bundle_uuid"]
+                )
+            )
+
+        if "bundle_label" in kwargs:
+            actions.append(
+                QuoteItemModel.bundle_label.set(
+                    None if kwargs["bundle_label"] == "null" else kwargs["bundle_label"]
+                )
+            )
+
+        if "currency" in kwargs:
+            actions.append(
+                QuoteItemModel.currency.set(
+                    None if kwargs["currency"] == "null" else kwargs["currency"]
+                )
+            )
+
+        if "pax_breakdown" in kwargs:
+            raise ValueError(
+                "pax_breakdown cannot be updated on an existing quote item without repricing"
+            )
+
         # Only allow updating discount
         if "subtotal_discount" in kwargs:
             subtotal_discount = (
@@ -543,6 +858,13 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
             discount = subtotal_discount if subtotal_discount is not None else 0
             final_subtotal = subtotal - discount
             actions.append(QuoteItemModel.final_subtotal.set(final_subtotal))
+
+        if "subtotal_native" in kwargs:
+            actions.append(
+                QuoteItemModel.subtotal_native.set(
+                    None if kwargs["subtotal_native"] == "null" else kwargs["subtotal_native"]
+                )
+            )
 
         # Update the quote item
         quote_item.update(actions=actions)
@@ -582,6 +904,7 @@ def delete_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> bool:
     request_uuid = kwargs.get("entity").request_uuid
     quote_uuid = kwargs.get("entity").quote_uuid
 
+    _release_availability_hold(info, kwargs.get("entity"))
     kwargs.get("entity").delete()
 
     # Update quote totals after deleting quote item

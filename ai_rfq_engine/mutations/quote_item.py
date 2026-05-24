@@ -6,7 +6,7 @@ __author__ = "bibow"
 import traceback
 from typing import Any, Dict
 
-from graphene import Boolean, Field, Mutation, String
+from graphene import Boolean, DateTime, Field, Mutation, String
 
 from silvaengine_utility import JSONCamelCase
 from silvaengine_utility import SafeFloat as Float
@@ -27,9 +27,16 @@ class InsertUpdateQuoteItem(Mutation):
         batch_no = String(required=False)
         request_uuid = String(required=False)
         request_data = JSONCamelCase(required=False)
+        pax_breakdown = JSONCamelCase(required=False)
+        bundle_uuid = String(required=False)
+        bundle_label = String(required=False)
         qty = Float(required=False)
         subtotal_discount = Float(required=False)
+        currency = String(required=False)
+        subtotal_native = Float(required=False)
         notes = String(required=False)
+        service_start_at = DateTime(required=False)
+        service_end_at = DateTime(required=False)
         updated_by = String(required=True)
 
     @staticmethod
