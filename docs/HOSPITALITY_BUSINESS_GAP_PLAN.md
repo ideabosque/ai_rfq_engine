@@ -792,29 +792,29 @@ sequenceDiagram
     participant catalog_inquiry_query
     participant catalog_registry
     participant external_system_config
-    participant neo4j_handler
-    participant Neo4j
+    participant catalog_handler
+    participant External_Catalog
 
-    AI_Agent->>schema: inquire_catalog
+    AI_Agent->>schema: inquireCatalog
     schema->>catalog_inquiry_query: resolve_inquire_catalog
     catalog_inquiry_query->>catalog_registry: dispatch_inquire
-    catalog_registry->>external_system_config: resolve_external_system_model_for system_kind catalog_inquiry
+    catalog_registry->>external_system_config: resolve catalog inquiry config
     external_system_config-->>catalog_registry: config row or None
     Note over catalog_registry: None raises NotConfiguredError
-    catalog_registry->>external_system_config: resolve_credential_for
-    Note over external_system_config: ref via backend wins;<br/>inline value only when flag enabled
-    external_system_config-->>catalog_registry: credential or None
-    Note over catalog_registry: missing credential with auth_strategy not none<br/>raises AuthUnavailableError
-    catalog_registry->>catalog_registry: get_handler adapter_id
+    catalog_registry->>catalog_registry: get registered handler
     Note over catalog_registry: unregistered adapter raises NotConfiguredError
-    catalog_registry->>neo4j_handler: inquire reference config credential query
-    neo4j_handler->>Neo4j: external query
-    Neo4j-->>neo4j_handler: matching nodes
-    neo4j_handler-->>catalog_registry: CatalogResponse envelope
-    Note over neo4j_handler: timeout raises SystemTimeoutError;<br/>missing node raises UnknownNodeError
+    catalog_registry->>external_system_config: resolve credential
+    Note over external_system_config: Secret ref wins and inline secret requires local test flag
+    external_system_config-->>catalog_registry: credential or None
+    Note over catalog_registry: Required missing credential raises AuthUnavailableError
+    catalog_registry->>catalog_handler: inquire with reference and query
+    catalog_handler->>External_Catalog: adapter-specific inquiry
+    External_Catalog-->>catalog_handler: matching content or node data
+    catalog_handler-->>catalog_registry: CatalogResponse envelope
+    Note over catalog_handler: Timeout or unknown node raises structured error
     catalog_registry-->>catalog_inquiry_query: envelope
     catalog_inquiry_query-->>schema: CatalogInquiryResultType
-    Note over catalog_inquiry_query: CatalogHandlerError caught and<br/>returned in band as error_code
+    Note over catalog_inquiry_query: CatalogHandlerError becomes error_code
     schema-->>AI_Agent: result
 ```
 
@@ -826,12 +826,12 @@ sequenceDiagram
 | `catalog_inquiry_query` | [ai_rfq_engine/queries/catalog_inquiry.py](../ai_rfq_engine/queries/catalog_inquiry.py) — `resolve_inquire_catalog`; wraps dispatcher errors into in-band fields |
 | `catalog_registry` | [ai_rfq_engine/handlers/catalog/registry.py](../ai_rfq_engine/handlers/catalog/registry.py) — `dispatch_inquire`, registry lookup |
 | `external_system_config` | [ai_rfq_engine/models/external_system_config.py](../ai_rfq_engine/models/external_system_config.py) — `resolve_external_system_model_for`, `resolve_credential_for` |
-| `neo4j_handler` | placeholder for the registered catalog handler (currently `stub_handler`; real Neo4j handler is a follow-on deliverable) |
-| `Neo4j` | external catalog system |
+| `catalog_handler` | the registered adapter selected by `adapter_id` or `system_code` (currently `stub_handler`; real Neo4j handler is a follow-on deliverable) |
+| `External_Catalog` | external catalog system for a real adapter; omitted by the deterministic stub |
 
 ##### `resolve_check_availability` (G3)
 
-Same dispatch shape as `inquire_catalog`, but routed through `handlers/availability/registry.py` with `system_kind="availability"`. The registry also exposes `dispatch_acquire_hold`, `dispatch_release_hold`, and `dispatch_confirm_hold` for the hold lifecycle invoked from `insert_update_quote_item` and `delete_quote_item`; the diagram below traces the GraphQL-exposed `check` operation specifically.
+Same dispatch shape as `inquire_catalog`, but routed through `handlers/availability/registry.py` with `system_kind="availability"`. `checkAvailability` is read-only. The public hold operations are `acquireAvailabilityHold`, `releaseAvailabilityHold`, and `confirmAvailabilityHold` mutations; internally, quote creation dispatches acquisition for a required hold, quote-item deletion dispatches release, and transition of a quote to `accepted` dispatches confirmation. The diagram below traces the read-only query specifically.
 
 ```mermaid
 sequenceDiagram
@@ -841,29 +841,29 @@ sequenceDiagram
     participant availability_query
     participant availability_registry
     participant external_system_config
-    participant pms_handler
-    participant PMS
+    participant availability_handler
+    participant Reservation_System
 
-    AI_Agent->>schema: check_availability
+    AI_Agent->>schema: checkAvailability
     schema->>availability_query: resolve_check_availability
     availability_query->>availability_registry: dispatch_check
-    availability_registry->>external_system_config: resolve_external_system_model_for system_kind availability
+    availability_registry->>external_system_config: resolve availability config
     external_system_config-->>availability_registry: config row or None
     Note over availability_registry: None raises NotConfiguredError
-    availability_registry->>external_system_config: resolve_credential_for
-    external_system_config-->>availability_registry: credential or None
-    Note over availability_registry: missing credential with auth_strategy not none<br/>raises AuthUnavailableError
-    availability_registry->>availability_registry: get_handler adapter_id
+    availability_registry->>availability_registry: get registered handler
     Note over availability_registry: unregistered adapter raises NotConfiguredError
-    availability_registry->>pms_handler: check request config credential
-    pms_handler->>PMS: capacity query for service window
-    PMS-->>pms_handler: capacity and optional hold token
-    pms_handler-->>availability_registry: AvailabilityResponse envelope
-    Note over pms_handler: timeout raises SystemTimeoutError;<br/>unsupported op raises OperationUnsupportedError
+    availability_registry->>external_system_config: resolve credential
+    external_system_config-->>availability_registry: credential or None
+    Note over availability_registry: Required missing credential raises AuthUnavailableError
+    availability_registry->>availability_handler: check capacity
+    availability_handler->>Reservation_System: read-only capacity query for service window
+    Reservation_System-->>availability_handler: capacity result
+    availability_handler-->>availability_registry: AvailabilityResponse envelope
+    Note over availability_handler: Check is read only and may raise timeout
     availability_registry-->>availability_query: envelope
     availability_query-->>schema: AvailabilityResultType
-    Note over availability_query: AvailabilityHandlerError caught and<br/>returned in band as error_code
-    schema-->>AI_Agent: result with available hold_token expires_at
+    Note over availability_query: AvailabilityHandlerError becomes error_code
+    schema-->>AI_Agent: result with available and no acquired hold
 ```
 
 **Participant key**
@@ -874,15 +874,15 @@ sequenceDiagram
 | `availability_query` | [ai_rfq_engine/queries/availability.py](../ai_rfq_engine/queries/availability.py) — `resolve_check_availability`; wraps dispatcher errors into in-band fields |
 | `availability_registry` | [ai_rfq_engine/handlers/availability/registry.py](../ai_rfq_engine/handlers/availability/registry.py) — `dispatch_check` (also `dispatch_acquire_hold`, `dispatch_release_hold`, `dispatch_confirm_hold` for the hold lifecycle) |
 | `external_system_config` | same module as G7b — `system_kind="availability"` is the only difference in resolution |
-| `pms_handler` | placeholder for the registered availability handler (currently `stub_handler`; real PMS/GDS handler is a follow-on deliverable) |
-| `PMS` | external reservation system (Opera, Cloudbeds, Amadeus GDS, etc.) |
+| `availability_handler` | the registered availability adapter selected by `adapter_id` or `system_code` (currently `stub_handler`; real PMS/GDS handler is a follow-on deliverable) |
+| `Reservation_System` | external reservation system for a real adapter; omitted by the deterministic stub |
 
 **Notes on operation symmetry between the two resolvers**
 
 - Both call `resolve_external_system_model_for` with different `system_kind` values; the G7c `system_kind="both"` fallback works identically for either resolver.
 - Both invoke `resolve_credential_for` and apply the same `auth_unavailable` rule when `auth_strategy != "none"`.
 - Both translate handler-raised `*HandlerError` subclasses into in-band `error_code` fields rather than GraphQL errors — callers branch on the code, not on exception text.
-- `resolve_check_availability` additionally populates `available`, `hold_token`, and `expires_at` in the success envelope; the hold-lifecycle dispatchers (acquire / release / confirm) reuse the same `_dispatch` machinery and are invoked from `insert_update_quote_item` and `delete_quote_item` rather than exposed as standalone GraphQL queries.
+- `resolve_check_availability` additionally populates the read-only `available` result; it does not acquire a `hold_token`. `acquireAvailabilityHold`, `releaseAvailabilityHold`, and `confirmAvailabilityHold` are explicit GraphQL mutations that reuse the same `_dispatch` machinery; the quote workflow invokes the corresponding dispatchers during quote-item creation, quote-item deletion, and acceptance respectively.
 
 ### Hardening + cross-vertical pilot
 
