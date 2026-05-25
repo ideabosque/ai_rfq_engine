@@ -69,18 +69,22 @@ class SegmentContactModel(BaseModel):
 class ItemModel(BaseModel):
     table_name = "are-items"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     item_uuid = UnicodeAttribute(range_key=True)
+    endpoint_id = UnicodeAttribute()
+    part_id = UnicodeAttribute()
     item_type = UnicodeAttribute()
     item_name = UnicodeAttribute()
     item_description = UnicodeAttribute(null=True)
-    uom = UnicodeAttribute()  # Unit of Measure (e.g., "pieces", "kg")
+    pricing_mode = UnicodeAttribute(null=True)   # unit, per_pax_type, or occupancy
+    uom = UnicodeAttribute()
     item_external_id = UnicodeAttribute(null=True)
 ```
 
 **Role in Pricing**:
 - The **base entity** for all pricing operations
 - Defines the Unit of Measure (UOM) which is essential for per-unit pricing calculations
+- `pricing_mode` determines how line pricing is calculated (`unit`, `per_pax_type`, or `occupancy`)
 - Acts as the **parent key** in pricing tier configurations
 - Each item can have multiple pricing tiers and discount rules depending on segment and provider
 - No direct pricing fields, but all pricing data is indexed by `item_uuid`
@@ -102,13 +106,14 @@ class ItemModel(BaseModel):
 class ProviderItemModel(BaseModel):
     table_name = "are-provider_items"
 
-    endpoint_id = UnicodeAttribute(hash_key=True)
+    partition_key = UnicodeAttribute(hash_key=True)
     provider_item_uuid = UnicodeAttribute(range_key=True)
     item_uuid = UnicodeAttribute()                          # Foreign key to Item
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
-    provider_item_external_id = UnicodeAttribute(null=True)
+    provider_item_external_id = UnicodeAttribute(null=True)  # External ID
     base_price_per_uom = NumberAttribute()                 # KEY PRICING FIELD
     item_spec = MapAttribute(null=True)                    # Additional specs
+    availability_mode = UnicodeAttribute(default="none")   # none, check_only, require_hold
 ```
 
 **Core Pricing Responsibility**:
@@ -116,6 +121,7 @@ class ProviderItemModel(BaseModel):
 - **Base Price**: `base_price_per_uom` is the foundational price per unit
 - Acts as the default guardrail price when no batches are available
 - Used as the parent key for item price tiers (per-provider pricing variations)
+- **Availability Mode**: `availability_mode` controls whether quote items require availability checks or holds (`none`, `check_only`, `require_hold`)
 
 **Key Relationships**:
 ```
@@ -154,9 +160,13 @@ class ProviderItemBatchModel(BaseModel):
     provider_item_uuid = UnicodeAttribute(hash_key=True)
     batch_no = UnicodeAttribute(range_key=True)
     item_uuid = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
     expired_at = UTCDateTimeAttribute()
     produced_at = UTCDateTimeAttribute()
+
+    # Service-dated inventory (hospitality)
+    service_start_at = UTCDateTimeAttribute(null=True)     # Start of service window
+    service_end_at = UTCDateTimeAttribute(null=True)       # End of service window
 
     # Cost Components
     cost_per_uom = NumberAttribute()
@@ -171,6 +181,11 @@ class ProviderItemBatchModel(BaseModel):
     # Inventory Status
     slow_move_item = BooleanAttribute(default=False)
     in_stock = BooleanAttribute(default=True)
+    availability_qty = NumberAttribute(null=True)          # Remaining bookable units
+
+    # Hospitality fields
+    currency = UnicodeAttribute(null=True)                  # Batch-level currency
+    cancellation_policy_uuid = UnicodeAttribute(null=True) # Referenced policy for this batch
 ```
 
 **Batch Pricing Calculations**:
@@ -201,7 +216,22 @@ cols["guardrail_price_per_uom"] = cols["total_cost_per_uom"] * (
 **Batch Status Tracking**:
 - `slow_move_item`: Flag for slow-moving inventory (potential dynamic pricing)
 - `in_stock`: Availability indicator
+- `availability_qty`: Remaining bookable units (null means unquantified/infinite)
 - `expired_at` / `produced_at`: Temporal tracking for freshness
+- `service_start_at` / `service_end_at`: Service-dated inventory window (hospitality)
+- `currency`: Batch-level currency for hospitality multi-currency scenarios
+- `cancellation_policy_uuid`: Links to cancellation terms for this batch
+
+**Service Window Overlap Filter**:
+
+`ProviderItemBatch` list queries accept `service_window_start` and `service_window_end` parameters to find batches whose service dates overlap a requested window. The filter applies:
+
+```
+batch.service_start_at < service_window_end
+and batch.service_end_at > service_window_start
+```
+
+Procurement batches without service dates remain unaffected.
 
 **Role in Pricing**:
 - Provides **detailed cost breakdown** at the batch level
@@ -225,7 +255,7 @@ class ItemPriceTierModel(BaseModel):
     item_price_tier_uuid = UnicodeAttribute(range_key=True)
     provider_item_uuid = UnicodeAttribute()                # Which provider
     segment_uuid = UnicodeAttribute()                      # Which segment
-    endpoint_id = UnicodeAttribute()
+    partition_key = UnicodeAttribute()
 
     # Tier Range Definition
     quantity_greater_then = NumberAttribute()              # Lower bound (inclusive)
@@ -234,6 +264,12 @@ class ItemPriceTierModel(BaseModel):
     # Pricing Options (Tier can use either approach)
     margin_per_uom = NumberAttribute(null=True)            # Margin to apply to batch costs
     price_per_uom = NumberAttribute(null=True)             # Direct fixed price
+    pax_type = UnicodeAttribute(null=True)                  # PAX category for per_pax_type mode
+    currency = UnicodeAttribute(null=True)                  # Tier-level currency
+
+    # Occupancy mode fields
+    base_occupancy = MapAttribute(null=True)                # {pax_type: count}
+    extra_pax_surcharges = MapAttribute(null=True)          # {pax_type: surcharge}
 
     status = UnicodeAttribute(default="in_review")
 ```
@@ -421,24 +457,31 @@ class QuoteItemModel(BaseModel):
     quote_item_uuid = UnicodeAttribute(range_key=True)
     provider_item_uuid = UnicodeAttribute()
     item_uuid = UnicodeAttribute()
-    batch_no = UnicodeAttribute(null=True)
+    batch_no = UnicodeAttribute(null=True)          # Pinned service-dated batch
     request_uuid = UnicodeAttribute()
-    endpoint_id = UnicodeAttribute()
-    request_data = MapAttribute(null=True)
+    partition_key = UnicodeAttribute()
+    request_data = MapAttribute(null=True)          # Includes cancellation_policy_snapshot
 
     # Pricing Fields (calculated at creation)
-    price_per_uom = NumberAttribute()          # From tier lookup
-    qty = NumberAttribute()
-    subtotal = NumberAttribute()               # price_per_uom * qty
-    subtotal_discount = NumberAttribute(null=True)  # Applied discount amount
-    final_subtotal = NumberAttribute()         # subtotal - discount
+    price_per_uom = NumberAttribute()               # From tier lookup
+    qty = NumberAttribute()                         # UOM units (room-nights, etc.)
+    pax_breakdown = MapAttribute(null=True)          # {pax_type: count}
+    bundle_uuid = UnicodeAttribute(null=True)        # Itinerary bundle grouping
+    bundle_label = UnicodeAttribute(null=True)       # Human-readable bundle name
+    subtotal = NumberAttribute()                     # Display-currency subtotal
+    subtotal_discount = NumberAttribute(null=True)   # Applied discount amount
+    final_subtotal = NumberAttribute()               # subtotal - discount (display)
+    currency = UnicodeAttribute(null=True)            # Native (supplier) currency
+    subtotal_native = NumberAttribute(null=True)      # Original subtotal in native currency
+    hold_token = UnicodeAttribute(null=True)          # Availability hold reference
+    hold_expires_at = UTCDateTimeAttribute(null=True) # Hold TTL
 ```
 
 **Quote Item Creation Logic**:
 
-See [ai_rfq_engine/models/quote_item.py:247-312](../ai_rfq_engine/models/quote_item.py#L247-L312)
+See [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py)
 
-When creating a quote item:
+When creating a quote item, the pricing mode on the parent `Item` determines the calculation path:
 
 ```python
 def insert_update_quote_item(info: ResolveInfo, **kwargs):
@@ -450,18 +493,12 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs):
         provider_item_uuid = kwargs.get("provider_item_uuid")
         batch_no = kwargs.get("batch_no")
 
-        # Get price from tiers
-        price_per_uom = get_price_per_uom(
-            info, item_uuid, qty, segment_uuid,
-            provider_item_uuid, batch_no
-        )
+        # Pricing mode determines calculation path
+        item = get_item(partition_key, item_uuid)
+        pricing_mode = getattr(item, "pricing_mode", None) or "unit"
+        pax_breakdown = kwargs.get("pax_breakdown")
 
-        if price_per_uom is None:
-            raise ValueError("No price tier found")
-
-        # Auto-calculate totals
-        cols["subtotal"] = float(price_per_uom) * float(qty)
-        subtotal_discount = cols.get("subtotal_discount", 0)
+        # ... pricing calculation per mode (see Hospitality Pricing section)
         cols["final_subtotal"] = cols["subtotal"] - subtotal_discount
 
         QuoteItemModel(...).save()
@@ -478,6 +515,142 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs):
 
 ---
 
+### 7a. Hospitality Pricing Modes
+
+**File**: [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py)
+
+The `Item.pricing_mode` field controls how `insert_update_quote_item` calculates line pricing. Three modes are supported:
+
+#### Unit Mode (`"unit"` or `null`)
+
+Default procurement pricing. The `qty` field represents the number of UOM units and pricing follows the standard tier lookup:
+
+```
+price_per_uom = get_price_per_uom(item_uuid, qty, segment_uuid, provider_item_uuid, batch_no)
+subtotal = price_per_uom * qty
+```
+
+Used for: generic procurement items, unit-priced add-ons, and legacy items.
+
+#### Per-PAX-Type Mode (`"per_pax_type"`)
+
+Each participant category (adult, child, infant, etc.) has its own price tier. The `pax_breakdown` map is required:
+
+```python
+pax_breakdown = {"adult": 3, "child": 2}  # caller-provided
+qty = 5  # must equal sum(pax_breakdown.values())
+
+subtotal = sum(pax_breakdown[ptype] * get_price_per_uom(..., pax_type=ptype) for ptype in pax_breakdown)
+price_per_uom = subtotal / qty  # blended average per-UOM rate
+```
+
+Tier selection uses `legacy_pax_only=False` and a `pax_type` filter. Used for: tickets, meals, transfers, delegate fees.
+
+#### Occupancy Mode (`"occupancy"`)
+
+Lodging-style pricing where one base rate covers guests up to `base_occupancy`, and extra guests incur per-guest surcharges. `qty` is the number of billable units (e.g., room-nights), **not** guest count.
+
+```python
+pax_breakdown = {"adult": 2, "child": 1}
+tier = _get_occupancy_pricing_tier(item_uuid, qty, segment_uuid, provider_item_uuid)
+base_rate = tier.price_per_uom
+base_occupancy = {"adult": 2}  # from tier.base_occupancy
+extra_pax_surcharges = {"adult": 50.0, "child": 25.0}  # from tier.extra_pax_surcharges
+
+per_uom_surcharge = sum(
+    max(0, count - base_occupancy.get(pt, 0)) * extra_pax_surcharges.get(pt, 0)
+    for pt, count in pax_breakdown.items()
+)
+price_per_uom = base_rate + per_uom_surcharge
+subtotal = price_per_uom * qty
+```
+
+The occupancy tier is selected with `legacy_pax_only=True` (no `pax_type` filter). Used for: hotel room-nights, accommodation, table-seatings.
+
+#### Occupancy Tier Fields on ItemPriceTier
+
+`ItemPriceTier` supports two additional MapAttribute fields for occupancy mode:
+
+- **`base_occupancy`** (`MapAttribute`): `{pax_type: count}` — number of guests of each type included in the base rate.
+- **`extra_pax_surcharges`** (`MapAttribute`): `{pax_type: price_per_extra}` — surcharge per extra guest beyond base occupancy.
+
+---
+
+### 7b. FX Rate and Currency Conversion
+
+**Files**: [ai_rfq_engine/models/quote.py](../ai_rfq_engine/models/quote.py), [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py)
+
+When a `Quote` has a locked FX rate, line subtotals are stored in both native (supplier) and display currencies:
+
+```python
+# Quote fields governing FX behaviour:
+# currency (native), display_currency, fx_rate, fx_rate_locked_at
+
+subtotal_native_amount = subtotal  # computed by pricing mode
+subtotal_display = subtotal_native_amount
+
+if fx_rate and display_currency and native_currency and display_currency != native_currency:
+    subtotal_display = subtotal_native_amount * float(fx_rate)
+
+# Stored on QuoteItem:
+#   subtotal_native := subtotal_native_amount (supplier currency)
+#   subtotal         := subtotal_display (customer-facing currency)
+#   currency         := native_currency (defaulted from Quote)
+#   final_subtotal   := subtotal_display - subtotal_discount
+```
+
+The `FxRateModel` (`are-fx_rates` table) stores currency pair rates with a `currency_pair_date` LSI for time-based lookups.
+
+---
+
+### 7c. Cancellation Policy Snapshot
+
+**File**: [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py) — `_build_cancellation_snapshot`
+
+When a quote item pins a `batch_no` whose batch references a `cancellation_policy_uuid`, the engine fetches the `CancellationPolicyModel` and adds a snapshot to `request_data.cancellation_policy_snapshot`:
+
+```python
+snapshot = _build_cancellation_snapshot(partition_key, provider_item_uuid, batch_no)
+# snapshot = {
+#     "policy_uuid": ...,
+#     "label": ...,
+#     "description": ...,
+#     "tiers": ...,
+#     "notes_template_uuid": ...,
+#     "snapshotted_at": "2026-05-24T12:00:00Z"
+# }
+if "cancellation_policy_snapshot" in request_data:
+    raise ValueError("request_data.cancellation_policy_snapshot is engine-owned")
+if snapshot is not None:
+    request_data["cancellation_policy_snapshot"] = snapshot
+```
+
+`request_data.cancellation_policy_snapshot` is engine-owned: caller input containing this reserved key is rejected, and an existing generated snapshot cannot be edited through quote-item update. This prevents substitution of terms for a batch-linked policy.
+
+---
+
+### 7d. Availability and Hold Lifecycle
+
+**Files**: [ai_rfq_engine/handlers/availability/handler.py](../ai_rfq_engine/handlers/availability/handler.py), [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py)
+
+`ProviderItem.availability_mode` (default `"none"`) governs whether availability is enforced:
+
+| Mode | Behavior |
+|---|---|
+| `none` | Persist the quote item without an availability check |
+| `check_only` | Require an available response before persisting |
+| `require_hold` | Require quantified capacity and persist an atomic capacity reservation before persisting |
+
+The availability handler resolves availability from `ProviderItemBatch` data locally. Lifecycle hooks:
+
+- **Create**: `_enforce_availability` — dispatches `check` or `acquire_hold` depending on mode.
+- **Delete**: `_release_availability_hold` — dispatches `release_hold` for any held item.
+- **Accept**: `_confirm_quote_item_holds` — dispatches `confirm_hold` for every held item when the quote transitions to `accepted`.
+
+Hold tokens identify durable `AvailabilityHoldModel` rows with a 15-minute expiration. Acquisition conditionally decrements `ProviderItemBatch.availability_qty` in the same transaction as hold creation; release and explicit expiry restore capacity once; confirmation changes hold status without decrementing again. Deployment must invoke expiry handling for abandoned held rows.
+
+---
+
 ### 8. Quote Model
 
 **File**: [ai_rfq_engine/models/quote.py](../ai_rfq_engine/models/quote.py)
@@ -491,14 +664,24 @@ class QuoteModel(BaseModel):
     request_uuid = UnicodeAttribute(hash_key=True)
     quote_uuid = UnicodeAttribute(range_key=True)
     provider_corp_external_id = UnicodeAttribute(default="XXXXXXXXXXXXXXXXXXXX")
+    sales_rep_email = UnicodeAttribute(null=True)
+    partition_key = UnicodeAttribute()
 
     # Pricing Totals (aggregated from quote items)
+    shipping_method = UnicodeAttribute(null=True)
     shipping_amount = NumberAttribute(default=0)
     total_quote_amount = NumberAttribute(default=0)           # Sum of subtotals
     total_quote_discount = NumberAttribute(default=0)         # Sum of discounts
     final_total_quote_amount = NumberAttribute(default=0)    # Items + shipping
 
+    # Hospitality FX fields
+    currency = UnicodeAttribute(null=True)                    # Native (supplier) currency
+    display_currency = UnicodeAttribute(null=True)            # Customer-facing currency
+    fx_rate = NumberAttribute(null=True)                      # Locked exchange rate
+    fx_rate_locked_at = UTCDateTimeAttribute(null=True)       # When the rate was locked
+
     rounds = NumberAttribute(default=0)
+    notes = UnicodeAttribute(null=True)
     status = UnicodeAttribute(default="initial")
 ```
 
@@ -542,9 +725,17 @@ def update_quote_totals(info: ResolveInfo, request_uuid: str, quote_uuid: str):
 
 **Quote Calculation Flow**:
 ```
-Quote Total = SUM(QuoteItem.subtotal) + shipping_amount
-Quote Discount = SUM(QuoteItem.subtotal_discount)
-Final Total = SUM(QuoteItem.final_subtotal) + shipping_amount
+# Per quote item (hospitality-aware):
+subtotal_native = price_per_uom * qty               # in supplier currency
+subtotal_display = subtotal_native * fx_rate        # in display currency (if different)
+subtotal = subtotal_display                         # stored as display-currency subtotal
+subtotal_native = subtotal_native                   # stored as native-currency subtotal
+final_subtotal = subtotal - subtotal_discount       # display currency
+
+# Quote aggregates (display currency):
+Quote Total = SUM(quote_items.subtotal) + shipping_amount
+Quote Discount = SUM(quote_items.subtotal_discount)
+Final Total = SUM(quote_items.final_subtotal) + shipping_amount
 ```
 
 ---
@@ -1696,6 +1887,10 @@ The pricing system is a **sophisticated multi-tier architecture** that:
 7. **Scales efficiently** through batch loaders and caching
 8. **Maintains referential integrity** through deletion constraints
 9. **Supports AI-driven discount prompts** with flexible scoping and priority-based conflict resolution
+10. **Supports hospitality pricing modes** — unit (procurement), per_pax_type (tickets/meals), and occupancy (room-nights)
+11. **Implements quote-level FX conversion** with locked rates and native/display currency tracking
+12. **Protects cancellation-policy snapshots** as engine-owned quoted terms
+13. **Provides durable local availability holds** with transactional capacity reservation and restoration
 
 The system prioritizes:
 - **Efficiency** through database-level tier matching

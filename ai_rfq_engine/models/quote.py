@@ -269,11 +269,6 @@ def _confirm_quote_item_holds(info: ResolveInfo, quote: Any) -> None:
             continue
         dispatch_confirm_hold(
             info,
-            system_code=provider_item.availability_system_code,
-            namespace=getattr(provider_item, "availability_namespace", None) or "DEFAULT",
-            provider_corp_external_id=getattr(
-                provider_item, "provider_corp_external_id", None
-            ),
             provider_item_uuid=quote_item.provider_item_uuid,
             batch_no=getattr(quote_item, "batch_no", None),
             hold_token=hold_token,

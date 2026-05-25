@@ -33,6 +33,7 @@ class InsertUpdateProviderItemBatch(Mutation):
         guardrail_margin_per_uom = Float(required=False)
         slow_move_item = Boolean(required=False)
         in_stock = Boolean(required=False)
+        availability_qty = Float(required=False)
         currency = String(required=False)
         cancellation_policy_uuid = String(required=False)
         updated_by = String(required=True)

@@ -25,10 +25,6 @@ from .mutations.cancellation_policy import (
     DeleteCancellationPolicy,
     InsertUpdateCancellationPolicy,
 )
-from .mutations.external_system_config import (
-    DeleteExternalSystemConfig,
-    InsertUpdateExternalSystemConfig,
-)
 from .mutations.fx_rate import DeleteFxRate, InsertUpdateFxRate
 from .mutations.item_catalog_ref import (
     DeleteItemCatalogRef,
@@ -56,6 +52,7 @@ from .queries.cancellation_policy import (
 from .mutations.availability import (
     AcquireAvailabilityHold,
     ConfirmAvailabilityHold,
+    ExpireAvailabilityHold,
     ReleaseAvailabilityHold,
 )
 from .queries.availability import resolve_check_availability
@@ -66,11 +63,6 @@ from .queries.discount_prompt import (
 )
 from .queries.file import resolve_file, resolve_file_list
 from .queries.catalog_inquiry import resolve_inquire_catalog
-from .queries.external_system_config import (
-    resolve_external_system_config,
-    resolve_external_system_config_list,
-    resolve_external_system_for,
-)
 from .queries.fx_rate import resolve_fx_rate, resolve_fx_rate_list
 from .queries.item_catalog_ref import (
     find_item_catalog_refs,
@@ -104,10 +96,6 @@ from .types.cancellation_policy import (
 from .types.availability import AvailabilityResultType
 from .types.catalog_inquiry import CatalogInquiryResultType
 from .types.discount_prompt import DiscountPromptListType, DiscountPromptType
-from .types.external_system_config import (
-    ExternalSystemConfigListType,
-    ExternalSystemConfigType,
-)
 from .types.fx_rate import FxRateListType, FxRateType
 from .types.item_catalog_ref import ItemCatalogRefListType, ItemCatalogRefType
 from .types.file import FileListType, FileType
@@ -134,8 +122,6 @@ def type_class():
         CatalogInquiryResultType,
         DiscountPromptType,
         DiscountPromptListType,
-        ExternalSystemConfigType,
-        ExternalSystemConfigListType,
         FxRateType,
         FxRateListType,
         ItemCatalogRefType,
@@ -454,7 +440,6 @@ class Query(ObjectType):
         ItemCatalogRefListType,
         page_number=Int(required=False),
         limit=Int(required=False),
-        system_code=String(required=False),
         namespace=String(required=False),
         item_uuid=String(required=False),
         status=String(required=False),
@@ -462,49 +447,20 @@ class Query(ObjectType):
 
     item_catalog_refs = List(
         ItemCatalogRefType,
-        system_code=String(required=True),
         namespace=String(required=False),
         node_ids=List(String, required=True),
         status=String(required=False),
     )
 
-    external_system_config = Field(
-        ExternalSystemConfigType,
-        config_uuid=String(required=True),
-    )
-
-    external_system_config_list = Field(
-        ExternalSystemConfigListType,
-        page_number=Int(required=False),
-        limit=Int(required=False),
-        system_code=String(required=False),
-        system_kind=String(required=False),
-        namespace=String(required=False),
-        status=String(required=False),
-    )
-
-    resolved_external_system_config = Field(
-        ExternalSystemConfigType,
-        system_code=String(required=True),
-        system_kind=String(required=True),
-        namespace=String(required=False),
-        provider_corp_external_id=String(required=False),
-    )
-
     inquire_catalog = Field(
         CatalogInquiryResultType,
-        system_code=String(required=True),
         namespace=String(required=False),
         node_id=String(required=False),
-        provider_corp_external_id=String(required=False),
         query=JSONCamelCase(required=False),
     )
 
     check_availability = Field(
         AvailabilityResultType,
-        system_code=String(required=True),
-        namespace=String(required=False),
-        provider_corp_external_id=String(required=False),
         provider_item_uuid=String(required=True),
         batch_no=String(required=False),
         service_start_at=DateTime(required=True),
@@ -681,21 +637,6 @@ class Query(ObjectType):
     ) -> List_Type[ItemCatalogRefType]:
         return find_item_catalog_refs(info, **kwargs)
 
-    def resolve_external_system_config(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ExternalSystemConfigType | None:
-        return resolve_external_system_config(info, **kwargs)
-
-    def resolve_external_system_config_list(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ExternalSystemConfigListType:
-        return resolve_external_system_config_list(info, **kwargs)
-
-    def resolve_resolved_external_system_config(
-        self, info: ResolveInfo, **kwargs: Dict[str, Any]
-    ) -> ExternalSystemConfigType | None:
-        return resolve_external_system_for(info, **kwargs)
-
     def resolve_inquire_catalog(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
     ) -> CatalogInquiryResultType:
@@ -711,6 +652,7 @@ class Mutations(ObjectType):
     acquire_availability_hold = AcquireAvailabilityHold.Field()
     release_availability_hold = ReleaseAvailabilityHold.Field()
     confirm_availability_hold = ConfirmAvailabilityHold.Field()
+    expire_availability_hold = ExpireAvailabilityHold.Field()
     insert_update_cancellation_policy = InsertUpdateCancellationPolicy.Field()
     delete_cancellation_policy = DeleteCancellationPolicy.Field()
     insert_update_item = InsertUpdateItem.Field()
@@ -741,5 +683,3 @@ class Mutations(ObjectType):
     delete_fx_rate = DeleteFxRate.Field()
     insert_update_item_catalog_ref = InsertUpdateItemCatalogRef.Field()
     delete_item_catalog_ref = DeleteItemCatalogRef.Field()
-    insert_update_external_system_config = InsertUpdateExternalSystemConfig.Field()
-    delete_external_system_config = DeleteExternalSystemConfig.Field()

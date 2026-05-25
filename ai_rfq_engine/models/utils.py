@@ -13,9 +13,9 @@ from ..utils.normalization import normalize_to_json
 
 
 def initialize_tables(logger: logging.Logger) -> None:
+    from .availability_hold import AvailabilityHoldModel
     from .cancellation_policy import CancellationPolicyModel
     from .discount_prompt import DiscountPromptModel
-    from .external_system_config import ExternalSystemConfigModel
     from .file import FileModel
     from .fx_rate import FxRateModel
     from .installment import InstallmentModel
@@ -31,9 +31,9 @@ def initialize_tables(logger: logging.Logger) -> None:
     from .segment_contact import SegmentContactModel
 
     models: List = [
+        AvailabilityHoldModel,
         CancellationPolicyModel,
         DiscountPromptModel,
-        ExternalSystemConfigModel,
         FileModel,
         FxRateModel,
         InstallmentModel,

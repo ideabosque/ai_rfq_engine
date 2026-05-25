@@ -370,7 +370,7 @@ class TestHospitalityPilotHotelRoomNight:
         assert "service_window_start" in availability_args
         assert "service_window_end" in availability_args
         assert "item_catalog_refs" in query_fields
-        assert "resolved_external_system_config" in query_fields
+        assert "inquire_catalog" in query_fields
 
     @pytest.mark.unit
     def test_service_window_validation_rejects_inverted_dates(self):

@@ -8,6 +8,10 @@
 
 The AI RFQ Engine is a sophisticated GraphQL-based Request for Quote (RFQ) management system designed for B2B procurement workflows. Built on AWS Serverless architecture (Lambda + DynamoDB), it provides a comprehensive data model for managing items, providers, quotes, and complex pricing rules. The engine is currently migrating to a **lazy-loading nested resolver pattern** with **batch loading optimization** to deliver high-performance, flexible query capabilities.
 
+### Hospitality Readiness Note (Reviewed 2026-05-24)
+
+Hospitality-shaped modeling and calculation are present in this working tree: service-dated batches, PAX and occupancy pricing, bundle grouping, FX fields, engine-owned cancellation-policy snapshots, catalog mapping, and durable local availability holds. `require_hold` now writes a tenant-scoped hold and reserves quantified capacity transactionally; release and explicit expiry restore it once. Production rollout still requires DynamoDB-backed contention validation and configured expiry invocation for abandoned holds. See [HOSPITALITY_BUSINESS_GAP_PLAN.md](HOSPITALITY_BUSINESS_GAP_PLAN.md) and [HOSPITALITY_QUICK_START.md](HOSPITALITY_QUICK_START.md).
+
 ### 📊 Project Progress Overview
 
 ```
@@ -124,8 +128,18 @@ graph TD
 - `request_uuid` (Hash Key): Parent request
 - `quote_uuid` (Range Key): Unique identifier
 - `provider_corp_external_id`: Provider identifier (indexed)
+- `sales_rep_email`: Sales representative email
+- `shipping_method`: Shipping method
+- `shipping_amount`: Shipping amount
 - `total_quote_amount`: Total amount (auto-calculated)
+- `total_quote_discount`: Total discount (auto-calculated)
 - `final_total_quote_amount`: Final amount with shipping (auto-calculated)
+- `currency`: Native (supplier) currency code
+- `display_currency`: Customer-facing display currency
+- `fx_rate`: Locked exchange rate
+- `fx_rate_locked_at`: When the rate was locked
+- `rounds`: Negotiation round counter
+- `notes`: Free-text notes
 - `status`: Quote status
 
 **Relationships**:
@@ -139,19 +153,30 @@ graph TD
 ---
 
 #### QuoteItem
-**Purpose**: Line items in a quote with pricing
+**Purpose**: Line items in a quote with pricing (hospitality-aware)
 
-**Table**: `are-quote-items`
+**Table**: `are-quote_items`
 
 **Key Attributes**:
 - `quote_uuid` (Hash Key): Parent quote
 - `quote_item_uuid` (Range Key): Unique identifier
 - `item_uuid`: Catalog item reference (indexed)
 - `provider_item_uuid`: Provider item reference (indexed)
-- `qty`: Quantity
-- `price_per_uom`: Price per unit (auto-calculated from ItemPriceTier)
-- `subtotal`: Line total (auto-calculated)
-- `final_subtotal`: Final total after discounts (auto-calculated)
+- `batch_no`: Pinned service-dated batch (optional)
+- `request_uuid`: Request reference
+- `qty`: Quantity (UOM units for unit/occupancy, total pax for per_pax_type)
+- `pax_breakdown`: MapAttribute — `{pax_type: count}` for per_pax_type/occupancy modes
+- `bundle_uuid`: Itinerary bundle grouping key (optional)
+- `bundle_label`: Human-readable bundle name (optional)
+- `price_per_uom`: Computed per-UOM rate
+- `subtotal`: Display-currency subtotal
+- `subtotal_native`: Native (supplier) currency subtotal (optional)
+- `currency`: Native currency code (optional)
+- `subtotal_discount`: Applied discount amount
+- `final_subtotal`: Display-currency total after discount
+- `hold_token`: Availability hold reference (optional)
+- `hold_expires_at`: Hold token expiry (optional)
+- `request_data`: MapAttribute including `cancellation_policy_snapshot`
 
 **Relationships**:
 - **Many-to-One** with Quote
@@ -174,6 +199,8 @@ graph TD
 - `item_name`: Item name
 - `uom`: Unit of measure
 - `item_description`: Description
+- `pricing_mode`: Pricing calculation mode (`"unit"`, `"per_pax_type"`, or `"occupancy"`; default `"unit"`)
+- `item_external_id`: External identifier
 
 **Relationships**:
 - **One-to-Many** with ProviderItem
@@ -187,7 +214,7 @@ graph TD
 #### ProviderItem
 **Purpose**: Provider-specific item catalog
 
-**Table**: `are-provider-items`
+**Table**: `are-provider_items`
 
 **Key Attributes**:
 - `endpoint_id` (Hash Key): Tenant identifier
@@ -195,7 +222,9 @@ graph TD
 - `item_uuid`: Catalog item reference (indexed)
 - `provider_corp_external_id`: Provider identifier
 - `base_price_per_uom`: Base price
-- `item_spec`: Provider-specific specifications (JSON)
+- `item_spec`: Provider-specific specifications (JSON MapAttribute)
+- `provider_item_external_id`: External identifier (indexed)
+- `availability_mode`: Availability enforcement mode (`"none"`, `"check_only"`, or `"require_hold"`; default `"none"`)
 
 **Relationships**:
 - **Many-to-One** with Item
@@ -207,9 +236,9 @@ graph TD
 ---
 
 #### ProviderItemBatch
-**Purpose**: Inventory batch/lot tracking with costs
+**Purpose**: Inventory batch/lot tracking with costs and hospitality service dating
 
-**Table**: `are-provider-item-batches`
+**Table**: `are-provider_item_batches`
 
 **Key Attributes**:
 - `provider_item_uuid` (Hash Key): Parent provider item
@@ -220,6 +249,11 @@ graph TD
 - `total_cost_per_uom`: Total cost (auto-calculated)
 - `guardrail_price_per_uom`: Minimum price (auto-calculated)
 - `in_stock`: Inventory status
+- `service_start_at`: Start of service window (hospitality)
+- `service_end_at`: End of service window (hospitality)
+- `availability_qty`: Remaining bookable units (null = unquantified)
+- `currency`: Batch-level currency (hospitality)
+- `cancellation_policy_uuid`: Referenced cancellation policy (hospitality)
 
 **Relationships**:
 - **Many-to-One** with ProviderItem
@@ -232,9 +266,9 @@ graph TD
 ---
 
 #### ItemPriceTier
-**Purpose**: Quantity-based pricing tiers
+**Purpose**: Quantity-based pricing tiers with hospitality PAX/occupancy support
 
-**Table**: `are-item-price-tiers`
+**Table**: `are-item_price_tiers`
 
 **Key Attributes**:
 - `item_uuid` (Hash Key): Catalog item
@@ -244,6 +278,11 @@ graph TD
 - `quantity_greater_then`: Lower bound
 - `quantity_less_then`: Upper bound (NULL for highest tier)
 - `margin_per_uom`: Margin percentage
+- `price_per_uom`: Direct price (alternative to margin)
+- `pax_type`: PAX category for per_pax_type pricing mode (null = legacy/occupancy)
+- `currency`: Tier-level currency
+- `base_occupancy`: MapAttribute — `{pax_type: count}` for occupancy mode
+- `extra_pax_surcharges`: MapAttribute — `{pax_type: surcharge}` for occupancy mode
 - `status`: Tier status (active/inactive)
 
 **Relationships**:
@@ -368,6 +407,101 @@ The `validate_and_normalize_discount_rules()` function enforces:
 - **Many-to-One** with Segment (via `tags` containing segment_uuid)
 - **Many-to-One** with Item (via `tags` containing item_uuid)
 - **Many-to-One** with ProviderItem (via `tags` containing provider_item_uuid)
+
+---
+
+#### Segment
+**Purpose**: Customer segmentation for targeted pricing
+
+**Table**: `are-segments`
+
+**Key Attributes**:
+- `endpoint_id` (Hash Key): Tenant identifier
+- `segment_uuid` (Range Key): Unique identifier
+- `segment_name`: Segment name
+- `segment_description`: Description
+- `provider_corp_external_id`: Provider identifier (indexed)
+
+**Relationships**:
+- **One-to-Many** with SegmentContact
+- **One-to-Many** with ItemPriceTier
+- **One-to-Many** with DiscountRule
+
+**Nested Resolvers**: None (leaf type)
+
+---
+
+#### FxRate
+**Purpose**: Currency exchange rates for quote-level FX conversion
+
+**Table**: `are-fx_rates`
+
+**Key Attributes**:
+- `partition_key` (Hash Key): Tenant partition
+- `fx_rate_uuid` (Range Key): Unique identifier
+- `source_currency`: Source currency code
+- `target_currency`: Target currency code
+- `rate`: Exchange rate value
+- `currency_pair_date`: Composite key for date-based lookups (LSI)
+- `rate_date`: Effective date of the rate
+- `provider`: Rate source provider
+- `notes`: Descriptive notes
+- `status`: Rate status (`active`, default)
+
+**Relationships**:
+- Referenced by `Quote.fx_rate` for locked conversion
+- LSI on `currency_pair_date` enables time-based rate lookups
+
+**Nested Resolvers**: None (leaf type)
+
+---
+
+#### CancellationPolicy
+**Purpose**: Cancellation terms with engine-owned generated quote-item snapshots
+
+**Table**: `are-cancellation_policies`
+
+**Key Attributes**:
+- `partition_key` (Hash Key): Tenant partition
+- `policy_uuid` (Range Key): Unique identifier
+- `provider_item_uuid`: Provider item reference (LSI)
+- `label`: Policy display name
+- `description`: Policy description
+- `tiers`: Structured cancellation tier data (MapAttribute)
+- `notes_template_uuid`: Reference to a notes template
+- `status`: Policy status (`active`, default)
+
+**Relationships**:
+- **Many-to-One** with ProviderItem (via `provider_item_uuid`)
+- Snapshotted onto `QuoteItem.request_data.cancellation_policy_snapshot` at quote creation time
+
+**Nested Resolvers**: None (leaf type)
+
+---
+
+#### ItemCatalogRef
+**Purpose**: Maps external catalog identities (KGE nodes) to internal items
+
+**Table**: `are-item_catalog_refs`
+
+**Key Attributes**:
+- `partition_key` (Hash Key): Tenant partition
+- `catalog_ref_uuid` (Range Key): Unique identifier
+- `namespace`: Catalog namespace (default `"DEFAULT"`)
+- `node_id`: External node identifier
+- `namespace_node_key`: Composite key `namespace#node_id` (LSI)
+- `item_uuid`: Internal item reference
+- `item_lookup_key`: Item UUID for reverse lookups (LSI)
+- `provider_item_uuid`: Optional provider item reference
+- `extra`: Additional metadata (MapAttribute)
+- `status`: Reference status (`active`, default)
+
+**Relationships**:
+- **Many-to-One** with Item (via `item_uuid`)
+- **Many-to-One** with ProviderItem (via `provider_item_uuid`)
+- Used by `inquire_catalog` query to bridge KGE search results to internal records
+
+**Nested Resolvers**: None (leaf type)
 
 ---
 

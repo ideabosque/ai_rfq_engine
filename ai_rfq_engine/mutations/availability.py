@@ -11,6 +11,7 @@ from silvaengine_utility import SafeFloat as Float
 from ..handlers.availability import (
     dispatch_acquire_hold,
     dispatch_confirm_hold,
+    dispatch_expire_hold,
     dispatch_release_hold,
 )
 from ..queries.availability import _result_from_dispatch
@@ -21,9 +22,6 @@ class AcquireAvailabilityHold(Mutation):
     availability = Field(AvailabilityResultType)
 
     class Arguments:
-        system_code = String(required=True)
-        namespace = String(required=False)
-        provider_corp_external_id = String(required=False)
         provider_item_uuid = String(required=True)
         batch_no = String(required=False)
         service_start_at = DateTime(required=True)
@@ -46,9 +44,6 @@ class _HeldAvailabilityMutation(Mutation):
     dispatcher = None
 
     class Arguments:
-        system_code = String(required=True)
-        namespace = String(required=False)
-        provider_corp_external_id = String(required=False)
         provider_item_uuid = String(required=True)
         batch_no = String(required=False)
         hold_token = String(required=True)
@@ -69,3 +64,7 @@ class ReleaseAvailabilityHold(_HeldAvailabilityMutation):
 
 class ConfirmAvailabilityHold(_HeldAvailabilityMutation):
     dispatcher = dispatch_confirm_hold
+
+
+class ExpireAvailabilityHold(_HeldAvailabilityMutation):
+    dispatcher = dispatch_expire_hold

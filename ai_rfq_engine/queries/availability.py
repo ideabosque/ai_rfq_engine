@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-"""GraphQL resolver for G3 availability checks."""
+"""GraphQL resolver for availability operations using local ProviderItemBatch data."""
 from __future__ import annotations
 
 __author__ = "bibow"
@@ -26,14 +26,9 @@ def _parse_time(value: Optional[Any]):
 
 
 def _result_from_dispatch(info: ResolveInfo, dispatch, **kwargs: Dict[str, Any]) -> AvailabilityResultType:
-    system_code = kwargs["system_code"]
-    namespace = kwargs.get("namespace") or "DEFAULT"
     try:
         result = dispatch(
             info,
-            system_code=system_code,
-            namespace=namespace,
-            provider_corp_external_id=kwargs.get("provider_corp_external_id"),
             provider_item_uuid=kwargs["provider_item_uuid"],
             batch_no=kwargs.get("batch_no"),
             service_start_at=kwargs.get("service_start_at"),
@@ -44,7 +39,6 @@ def _result_from_dispatch(info: ResolveInfo, dispatch, **kwargs: Dict[str, Any])
         )
     except AvailabilityHandlerError as exc:
         return AvailabilityResultType(
-            system=system_code,
             operation=getattr(dispatch, "__name__", "").removeprefix("dispatch_"),
             provider_item_uuid=kwargs["provider_item_uuid"],
             batch_no=kwargs.get("batch_no"),
@@ -57,7 +51,6 @@ def _result_from_dispatch(info: ResolveInfo, dispatch, **kwargs: Dict[str, Any])
 
     request = result.get("request") or {}
     return AvailabilityResultType(
-        system=result.get("system", system_code),
         operation=result.get("operation"),
         provider_item_uuid=request.get(
             "provider_item_uuid", kwargs["provider_item_uuid"]

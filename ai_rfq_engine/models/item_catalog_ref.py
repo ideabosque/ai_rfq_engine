@@ -34,14 +34,14 @@ from ..types.item_catalog_ref import (
 from ..utils.normalization import normalize_to_json
 
 
-class SystemNodeIndex(LocalSecondaryIndex):
+class NamespaceNodeIndex(LocalSecondaryIndex):
     class Meta:
         billing_mode = "PAY_PER_REQUEST"
         projection = AllProjection()
-        index_name = "system_node_index"
+        index_name = "namespace_node_index"
 
     partition_key = UnicodeAttribute(hash_key=True)
-    system_node_key = UnicodeAttribute(range_key=True)
+    namespace_node_key = UnicodeAttribute(range_key=True)
 
 
 class ItemLookupIndex(LocalSecondaryIndex):
@@ -70,10 +70,9 @@ class ItemCatalogRefModel(BaseModel):
 
     partition_key = UnicodeAttribute(hash_key=True)
     catalog_ref_uuid = UnicodeAttribute(range_key=True)
-    system_code = UnicodeAttribute()
     namespace = UnicodeAttribute(default="DEFAULT")
     node_id = UnicodeAttribute()
-    system_node_key = UnicodeAttribute()
+    namespace_node_key = UnicodeAttribute()
     extra = MapAttribute(null=True)
     item_uuid = UnicodeAttribute()
     item_lookup_key = UnicodeAttribute()
@@ -82,7 +81,7 @@ class ItemCatalogRefModel(BaseModel):
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
-    system_node_index = SystemNodeIndex()
+    namespace_node_index = NamespaceNodeIndex()
     item_lookup_index = ItemLookupIndex()
     updated_at_index = UpdateAtIndex()
 
@@ -182,7 +181,6 @@ def resolve_item_catalog_ref(
     attributes_to_get=[
         "partition_key",
         "catalog_ref_uuid",
-        "system_code",
         "namespace",
         "node_id",
         "item_uuid",
@@ -194,7 +192,6 @@ def resolve_item_catalog_ref(
 )
 def resolve_item_catalog_ref_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     partition_key = info.context.get("partition_key")
-    system_code = kwargs.get("system_code")
     namespace = kwargs.get("namespace")
     item_uuid = kwargs.get("item_uuid")
     status = kwargs.get("status")
@@ -208,8 +205,6 @@ def resolve_item_catalog_ref_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -
         count_funct = ItemCatalogRefModel.updated_at_index.count
 
     the_filters = None
-    if system_code:
-        the_filters &= ItemCatalogRefModel.system_code == system_code
     if namespace:
         the_filters &= ItemCatalogRefModel.namespace == namespace
     if item_uuid:
@@ -224,7 +219,6 @@ def resolve_item_catalog_ref_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -
 
 def find_item_catalog_refs(
     info: ResolveInfo,
-    system_code: str,
     node_ids: List[str],
     namespace: str = "DEFAULT",
     status: str = "active",
@@ -232,13 +226,13 @@ def find_item_catalog_refs(
     partition_key = info.context.get("partition_key")
     refs = []
     for node_id in node_ids:
-        system_node_key = f"{system_code}#{namespace}#{node_id}"
+        namespace_node_key = f"{namespace}#{node_id}"
         filters = (
             ItemCatalogRefModel.status == status if status is not None else None
         )
-        matches = ItemCatalogRefModel.system_node_index.query(
+        matches = ItemCatalogRefModel.namespace_node_index.query(
             partition_key,
-            ItemCatalogRefModel.system_node_key == system_node_key,
+            ItemCatalogRefModel.namespace_node_key == namespace_node_key,
             filter_condition=filters,
         )
         refs.extend(get_item_catalog_ref_type(info, ref) for ref in matches)
@@ -259,17 +253,15 @@ def insert_update_item_catalog_ref(info: ResolveInfo, **kwargs: Dict[str, Any]) 
     if kwargs.get("entity") is None:
         partition_key = kwargs.get("partition_key") or info.context.get("partition_key")
         catalog_ref_uuid = kwargs.get("catalog_ref_uuid")
-        system_code = kwargs.get("system_code", "")
         namespace = kwargs.get("namespace", "DEFAULT")
         node_id = kwargs.get("node_id", "")
         item_uuid = kwargs.get("item_uuid", "")
 
         cols = {
             "updated_by": kwargs["updated_by"],
-            "system_code": system_code,
             "namespace": namespace,
             "node_id": node_id,
-            "system_node_key": f"{system_code}#{namespace}#{node_id}",
+            "namespace_node_key": f"{namespace}#{node_id}",
             "item_uuid": item_uuid,
             "item_lookup_key": item_uuid,
             "created_at": pendulum.now("UTC"),
@@ -297,7 +289,6 @@ def insert_update_item_catalog_ref(info: ResolveInfo, **kwargs: Dict[str, Any]) 
     ]
 
     field_map = {
-        "system_code": ItemCatalogRefModel.system_code,
         "namespace": ItemCatalogRefModel.namespace,
         "node_id": ItemCatalogRefModel.node_id,
         "item_uuid": ItemCatalogRefModel.item_uuid,
@@ -310,12 +301,11 @@ def insert_update_item_catalog_ref(info: ResolveInfo, **kwargs: Dict[str, Any]) 
         if key in kwargs:
             actions.append(field.set(None if kwargs[key] == "null" else kwargs[key]))
 
-    # Recompute system_node_key if system_code, namespace, or node_id changed
-    if any(k in kwargs for k in ("system_code", "namespace", "node_id")):
-        sc = kwargs.get("system_code", getattr(ref, "system_code", ""))
+    # Recompute the index key whenever its identity components change.
+    if any(k in kwargs for k in ("namespace", "node_id")):
         ns = kwargs.get("namespace", getattr(ref, "namespace", "DEFAULT"))
         nid = kwargs.get("node_id", getattr(ref, "node_id", ""))
-        actions.append(ItemCatalogRefModel.system_node_key.set(f"{sc}#{ns}#{nid}"))
+        actions.append(ItemCatalogRefModel.namespace_node_key.set(f"{ns}#{nid}"))
 
     if "item_uuid" in kwargs:
         actions.append(ItemCatalogRefModel.item_lookup_key.set(kwargs["item_uuid"]))

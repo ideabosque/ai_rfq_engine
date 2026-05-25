@@ -570,36 +570,263 @@ class TestRestaurantOrEventHardening:
     """
     Banquet table with per-pax-type pricing, deposit-only quote, and an
     availability hold acquired through the G3 contract before the quote item
-    is persisted. This scenario exercises the stub availability handler — the
-    real PMS adapter is out of scope for the hardening pilot.
+    is persisted. Capacity is resolved from local ProviderItemBatch records.
     """
+
+    @pytest.fixture(scope="class")
+    def banquet_context(self, engine, endpoint_id, part_id):
+        updated_by = "hardening_banquet_pilot"
+        now = pendulum.now("UTC")
+        service_start = (now + timedelta(days=45)).isoformat()
+        service_end = (now + timedelta(days=45, hours=4)).isoformat()
+
+        item_uuid = _graphql(
+            engine,
+            """mutation ($name: String, $mode: String, $uom: String, $by: String!) {
+                insertUpdateItem(itemType: "banquet", itemName: $name,
+                                  pricingMode: $mode, uom: $uom, updatedBy: $by) {
+                    item { itemUuid }
+                }
+            }""",
+            {
+                "name": "Conference Dinner Admission",
+                "mode": "per_pax_type",
+                "uom": "guest",
+                "by": updated_by,
+            },
+            endpoint_id,
+            part_id,
+        )["insertUpdateItem"]["item"]["itemUuid"]
+
+        provider_item_uuid = _graphql(
+            engine,
+            """mutation ($iid: String!, $price: Float, $mode: String, $by: String!) {
+                insertUpdateProviderItem(itemUuid: $iid,
+                                         providerCorpExternalId: "VENUE-HARDEN-001",
+                                         basePricePerUom: $price,
+                                         availabilityMode: $mode, updatedBy: $by) {
+                    providerItem { providerItemUuid availabilityMode }
+                }
+            }""",
+            {
+                "iid": item_uuid,
+                "price": 80.0,
+                "mode": "require_hold",
+                "by": updated_by,
+            },
+            endpoint_id,
+            part_id,
+        )["insertUpdateProviderItem"]["providerItem"]["providerItemUuid"]
+
+        batch_no = f"BANQUET-{now.format('YYYYMMDD')}"
+        _graphql(
+            engine,
+            """mutation ($pid: String!, $iid: String!, $bno: String!, $start: DateTime,
+                        $end: DateTime, $capacity: Float, $by: String!) {
+                insertUpdateProviderItemBatch(providerItemUuid: $pid, itemUuid: $iid,
+                                               batchNo: $bno, expiredAt: $end,
+                                               producedAt: $start, serviceStartAt: $start,
+                                               serviceEndAt: $end, costPerUom: 40,
+                                               freightCostPerUom: 0,
+                                               additionalCostPerUom: 0,
+                                               availabilityQty: $capacity, inStock: true,
+                                               updatedBy: $by) {
+                    providerItemBatch { batchNo availabilityQty }
+                }
+            }""",
+            {
+                "pid": provider_item_uuid,
+                "iid": item_uuid,
+                "bno": batch_no,
+                "start": service_start,
+                "end": service_end,
+                "capacity": 20.0,
+                "by": updated_by,
+            },
+            endpoint_id,
+            part_id,
+        )
+
+        segment_uuid = _graphql(
+            engine,
+            """mutation ($by: String!) {
+                insertUpdateSegment(segmentName: "Banquet Retail", updatedBy: $by) {
+                    segment { segmentUuid }
+                }
+            }""",
+            {"by": updated_by},
+            endpoint_id,
+            part_id,
+        )["insertUpdateSegment"]["segment"]["segmentUuid"]
+
+        for pax_type, price in [("delegate", 80.0), ("observer", 40.0)]:
+            _graphql(
+                engine,
+                """mutation ($iid: String!, $pid: String!, $sid: String!, $pax: String,
+                            $price: Float, $by: String!) {
+                    insertUpdateItemPriceTier(itemUuid: $iid, providerItemUuid: $pid,
+                                               segmentUuid: $sid, quantityGreaterThen: 0,
+                                               paxType: $pax, pricePerUom: $price,
+                                               status: "active", updatedBy: $by) {
+                        itemPriceTier { itemPriceTierUuid }
+                    }
+                }""",
+                {
+                    "iid": item_uuid,
+                    "pid": provider_item_uuid,
+                    "sid": segment_uuid,
+                    "pax": pax_type,
+                    "price": price,
+                    "by": updated_by,
+                },
+                endpoint_id,
+                part_id,
+            )
+
+        return {
+            "item_uuid": item_uuid,
+            "provider_item_uuid": provider_item_uuid,
+            "batch_no": batch_no,
+            "segment_uuid": segment_uuid,
+            "service_start": service_start,
+            "service_end": service_end,
+            "updated_by": updated_by,
+        }
 
     @pytest.mark.integration
     def test_banquet_with_availability_hold_and_deposit_only(
-        self, engine, endpoint_id, part_id
+        self, engine, endpoint_id, part_id, banquet_context
     ):
         # Implementation pattern (kept short — same shape as Hotel scenario):
         #   1. Seed Item with pricing_mode='per_pax_type'
-        #   2. Seed ProviderItem with availability_mode='require_hold' +
-        #      availability_system_code='stub'
-        #   3. Seed ExternalSystemConfig (system_kind='availability', system_code='stub')
-        #      pointing at the StubAvailabilityHandler
-        #   4. Seed two pax_type tiers (delegate $80, observer $40)
-        #   5. Seed ProviderItemBatch with service window
-        #   6. Create Request -> Quote -> QuoteItem with pax_breakdown {delegate: 10, observer: 5}
+        #   2. Seed ProviderItem with availability_mode='require_hold'
+        #   3. Seed two pax_type tiers (delegate $80, observer $40)
+        #   4. Seed ProviderItemBatch with service window
+        #   5. Create Request -> Quote -> QuoteItem with pax_breakdown {delegate: 10, observer: 5}
         #      The insert_update_quote_item path will invoke _enforce_availability
-        #      which dispatches to the stub via the G7c config. A hold_token must
+        #      which resolves local ProviderItemBatch capacity. A hold_token must
         #      be persisted on the resulting QuoteItem.
-        #   7. Create a single deposit-only installment for the full amount
+        #   6. Create a single deposit-only installment for the full amount
         #
         # This test is documented in detail in HOSPITALITY_BUSINESS_GAP_PLAN.md §8.
-        # The stub handler needs configured fixtures to return ``available=True``
-        # and a hold_token; see ai_rfq_engine/handlers/availability/stub_handler.py.
-        pytest.skip(
-            "Banquet+hold scenario requires StubAvailabilityHandler fixtures and "
-            "ExternalSystemConfig seeding; included as a documented placeholder "
-            "until those fixtures are pinned down in the test harness."
-        )
+        ctx = banquet_context
+        availability = _graphql(
+            engine,
+            """query ($pid: String!, $bno: String, $start: DateTime!,
+                      $end: DateTime!, $qty: SafeFloat) {
+                checkAvailability(providerItemUuid: $pid, batchNo: $bno,
+                                  serviceStartAt: $start, serviceEndAt: $end,
+                                  qty: $qty) {
+                    available payload
+                }
+            }""",
+            {
+                "pid": ctx["provider_item_uuid"],
+                "bno": ctx["batch_no"],
+                "start": ctx["service_start"],
+                "end": ctx["service_end"],
+                "qty": 21.0,
+            },
+            endpoint_id,
+            part_id,
+        )["checkAvailability"]
+        assert availability["available"] is False
+        assert availability["payload"]["reason"] == "insufficient_availability"
+
+        request_uuid = _graphql(
+            engine,
+            """mutation ($by: String!) {
+                insertUpdateRequest(email: "events@example.com",
+                                    requestTitle: "Banquet hardening",
+                                    updatedBy: $by) {
+                    request { requestUuid }
+                }
+            }""",
+            {"by": ctx["updated_by"]},
+            endpoint_id,
+            part_id,
+        )["insertUpdateRequest"]["request"]["requestUuid"]
+        quote_uuid = _graphql(
+            engine,
+            """mutation ($rid: String!, $by: String!) {
+                insertUpdateQuote(requestUuid: $rid, updatedBy: $by) {
+                    quote { quoteUuid }
+                }
+            }""",
+            {"rid": request_uuid, "by": ctx["updated_by"]},
+            endpoint_id,
+            part_id,
+        )["insertUpdateQuote"]["quote"]["quoteUuid"]
+
+        quote_item = _graphql(
+            engine,
+            """mutation ($qid: String!, $rid: String!, $iid: String!, $pid: String!,
+                        $sid: String!, $bno: String!, $start: DateTime, $end: DateTime,
+                        $pax: JSONCamelCase, $by: String!) {
+                insertUpdateQuoteItem(quoteUuid: $qid, requestUuid: $rid,
+                                       itemUuid: $iid, providerItemUuid: $pid,
+                                       segmentUuid: $sid, batchNo: $bno, qty: 15,
+                                       paxBreakdown: $pax, serviceStartAt: $start,
+                                       serviceEndAt: $end, updatedBy: $by) {
+                    quoteItem { quoteItemUuid subtotal holdToken holdExpiresAt }
+                }
+            }""",
+            {
+                "qid": quote_uuid,
+                "rid": request_uuid,
+                "iid": ctx["item_uuid"],
+                "pid": ctx["provider_item_uuid"],
+                "sid": ctx["segment_uuid"],
+                "bno": ctx["batch_no"],
+                "start": ctx["service_start"],
+                "end": ctx["service_end"],
+                "pax": {"delegate": 10, "observer": 5},
+                "by": ctx["updated_by"],
+            },
+            endpoint_id,
+            part_id,
+        )["insertUpdateQuoteItem"]["quoteItem"]
+        assert quote_item["subtotal"] == pytest.approx(1000.0)
+        assert quote_item["holdToken"]
+        assert quote_item["holdExpiresAt"]
+
+        installment = _graphql(
+            engine,
+            """mutation ($qid: String!, $rid: String!, $amount: SafeFloat, $by: String!) {
+                insertUpdateInstallment(quoteUuid: $qid, requestUuid: $rid,
+                                         priority: 1, installmentAmount: $amount,
+                                         updatedBy: $by) {
+                    installment { installmentUuid installmentAmount }
+                }
+            }""",
+            {
+                "qid": quote_uuid,
+                "rid": request_uuid,
+                "amount": quote_item["subtotal"],
+                "by": ctx["updated_by"],
+            },
+            endpoint_id,
+            part_id,
+        )["insertUpdateInstallment"]["installment"]
+        assert installment["installmentAmount"] == pytest.approx(1000.0)
+
+        accepted = _graphql(
+            engine,
+            """mutation ($rid: String!, $qid: String!, $by: String!) {
+                insertUpdateQuote(requestUuid: $rid, quoteUuid: $qid,
+                                  status: "accepted", updatedBy: $by) {
+                    quote { status }
+                }
+            }""",
+            {
+                "rid": request_uuid,
+                "qid": quote_uuid,
+                "by": ctx["updated_by"],
+            },
+            endpoint_id,
+            part_id,
+        )["insertUpdateQuote"]["quote"]
+        assert accepted["status"] == "accepted"
 
 
 # --- Scenario 4: Multi-leg travel itinerary bundle ------------------------ #
@@ -613,9 +840,99 @@ class TestMultiLegTravelItineraryHardening:
     presentational via ``bundle_uuid``.
     """
 
+    @pytest.fixture(scope="class")
+    def itinerary_context(self, engine, endpoint_id, part_id):
+        updated_by = "hardening_itinerary_pilot"
+        segment_uuid = _graphql(
+            engine,
+            """mutation ($by: String!) {
+                insertUpdateSegment(segmentName: "Itinerary Retail", updatedBy: $by) {
+                    segment { segmentUuid }
+                }
+            }""",
+            {"by": updated_by},
+            endpoint_id,
+            part_id,
+        )["insertUpdateSegment"]["segment"]["segmentUuid"]
+
+        components = {}
+        definitions = [
+            ("hotel", "Itinerary Hotel Night", "occupancy", "room_night", 200.0),
+            ("transfer", "Airport Transfer", "per_pax_type", "passenger", 25.0),
+            ("activity", "Guided Activity", "per_pax_type", "guest", 60.0),
+        ]
+        for name, label, pricing_mode, uom, price in definitions:
+            item_uuid = _graphql(
+                engine,
+                """mutation ($name: String, $mode: String, $uom: String, $by: String!) {
+                    insertUpdateItem(itemType: "itinerary_component", itemName: $name,
+                                     pricingMode: $mode, uom: $uom, updatedBy: $by) {
+                        item { itemUuid }
+                    }
+                }""",
+                {"name": label, "mode": pricing_mode, "uom": uom, "by": updated_by},
+                endpoint_id,
+                part_id,
+            )["insertUpdateItem"]["item"]["itemUuid"]
+            provider_item_uuid = _graphql(
+                engine,
+                """mutation ($iid: String!, $provider: String, $price: Float, $by: String!) {
+                    insertUpdateProviderItem(itemUuid: $iid,
+                                             providerCorpExternalId: $provider,
+                                             basePricePerUom: $price, updatedBy: $by) {
+                        providerItem { providerItemUuid }
+                    }
+                }""",
+                {
+                    "iid": item_uuid,
+                    "provider": f"ITIN-{name.upper()}-001",
+                    "price": price,
+                    "by": updated_by,
+                },
+                endpoint_id,
+                part_id,
+            )["insertUpdateProviderItem"]["providerItem"]["providerItemUuid"]
+            tier_vars = {
+                "iid": item_uuid,
+                "pid": provider_item_uuid,
+                "sid": segment_uuid,
+                "price": price,
+                "pax": None if name == "hotel" else "adult",
+                "base": {"adult": 2} if name == "hotel" else None,
+                "extra": {"adult": 50.0} if name == "hotel" else None,
+                "by": updated_by,
+            }
+            _graphql(
+                engine,
+                """mutation ($iid: String!, $pid: String!, $sid: String!, $price: Float,
+                            $pax: String, $base: JSONCamelCase, $extra: JSONCamelCase,
+                            $by: String!) {
+                    insertUpdateItemPriceTier(itemUuid: $iid, providerItemUuid: $pid,
+                                               segmentUuid: $sid, quantityGreaterThen: 0,
+                                               pricePerUom: $price, paxType: $pax,
+                                               baseOccupancy: $base,
+                                               extraPaxSurcharges: $extra,
+                                               status: "active", updatedBy: $by) {
+                        itemPriceTier { itemPriceTierUuid }
+                    }
+                }""",
+                tier_vars,
+                endpoint_id,
+                part_id,
+            )
+            components[name] = {
+                "item_uuid": item_uuid,
+                "provider_item_uuid": provider_item_uuid,
+            }
+        return {
+            "components": components,
+            "segment_uuid": segment_uuid,
+            "updated_by": updated_by,
+        }
+
     @pytest.mark.integration
     def test_hotel_plus_transfer_plus_activity_bundle(
-        self, engine, endpoint_id, part_id
+        self, engine, endpoint_id, part_id, itinerary_context
     ):
         # Implementation pattern (kept short — same shape as Hotel scenario):
         #   1. Seed three Items: hotel (occupancy), transfer (per_pax_type), activity (per_pax_type)
@@ -634,11 +951,117 @@ class TestMultiLegTravelItineraryHardening:
         # subtotals by querying quote items filtered by provider.
         #
         # See HOSPITALITY_BUSINESS_GAP_PLAN.md §8 for the full acceptance criteria.
-        pytest.skip(
-            "Travel itinerary bundle scenario requires three-item seeding; "
-            "included as a documented placeholder until the test harness pins "
-            "down the per-vertical fixture seeding strategy."
-        )
+        ctx = itinerary_context
+        request_uuid = _graphql(
+            engine,
+            """mutation ($by: String!) {
+                insertUpdateRequest(email: "itinerary@example.com",
+                                    requestTitle: "Itinerary hardening",
+                                    updatedBy: $by) {
+                    request { requestUuid }
+                }
+            }""",
+            {"by": ctx["updated_by"]},
+            endpoint_id,
+            part_id,
+        )["insertUpdateRequest"]["request"]["requestUuid"]
+        quote_uuid = _graphql(
+            engine,
+            """mutation ($rid: String!, $by: String!) {
+                insertUpdateQuote(requestUuid: $rid, updatedBy: $by) {
+                    quote { quoteUuid }
+                }
+            }""",
+            {"rid": request_uuid, "by": ctx["updated_by"]},
+            endpoint_id,
+            part_id,
+        )["insertUpdateQuote"]["quote"]["quoteUuid"]
+
+        bundle_uuid = "itinerary-001"
+        lines = [
+            ("hotel", 3.0, {"adult": 2}, 600.0),
+            ("transfer", 2.0, {"adult": 2}, 50.0),
+            ("activity", 2.0, {"adult": 2}, 120.0),
+        ]
+        for name, qty, pax, expected_subtotal in lines:
+            component = ctx["components"][name]
+            quote_item = _graphql(
+                engine,
+                """mutation ($qid: String!, $rid: String!, $iid: String!, $pid: String!,
+                            $sid: String!, $qty: SafeFloat, $pax: JSONCamelCase,
+                            $bundle: String, $by: String!) {
+                    insertUpdateQuoteItem(quoteUuid: $qid, requestUuid: $rid,
+                                           itemUuid: $iid, providerItemUuid: $pid,
+                                           segmentUuid: $sid, qty: $qty,
+                                           paxBreakdown: $pax, bundleUuid: $bundle,
+                                           bundleLabel: "Summer itinerary", updatedBy: $by) {
+                        quoteItem { subtotal bundleUuid }
+                    }
+                }""",
+                {
+                    "qid": quote_uuid,
+                    "rid": request_uuid,
+                    "iid": component["item_uuid"],
+                    "pid": component["provider_item_uuid"],
+                    "sid": ctx["segment_uuid"],
+                    "qty": qty,
+                    "pax": pax,
+                    "bundle": bundle_uuid,
+                    "by": ctx["updated_by"],
+                },
+                endpoint_id,
+                part_id,
+            )["insertUpdateQuoteItem"]["quoteItem"]
+            assert quote_item["subtotal"] == pytest.approx(expected_subtotal)
+            assert quote_item["bundleUuid"] == bundle_uuid
+
+        bundle_items = _graphql(
+            engine,
+            """query ($qid: String!, $bundle: String) {
+                quoteItemList(quoteUuid: $qid, bundleUuid: $bundle) {
+                    quoteItemList { quoteItemUuid subtotal bundleUuid }
+                }
+            }""",
+            {"qid": quote_uuid, "bundle": bundle_uuid},
+            endpoint_id,
+            part_id,
+        )["quoteItemList"]["quoteItemList"]
+        assert len(bundle_items) == 3
+        assert sum(line["subtotal"] for line in bundle_items) == pytest.approx(770.0)
+
+        quote = _graphql(
+            engine,
+            """query ($rid: String!, $qid: String!) {
+                quote(requestUuid: $rid, quoteUuid: $qid) { totalQuoteAmount }
+            }""",
+            {"rid": request_uuid, "qid": quote_uuid},
+            endpoint_id,
+            part_id,
+        )["quote"]
+        assert quote["totalQuoteAmount"] == pytest.approx(770.0)
+
+        for priority in (1, 2):
+            installment = _graphql(
+                engine,
+                """mutation ($qid: String!, $rid: String!, $priority: Int,
+                            $amount: SafeFloat, $by: String!) {
+                    insertUpdateInstallment(quoteUuid: $qid, requestUuid: $rid,
+                                             priority: $priority,
+                                             installmentAmount: $amount, updatedBy: $by) {
+                        installment { installmentAmount }
+                    }
+                }""",
+                {
+                    "qid": quote_uuid,
+                    "rid": request_uuid,
+                    "priority": priority,
+                    "amount": 385.0,
+                    "by": ctx["updated_by"],
+                },
+                endpoint_id,
+                part_id,
+            )["insertUpdateInstallment"]["installment"]
+            assert installment["installmentAmount"] == pytest.approx(385.0)
 
 
 # --- Schema capability checks (unit-level, no DDB required) --------------- #
@@ -705,42 +1128,33 @@ class TestHardeningPilotSchemaCapabilities:
         )
 
     @pytest.mark.unit
-    def test_external_system_config_and_item_catalog_ref_resolvers_present(self):
+    def test_catalog_ref_resolvers_present_without_external_config(self):
+        from ai_rfq_engine.mutations.item_catalog_ref import InsertUpdateItemCatalogRef
+        from ai_rfq_engine.models.item_catalog_ref import ItemCatalogRefModel
         from ai_rfq_engine.schema import Query
+        from ai_rfq_engine.types.catalog_inquiry import CatalogInquiryResultType
+        from ai_rfq_engine.types.item_catalog_ref import ItemCatalogRefType
 
         for field in (
-            "external_system_config",
-            "external_system_config_list",
-            "resolved_external_system_config",
             "item_catalog_ref",
             "item_catalog_ref_list",
             "item_catalog_refs",
         ):
             assert field in Query._meta.fields, (
-                f"G7a/G7c: Query.{field} must be wired"
+                f"G7a: Query.{field} must be wired"
             )
+        assert "external_system_config" not in Query._meta.fields
+        assert "system_code" not in Query._meta.fields["item_catalog_refs"].args
+        assert "system_code" not in Query._meta.fields["inquire_catalog"].args
+        assert "system_code" not in InsertUpdateItemCatalogRef._meta.arguments
+        assert "system_code" not in ItemCatalogRefType._meta.fields
+        assert "system" not in CatalogInquiryResultType._meta.fields
+        assert hasattr(ItemCatalogRefModel, "namespace_node_index")
 
     @pytest.mark.unit
-    def test_neo4j_handlers_registered_under_neo4j_adapter_id(self):
-        """Both catalog and availability registries auto-register the Neo4j adapter."""
-        from ai_rfq_engine.handlers.availability import (
-            Neo4jAvailabilityHandler,
-            get_handler as get_avail_handler,
-        )
-        from ai_rfq_engine.handlers.catalog import (
-            Neo4jCatalogHandler,
-            get_handler as get_catalog_handler,
-        )
+    def test_handlers_export_direct_dispatch_functions(self):
+        from ai_rfq_engine.handlers.availability import dispatch_check
+        from ai_rfq_engine.handlers.catalog import dispatch_inquire
 
-        # The autouse fixture in other test files clears handlers between tests;
-        # here we re-import the package which triggers auto-registration.
-        import importlib
-
-        import ai_rfq_engine.handlers.availability as availability_pkg
-        import ai_rfq_engine.handlers.catalog as catalog_pkg
-
-        importlib.reload(availability_pkg)
-        importlib.reload(catalog_pkg)
-
-        assert availability_pkg.get_handler("neo4j") is Neo4jAvailabilityHandler
-        assert catalog_pkg.get_handler("neo4j") is Neo4jCatalogHandler
+        assert callable(dispatch_check)
+        assert callable(dispatch_inquire)

@@ -22,7 +22,6 @@ class InsertUpdateItemCatalogRef(Mutation):
 
     class Arguments:
         catalog_ref_uuid = String(required=False)
-        system_code = String(required=False)
         namespace = String(required=False)
         node_id = String(required=False)
         item_uuid = String(required=False)

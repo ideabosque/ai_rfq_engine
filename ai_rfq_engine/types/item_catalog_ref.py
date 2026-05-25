@@ -12,10 +12,9 @@ from silvaengine_utility import JSONCamelCase
 class ItemCatalogRefType(ObjectType):
     partition_key = String()
     catalog_ref_uuid = String()
-    system_code = String()
     namespace = String()
     node_id = String()
-    system_node_key = String()
+    namespace_node_key = String()
     extra = JSONCamelCase()
     item_uuid = String()
     item_lookup_key = String()

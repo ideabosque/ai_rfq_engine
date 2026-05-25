@@ -106,8 +106,6 @@ class ProviderItemModel(BaseModel):
     base_price_per_uom = NumberAttribute()
     item_spec = MapAttribute(null=True)
     availability_mode = UnicodeAttribute(default="none")
-    availability_system_code = UnicodeAttribute(null=True)
-    availability_namespace = UnicodeAttribute(default="DEFAULT")
     created_at = UTCDateTimeAttribute()
     updated_by = UnicodeAttribute()
     updated_at = UTCDateTimeAttribute()
@@ -377,14 +375,6 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
         raise ValueError(
             "availability_mode must be one of: none, check_only, require_hold"
         )
-    availability_system_code = kwargs.get(
-        "availability_system_code",
-        getattr(kwargs.get("entity"), "availability_system_code", None),
-    )
-    if availability_mode != "none" and not availability_system_code:
-        raise ValueError(
-            "availability_system_code is required when availability_mode enables availability"
-        )
     if kwargs.get("entity") is None:
         cols = {
             "item_spec": {},
@@ -399,8 +389,6 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
             "base_price_per_uom",
             "item_spec",
             "availability_mode",
-            "availability_system_code",
-            "availability_namespace",
         ]:
             if key in kwargs:
                 cols[key] = kwargs[key]
@@ -425,8 +413,6 @@ def insert_update_provider_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> 
         "base_price_per_uom": ProviderItemModel.base_price_per_uom,
         "item_spec": ProviderItemModel.item_spec,
         "availability_mode": ProviderItemModel.availability_mode,
-        "availability_system_code": ProviderItemModel.availability_system_code,
-        "availability_namespace": ProviderItemModel.availability_namespace,
     }
 
     # Add actions dynamically based on the presence of keys in kwargs

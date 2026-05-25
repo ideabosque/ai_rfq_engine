@@ -25,8 +25,6 @@ class InsertUpdateProviderItem(Mutation):
         base_price_per_uom = Float(required=False)
         item_spec = JSONCamelCase(required=False)
         availability_mode = String(required=False)
-        availability_system_code = String(required=False)
-        availability_namespace = String(required=False)
         updated_by = String(required=True)
 
     @staticmethod

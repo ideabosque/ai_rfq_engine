@@ -1,11 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-GraphQL resolver for ``inquire_catalog`` (G7b).
+GraphQL resolver for KGE-backed ``inquire_catalog`` (G7b).
 
 Wraps ``handlers.catalog.dispatch_inquire`` and translates structured
 ``CatalogHandlerError`` subclasses into in-band ``CatalogInquiryResultType``
-fields. Unknown / unexpected exceptions propagate as GraphQL errors.
+fields. Graph-instance configuration and credentials remain owned by KGE.
 """
 from __future__ import annotations
 
@@ -40,24 +40,19 @@ def _parse_fetched_at(value: Optional[str]):
 def resolve_inquire_catalog(
     info: ResolveInfo, **kwargs: Dict[str, Any]
 ) -> CatalogInquiryResultType:
-    system_code = kwargs["system_code"]
     namespace = kwargs.get("namespace") or "DEFAULT"
     node_id = kwargs.get("node_id")
-    provider_corp_external_id = kwargs.get("provider_corp_external_id")
     query = kwargs.get("query")
 
     try:
         result = dispatch_inquire(
             info,
-            system_code=system_code,
             namespace=namespace,
             node_id=node_id,
-            provider_corp_external_id=provider_corp_external_id,
             query=query,
         )
     except CatalogHandlerError as exc:
         return CatalogInquiryResultType(
-            system=system_code,
             namespace=namespace,
             node_id=node_id,
             payload=None,
@@ -69,7 +64,6 @@ def resolve_inquire_catalog(
 
     ref = result.get("ref") or {}
     return CatalogInquiryResultType(
-        system=result.get("system", system_code),
         namespace=ref.get("namespace", namespace),
         node_id=ref.get("node_id", node_id),
         payload=result.get("payload"),

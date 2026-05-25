@@ -24,6 +24,7 @@ class ProviderItemBatchType(ObjectType):
     guardrail_price_per_uom = Float()
     in_stock = Boolean()
     slow_move_item = Boolean()
+    availability_qty = Float()
     expired_at = DateTime()
     produced_at = DateTime()
     service_start_at = DateTime()

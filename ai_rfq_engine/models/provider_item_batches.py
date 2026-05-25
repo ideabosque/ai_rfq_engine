@@ -85,6 +85,7 @@ class ProviderItemBatchModel(BaseModel):
     guardrail_price_per_uom = NumberAttribute()
     slow_move_item = BooleanAttribute(default=False)
     in_stock = BooleanAttribute(default=True)
+    availability_qty = NumberAttribute(null=True)
     currency = UnicodeAttribute(null=True)
     cancellation_policy_uuid = UnicodeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
@@ -387,6 +388,7 @@ def insert_update_provider_item_batch(
             "guardrail_margin_per_uom",
             "slow_move_item",
             "in_stock",
+            "availability_qty",
             "currency",
             "cancellation_policy_uuid",
         ]:
@@ -433,6 +435,7 @@ def insert_update_provider_item_batch(
         "guardrail_price_per_uom": ProviderItemBatchModel.guardrail_price_per_uom,
         "slow_move_item": ProviderItemBatchModel.slow_move_item,
         "in_stock": ProviderItemBatchModel.in_stock,
+        "availability_qty": ProviderItemBatchModel.availability_qty,
         "currency": ProviderItemBatchModel.currency,
         "cancellation_policy_uuid": ProviderItemBatchModel.cancellation_policy_uuid,
     }

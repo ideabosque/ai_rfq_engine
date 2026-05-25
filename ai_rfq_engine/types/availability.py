@@ -10,7 +10,6 @@ from silvaengine_utility import JSONCamelCase
 
 
 class AvailabilityResultType(ObjectType):
-    system = String()
     operation = String()
     provider_item_uuid = String()
     batch_no = String()

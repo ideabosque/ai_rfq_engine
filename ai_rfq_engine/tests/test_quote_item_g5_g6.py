@@ -411,11 +411,10 @@ class TestG6CancellationSnapshot:
         # ...and the snapshot is added alongside it.
         assert rd["cancellation_policy_snapshot"]["policy_uuid"] == "pol-002"
 
-    def test_user_provided_snapshot_is_not_clobbered(
+    def test_user_provided_snapshot_is_rejected_when_batch_has_policy(
         self, info, patched_quote_item, monkeypatch
     ):
-        """A caller pre-populating the snapshot key (rare but legal) wins;
-        the auto-snapshot uses ``setdefault`` and never overwrites."""
+        """Quoted policy terms are engine-owned when a batch policy exists."""
         from ai_rfq_engine.models import cancellation_policy as cp_model
         from ai_rfq_engine.models import provider_item_batches as pib_model
 
@@ -431,23 +430,57 @@ class TestG6CancellationSnapshot:
             lambda *args: FakePolicy(policy_uuid="pol-003"),
         )
         raw = _raw_insert(patched_quote_item)
-        raw(
-            info,
-            entity=None,
-            quote_uuid="q",
-            quote_item_uuid="qi",
+        with pytest.raises(ValueError, match="engine-owned"):
+            raw(
+                info,
+                entity=None,
+                quote_uuid="q",
+                quote_item_uuid="qi",
+                request_uuid="r",
+                item_uuid="i",
+                provider_item_uuid="p",
+                batch_no="batch-003",
+                segment_uuid="s",
+                qty=1.0,
+                updated_by="t",
+                request_data={
+                    "cancellation_policy_snapshot": {"policy_uuid": "caller-override"}
+                },
+            )
+
+    def test_existing_generated_snapshot_cannot_be_changed_on_update(
+        self, info, patched_quote_item
+    ):
+        raw = _raw_insert(patched_quote_item)
+        existing = SimpleNamespace(
             request_uuid="r",
-            item_uuid="i",
-            provider_item_uuid="p",
-            batch_no="batch-003",
-            segment_uuid="s",
-            qty=1.0,
-            updated_by="t",
-            request_data={
-                "cancellation_policy_snapshot": {"policy_uuid": "caller-override"}
-            },
+            request_data={"cancellation_policy_snapshot": {"policy_uuid": "pol-001"}},
         )
-        c = FakeSavedRow.captured
-        assert c["request_data"]["cancellation_policy_snapshot"]["policy_uuid"] == (
-            "caller-override"
-        )
+        with pytest.raises(ValueError, match="cannot be changed"):
+            raw(
+                info,
+                entity=existing,
+                quote_uuid="q",
+                quote_item_uuid="qi",
+                updated_by="t",
+                request_data={"special_instructions": "changed"},
+            )
+
+    def test_reserved_snapshot_key_is_rejected_without_selected_policy(
+        self, info, patched_quote_item
+    ):
+        raw = _raw_insert(patched_quote_item)
+        with pytest.raises(ValueError, match="engine-owned"):
+            raw(
+                info,
+                entity=None,
+                quote_uuid="q",
+                quote_item_uuid="qi",
+                request_uuid="r",
+                item_uuid="i",
+                provider_item_uuid="p",
+                segment_uuid="s",
+                qty=1.0,
+                updated_by="t",
+                request_data={"cancellation_policy_snapshot": {"policy_uuid": "forged"}},
+            )

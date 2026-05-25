@@ -5,8 +5,13 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import functools
+import hashlib
+import json
 import traceback
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
+
+if TYPE_CHECKING:
+    from ..handlers.availability import AvailabilityResponse
 
 import pendulum
 from graphene import ResolveInfo
@@ -78,14 +83,25 @@ def _build_cancellation_snapshot(
             tiers = tiers.as_dict()
         except Exception:
             tiers = None
-    return {
+    policy_content = {
         "policy_uuid": getattr(policy, "policy_uuid", policy_uuid),
         "label": getattr(policy, "label", None),
         "description": getattr(policy, "description", None),
         "tiers": tiers,
         "notes_template_uuid": getattr(policy, "notes_template_uuid", None),
+    }
+    snapshot = {
+        **policy_content,
         "snapshotted_at": pendulum.now("UTC").to_iso8601_string(),
     }
+    snapshot_bytes = json.dumps(
+        policy_content,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    ).encode("utf-8")
+    snapshot["content_hash"] = hashlib.sha256(snapshot_bytes).hexdigest()[:16]
+    return snapshot
 
 
 def _enforce_availability(
@@ -98,7 +114,9 @@ def _enforce_availability(
     pax_breakdown: dict | None,
     service_start_at: Any = None,
     service_end_at: Any = None,
-) -> dict | None:
+    quote_uuid: str | None = None,
+    quote_item_uuid: str | None = None,
+) -> "AvailabilityResponse | None":
     """
     Check configured reservable capacity before persisting a quote item.
 
@@ -111,14 +129,6 @@ def _enforce_availability(
         return None
     if availability_mode not in {"check_only", "require_hold"}:
         raise ValueError(f"Unsupported availability_mode: {availability_mode}")
-    availability_system_code = getattr(
-        provider_item, "availability_system_code", None
-    )
-    if not availability_system_code:
-        raise ValueError(
-            "Provider item availability is enabled but availability_system_code is missing"
-        )
-
     if batch_no and (service_start_at is None or service_end_at is None):
         from .provider_item_batches import get_provider_item_batch
 
@@ -136,21 +146,18 @@ def _enforce_availability(
     from ..handlers.availability import dispatch_acquire_hold, dispatch_check
 
     dispatch = (
-        dispatch_acquire_hold
-        if availability_mode == "require_hold"
-        else dispatch_check
+        dispatch_acquire_hold if availability_mode == "require_hold" else dispatch_check
     )
     result = dispatch(
         info,
-        system_code=availability_system_code,
-        namespace=getattr(provider_item, "availability_namespace", None) or "DEFAULT",
-        provider_corp_external_id=getattr(provider_item, "provider_corp_external_id", None),
         provider_item_uuid=provider_item_uuid,
         batch_no=batch_no,
         service_start_at=service_start_at,
         service_end_at=service_end_at,
         pax_breakdown=pax_breakdown,
         qty=float(qty),
+        quote_uuid=quote_uuid,
+        quote_item_uuid=quote_item_uuid,
     )
     if not result.get("available"):
         raise ValueError(
@@ -159,7 +166,9 @@ def _enforce_availability(
     if availability_mode == "require_hold" and (
         not result.get("hold_token") or not result.get("expires_at")
     ):
-        raise ValueError("Availability handler did not return the required temporary hold")
+        raise ValueError(
+            "Availability handler did not return the required temporary hold"
+        )
     return result
 
 
@@ -179,9 +188,6 @@ def _release_availability_hold(info: ResolveInfo, quote_item: Any) -> None:
 
     dispatch_release_hold(
         info,
-        system_code=provider_item.availability_system_code,
-        namespace=getattr(provider_item, "availability_namespace", None) or "DEFAULT",
-        provider_corp_external_id=getattr(provider_item, "provider_corp_external_id", None),
         provider_item_uuid=quote_item.provider_item_uuid,
         batch_no=getattr(quote_item, "batch_no", None),
         hold_token=hold_token,
@@ -704,9 +710,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
 
         if pricing_mode == "per_pax_type":
             if not isinstance(pax_breakdown, dict) or not pax_breakdown:
-                raise ValueError(
-                    "pax_breakdown is required for per_pax_type pricing"
-                )
+                raise ValueError("pax_breakdown is required for per_pax_type pricing")
 
             pax_total = 0.0
             subtotal = 0.0
@@ -755,9 +759,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
             # ``qty`` is the number of UOM units (room-nights, table-seatings,
             # etc.); ``pax_breakdown`` is who's staying / attending.
             if not isinstance(pax_breakdown, dict) or not pax_breakdown:
-                raise ValueError(
-                    "pax_breakdown is required for occupancy pricing"
-                )
+                raise ValueError("pax_breakdown is required for occupancy pricing")
             tier = _get_occupancy_pricing_tier(
                 info,
                 item_uuid=item_uuid,
@@ -812,9 +814,25 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         cols["request_uuid"] = request_uuid
         cols["price_per_uom"] = price_per_uom
 
-        for optional_key in ["batch_no", "request_data", "pax_breakdown", "bundle_uuid", "bundle_label", "currency", "subtotal_native", "subtotal_discount", "notes"]:
+        for optional_key in [
+            "batch_no",
+            "request_data",
+            "pax_breakdown",
+            "bundle_uuid",
+            "bundle_label",
+            "currency",
+            "subtotal_native",
+            "subtotal_discount",
+            "notes",
+        ]:
             if optional_key in kwargs:
                 cols[optional_key] = kwargs[optional_key]
+        if isinstance(cols.get("request_data"), dict) and (
+            "cancellation_policy_snapshot" in cols["request_data"]
+        ):
+            raise ValueError(
+                "request_data.cancellation_policy_snapshot is engine-owned"
+            )
 
         from .quote import get_quote as _get_parent_quote
 
@@ -837,13 +855,20 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
             pax_breakdown=pax_breakdown,
             service_start_at=kwargs.get("service_start_at"),
             service_end_at=kwargs.get("service_end_at"),
+            quote_uuid=quote_uuid,
+            quote_item_uuid=quote_item_uuid,
         )
         if availability is not None:
             cols["hold_token"] = availability.get("hold_token")
             expires_at = availability.get("expires_at")
             cols["hold_expires_at"] = (
-                pendulum.parse(expires_at) if isinstance(expires_at, str) else expires_at
+                pendulum.parse(expires_at)
+                if isinstance(expires_at, str)
+                else expires_at
             )
+            selected_batch_no = (availability.get("request") or {}).get("batch_no")
+            if not cols.get("batch_no") and selected_batch_no:
+                cols["batch_no"] = selected_batch_no
 
         # G5: apply Quote-locked FX rate. ``subtotal`` from tier pricing is in the
         # native (supplier) currency. If the parent Quote was created with a
@@ -892,8 +917,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         if snapshot is not None:
             request_data = cols.get("request_data") or {}
             if isinstance(request_data, dict):
-                # Preserve any caller-provided keys; never clobber existing data.
-                request_data.setdefault("cancellation_policy_snapshot", snapshot)
+                request_data["cancellation_policy_snapshot"] = snapshot
                 cols["request_data"] = request_data
 
         # Auto-calculate subtotal and final_subtotal (both in DISPLAY currency)
@@ -902,11 +926,23 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         cols["subtotal"] = subtotal_display
         cols["final_subtotal"] = final_subtotal
 
-        QuoteItemModel(
-            quote_uuid,
-            quote_item_uuid,
-            **convert_decimal_to_number(cols),
-        ).save()
+        try:
+            QuoteItemModel(
+                quote_uuid,
+                quote_item_uuid,
+                **convert_decimal_to_number(cols),
+            ).save()
+        except Exception:
+            if cols.get("hold_token"):
+                from ..handlers.availability import dispatch_release_hold
+
+                dispatch_release_hold(
+                    info,
+                    provider_item_uuid=provider_item_uuid,
+                    batch_no=cols.get("batch_no"),
+                    hold_token=cols["hold_token"],
+                )
+            raise
 
         # Update quote totals after inserting new quote item
         if not request_uuid:
@@ -919,6 +955,20 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
     else:
         quote_item = kwargs.get("entity")
         request_uuid = quote_item.request_uuid
+        if "request_data" in kwargs:
+            request_data = kwargs["request_data"]
+            existing_data = getattr(quote_item, "request_data", None) or {}
+            if (
+                isinstance(request_data, dict)
+                and "cancellation_policy_snapshot" in request_data
+            ) or (
+                isinstance(existing_data, dict)
+                and "cancellation_policy_snapshot" in existing_data
+            ):
+                raise ValueError(
+                    "request_data.cancellation_policy_snapshot cannot be changed "
+                    "on an existing quote item; create a requote"
+                )
 
         actions = [
             QuoteItemModel.updated_by.set(kwargs["updated_by"]),
@@ -972,7 +1022,9 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
         if "subtotal_native" in kwargs:
             actions.append(
                 QuoteItemModel.subtotal_native.set(
-                    None if kwargs["subtotal_native"] == "null" else kwargs["subtotal_native"]
+                    None
+                    if kwargs["subtotal_native"] == "null"
+                    else kwargs["subtotal_native"]
                 )
             )
 
