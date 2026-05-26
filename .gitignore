@@ -163,5 +163,7 @@ cython_debug/
 
 .vscode/
 test_data.json
+ai_rfq_engine/tests/prepare_test_data/flight_products.json
+ai_rfq_engine/tests/prepare_test_data/segments_and_contacts.json
 .claude
 .zed
