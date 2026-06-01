@@ -468,6 +468,7 @@ class QuoteItemModel(BaseModel):
     pax_breakdown = MapAttribute(null=True)          # {pax_type: count}
     bundle_uuid = UnicodeAttribute(null=True)        # Itinerary bundle grouping
     bundle_label = UnicodeAttribute(null=True)       # Human-readable bundle name
+    bundle_component_uuid = UnicodeAttribute(null=True) # Optional template component link
     subtotal = NumberAttribute()                     # Display-currency subtotal
     subtotal_discount = NumberAttribute(null=True)   # Applied discount amount
     final_subtotal = NumberAttribute()               # subtotal - discount (display)
@@ -478,6 +479,8 @@ class QuoteItemModel(BaseModel):
 ```
 
 **Quote Item Creation Logic**:
+
+`bundle_uuid`, `bundle_label`, and `bundle_component_uuid` do not change price calculation. They connect a priced line back to a reusable `BundleModel` / `BundleComponentModel` package template when the quote was built from one. Each line still prices independently so provider attribution, service-dated capacity, FX, and cancellation snapshots remain line-specific.
 
 See [ai_rfq_engine/models/quote_item.py](../ai_rfq_engine/models/quote_item.py)
 
@@ -1891,6 +1894,7 @@ The pricing system is a **sophisticated multi-tier architecture** that:
 11. **Implements quote-level FX conversion** with locked rates and native/display currency tracking
 12. **Protects cancellation-policy snapshots** as engine-owned quoted terms
 13. **Provides durable local availability holds** with transactional capacity reservation and restoration
+14. **Supports reusable bundle templates** while keeping each quote component independently priced
 
 The system prioritizes:
 - **Efficiency** through database-level tier matching

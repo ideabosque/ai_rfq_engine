@@ -25,6 +25,7 @@ class QuoteItemType(ObjectType):
     pax_breakdown = JSONCamelCase()
     bundle_uuid = String()
     bundle_label = String()
+    bundle_component_uuid = String()
     price_per_uom = Float()
     subtotal = Float()
     subtotal_discount = Float()
@@ -42,6 +43,8 @@ class QuoteItemType(ObjectType):
     item = Field(lambda: ItemType)
     provider_item = Field(lambda: ProviderItemType)
     provider_item_batch = Field(lambda: ProviderItemBatchType)
+    bundle = Field(lambda: BundleType)
+    bundle_component = Field(lambda: BundleComponentType)
 
     updated_by = String()
     created_at = DateTime()
@@ -198,6 +201,24 @@ class QuoteItemType(ObjectType):
             )
         )
 
+    def resolve_bundle(parent, info):
+        from ..models.bundle import resolve_bundle
+
+        bundle_uuid = getattr(parent, "bundle_uuid", None)
+        if not bundle_uuid:
+            return None
+        return resolve_bundle(info, bundle_uuid=bundle_uuid)
+
+    def resolve_bundle_component(parent, info):
+        from ..models.bundle_component import resolve_bundle_component
+
+        bundle_component_uuid = getattr(parent, "bundle_component_uuid", None)
+        if not bundle_component_uuid:
+            return None
+        return resolve_bundle_component(
+            info, bundle_component_uuid=bundle_component_uuid
+        )
+
 
 class QuoteItemListType(ListObjectType):
     quote_item_list = List(QuoteItemType)
@@ -208,3 +229,5 @@ from .item import ItemType
 from .provider_item import ProviderItemType
 from .provider_item_batches import ProviderItemBatchType
 from .quote import QuoteType
+from .bundle import BundleType
+from .bundle_component import BundleComponentType

@@ -10,7 +10,7 @@ The AI RFQ Engine is a sophisticated GraphQL-based Request for Quote (RFQ) manag
 
 ### Hospitality Readiness Note (Reviewed 2026-05-24)
 
-Hospitality-shaped modeling and calculation are present in this working tree: service-dated batches, PAX and occupancy pricing, bundle grouping, FX fields, engine-owned cancellation-policy snapshots, catalog mapping, and durable local availability holds. `require_hold` now writes a tenant-scoped hold and reserves quantified capacity transactionally; release and explicit expiry restore it once. Production rollout still requires DynamoDB-backed contention validation and configured expiry invocation for abandoned holds. See [HOSPITALITY_BUSINESS_GAP_PLAN.md](HOSPITALITY_BUSINESS_GAP_PLAN.md) and [HOSPITALITY_QUICK_START.md](HOSPITALITY_QUICK_START.md).
+Hospitality-shaped modeling and calculation are present in this working tree: service-dated batches, PAX and occupancy pricing, reusable bundle/package templates, quote-line bundle grouping, FX fields, engine-owned cancellation-policy snapshots, catalog mapping, and durable local availability holds. `require_hold` now writes a tenant-scoped hold and reserves quantified capacity transactionally; release and explicit expiry restore it once. Production rollout still requires DynamoDB-backed contention validation and configured expiry invocation for abandoned holds. See [HOSPITALITY_BUSINESS_GAP_PLAN.md](HOSPITALITY_BUSINESS_GAP_PLAN.md) and [HOSPITALITY_QUICK_START.md](HOSPITALITY_QUICK_START.md).
 
 ### 📊 Project Progress Overview
 
@@ -109,6 +109,7 @@ graph TD
 - `email`: Customer email (indexed)
 - `request_title`: RFQ title
 - `items`: Requested items (JSON array)
+- `bundle_uuid`: Optional selected reusable package/itinerary template
 - `status`: Request status (draft, submitted, closed)
 
 **Relationships**:
@@ -168,6 +169,7 @@ graph TD
 - `pax_breakdown`: MapAttribute — `{pax_type: count}` for per_pax_type/occupancy modes
 - `bundle_uuid`: Itinerary bundle grouping key (optional)
 - `bundle_label`: Human-readable bundle name (optional)
+- `bundle_component_uuid`: Optional link back to a reusable bundle component template
 - `price_per_uom`: Computed per-UOM rate
 - `subtotal`: Display-currency subtotal
 - `subtotal_native`: Native (supplier) currency subtotal (optional)
@@ -182,8 +184,54 @@ graph TD
 - **Many-to-One** with Quote
 - **Many-to-One** with Item
 - **Many-to-One** with ProviderItem
+- **Optional Many-to-One** with BundleComponent
 
 **Nested Resolvers**: None (minimal type)
+
+---
+
+#### Bundle
+**Purpose**: Reusable package or itinerary template selected by requests and expanded into quote items
+
+**Table**: `are-bundles`
+
+**Key Attributes**:
+- `partition_key` (Hash Key): Tenant identifier
+- `bundle_uuid` (Range Key): Unique identifier
+- `bundle_code`: Optional human/business code
+- `bundle_name`: Template name
+- `bundle_type`: `package`, `itinerary`, `event_package`, etc.
+- `description`: Optional description
+- `extra`: Optional metadata
+- `status`: Template status
+
+**Relationships**:
+- **One-to-Many** with BundleComponent
+- **Optional One-to-Many** with Request via `Request.bundle_uuid`
+- **Optional One-to-Many** with QuoteItem via `QuoteItem.bundle_uuid`
+
+---
+
+#### BundleComponent
+**Purpose**: Default component definition within a reusable bundle
+
+**Table**: `are-bundle_components`
+
+**Key Attributes**:
+- `partition_key` (Hash Key): Tenant identifier
+- `bundle_component_uuid` (Range Key): Unique identifier
+- `bundle_uuid`: Parent bundle
+- `item_uuid`: Default item for this component
+- `provider_item_uuid`: Optional default provider item
+- `component_role`: Role such as lodging, transfer, activity, meal, or fee
+- `required`: Whether the component is required by default
+- `default_qty`: Optional default quantity
+- `sort_order`: Presentation order
+- `extra`: Optional metadata
+- `status`: Component status
+
+**Relationship To Pricing**:
+Bundle components are templates only. Pricing, availability holds, FX, and cancellation snapshots remain on independently persisted `QuoteItem` rows.
 
 ---
 

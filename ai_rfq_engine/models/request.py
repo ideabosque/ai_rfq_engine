@@ -34,6 +34,7 @@ from .file import resolve_file_list
 from .quote import resolve_quote_list
 from .utils import (
     validate_batch_exists,
+    validate_bundle_exists,
     validate_item_exists,
     validate_provider_item_exists,
 )
@@ -84,6 +85,7 @@ class RequestModel(BaseModel):
     shipping_address = MapAttribute(null=True)
     items = ListAttribute(of=MapAttribute)
     notes = UnicodeAttribute(null=True)
+    bundle_uuid = UnicodeAttribute(null=True)
     status = UnicodeAttribute(default="initial")
     expired_at = UTCDateTimeAttribute(null=True)
     created_at = UTCDateTimeAttribute()
@@ -202,6 +204,7 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     request_title = kwargs.get("request_title")
     request_description = kwargs.get("request_description")
     statuses = kwargs.get("statuses")
+    bundle_uuid = kwargs.get("bundle_uuid")
     from_expired_at = kwargs.get("from_expired_at")
     to_expired_at = kwargs.get("to_expired_at")
     updated_at_gt = kwargs.get("updated_at_gt")
@@ -240,6 +243,8 @@ def resolve_request_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         the_filters &= RequestModel.request_description.contains(request_description)
     if statuses:
         the_filters &= RequestModel.status.is_in(*statuses)
+    if bundle_uuid:
+        the_filters &= RequestModel.bundle_uuid == bundle_uuid
     if from_expired_at and to_expired_at:
         the_filters &= RequestModel.expired_at.between(from_expired_at, to_expired_at)
     if the_filters is not None:
@@ -307,6 +312,9 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
     # Validate items if provided (runs for both insert and update operations)
     if "items" in kwargs and kwargs["items"]:
         _validate_request_items(partition_key, kwargs["items"])
+    if kwargs.get("bundle_uuid") and kwargs["bundle_uuid"] != "null":
+        if not validate_bundle_exists(partition_key, kwargs["bundle_uuid"]):
+            raise ValueError(f"bundle_uuid '{kwargs['bundle_uuid']}' does not exist")
 
     if kwargs.get("entity") is None:
         cols = {
@@ -325,6 +333,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
             "shipping_address",
             "items",
             "notes",
+            "bundle_uuid",
             "status",
             "expired_at",
         ]:
@@ -352,6 +361,7 @@ def insert_update_request(info: ResolveInfo, **kwargs: Dict[str, Any]) -> None:
         "shipping_address": RequestModel.shipping_address,
         "items": RequestModel.items,
         "notes": RequestModel.notes,
+        "bundle_uuid": RequestModel.bundle_uuid,
         "status": RequestModel.status,
         "expired_at": RequestModel.expired_at,
     }

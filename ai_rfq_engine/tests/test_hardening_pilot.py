@@ -169,7 +169,12 @@ class TestB2BProcurementRegression:
         prov_data = _graphql(
             engine,
             prov_query,
-            {"itemId": item_uuid, "provId": "SUPPLIER-001", "price": 12.5, "by": updated_by},
+            {
+                "itemId": item_uuid,
+                "provId": "SUPPLIER-001",
+                "price": 12.5,
+                "by": updated_by,
+            },
             endpoint_id,
             part_id,
         )
@@ -210,9 +215,13 @@ class TestB2BProcurementRegression:
                 engine,
                 tier_query,
                 {
-                    "iid": item_uuid, "pid": provider_item_uuid,
-                    "sid": segment_uuid, "qty": qty_floor, "price": price,
-                    "stat": "active", "by": updated_by,
+                    "iid": item_uuid,
+                    "pid": provider_item_uuid,
+                    "sid": segment_uuid,
+                    "qty": qty_floor,
+                    "price": price,
+                    "stat": "active",
+                    "by": updated_by,
                 },
                 endpoint_id,
                 part_id,
@@ -238,8 +247,13 @@ class TestB2BProcurementRegression:
                     request { requestUuid }
                 }
             }""",
-            {"email": "buyer@acme.com", "title": "Bulk widget order", "by": ctx["updated_by"]},
-            endpoint_id, part_id,
+            {
+                "email": "buyer@acme.com",
+                "title": "Bulk widget order",
+                "by": ctx["updated_by"],
+            },
+            endpoint_id,
+            part_id,
         )
         request_uuid = req_data["insertUpdateRequest"]["request"]["requestUuid"]
 
@@ -251,7 +265,8 @@ class TestB2BProcurementRegression:
                 }
             }""",
             {"rid": request_uuid, "by": ctx["updated_by"]},
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
         quote = quote_data["insertUpdateQuote"]["quote"]
         # Procurement default: no currency/FX configured on the quote.
@@ -271,11 +286,16 @@ class TestB2BProcurementRegression:
                 }
             }""",
             {
-                "qid": quote_uuid, "rid": request_uuid, "iid": ctx["item_uuid"],
-                "pid": ctx["provider_item_uuid"], "sid": ctx["segment_uuid"],
-                "qty": 50.0, "by": ctx["updated_by"],
+                "qid": quote_uuid,
+                "rid": request_uuid,
+                "iid": ctx["item_uuid"],
+                "pid": ctx["provider_item_uuid"],
+                "sid": ctx["segment_uuid"],
+                "qty": 50.0,
+                "by": ctx["updated_by"],
             },
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
         qi = qi_data["insertUpdateQuoteItem"]["quoteItem"]
         assert qi["pricePerUom"] == pytest.approx(10.0)
@@ -298,8 +318,13 @@ class TestB2BProcurementRegression:
                     request { requestUuid }
                 }
             }""",
-            {"email": "buyer@acme.com", "title": "Volume order", "by": ctx["updated_by"]},
-            endpoint_id, part_id,
+            {
+                "email": "buyer@acme.com",
+                "title": "Volume order",
+                "by": ctx["updated_by"],
+            },
+            endpoint_id,
+            part_id,
         )
         request_uuid = req_data["insertUpdateRequest"]["request"]["requestUuid"]
 
@@ -311,7 +336,8 @@ class TestB2BProcurementRegression:
                 }
             }""",
             {"rid": request_uuid, "by": ctx["updated_by"]},
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
         quote_uuid = quote_data["insertUpdateQuote"]["quote"]["quoteUuid"]
 
@@ -327,11 +353,16 @@ class TestB2BProcurementRegression:
                 }
             }""",
             {
-                "qid": quote_uuid, "rid": request_uuid, "iid": ctx["item_uuid"],
-                "pid": ctx["provider_item_uuid"], "sid": ctx["segment_uuid"],
-                "qty": 150.0, "by": ctx["updated_by"],
+                "qid": quote_uuid,
+                "rid": request_uuid,
+                "iid": ctx["item_uuid"],
+                "pid": ctx["provider_item_uuid"],
+                "sid": ctx["segment_uuid"],
+                "qty": 150.0,
+                "by": ctx["updated_by"],
             },
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
         qi = qi_data["insertUpdateQuoteItem"]["quoteItem"]
         assert qi["pricePerUom"] == pytest.approx(8.0)
@@ -363,10 +394,14 @@ class TestHotelHardening:
                 }
             }""",
             {
-                "type": "lodging", "name": "Hardening Deluxe King",
-                "mode": "occupancy", "uom": "room_night", "by": updated_by,
+                "type": "lodging",
+                "name": "Hardening Deluxe King",
+                "mode": "occupancy",
+                "uom": "room_night",
+                "by": updated_by,
             },
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
         item_uuid = item_data["insertUpdateItem"]["item"]["itemUuid"]
         assert item_data["insertUpdateItem"]["item"]["pricingMode"] == "occupancy"
@@ -379,8 +414,14 @@ class TestHotelHardening:
                     providerItem { providerItemUuid }
                 }
             }""",
-            {"itemId": item_uuid, "provId": "HOTEL-HARDEN-001", "price": 200.0, "by": updated_by},
-            endpoint_id, part_id,
+            {
+                "itemId": item_uuid,
+                "provId": "HOTEL-HARDEN-001",
+                "price": 200.0,
+                "by": updated_by,
+            },
+            endpoint_id,
+            part_id,
         )
         provider_item_uuid = prov_data["insertUpdateProviderItem"]["providerItem"][
             "providerItemUuid"
@@ -405,7 +446,8 @@ class TestHotelHardening:
                 },
                 "by": updated_by,
             },
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
         policy_uuid = policy_data["insertUpdateCancellationPolicy"][
             "cancellationPolicy"
@@ -426,13 +468,19 @@ class TestHotelHardening:
                 }
             }""",
             {
-                "pid": provider_item_uuid, "iid": item_uuid,
+                "pid": provider_item_uuid,
+                "iid": item_uuid,
                 "bno": f"HARD-RN-{now.format('YYYYMMDD')}",
-                "exp": check_out, "prod": check_in,
-                "svcStart": check_in, "svcEnd": check_out,
-                "cost": 140.0, "cancelUuid": policy_uuid, "by": updated_by,
+                "exp": check_out,
+                "prod": check_in,
+                "svcStart": check_in,
+                "svcEnd": check_out,
+                "cost": 140.0,
+                "cancelUuid": policy_uuid,
+                "by": updated_by,
             },
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
         batch_no = batch_data["insertUpdateProviderItemBatch"]["providerItemBatch"][
             "batchNo"
@@ -446,7 +494,8 @@ class TestHotelHardening:
                 }
             }""",
             {"name": "RetailHotel", "by": updated_by},
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
         segment_uuid = seg_data["insertUpdateSegment"]["segment"]["segmentUuid"]
 
@@ -465,12 +514,18 @@ class TestHotelHardening:
                 }
             }""",
             {
-                "iid": item_uuid, "pid": provider_item_uuid, "sid": segment_uuid,
-                "qty": 0.0, "price": 200.0,
-                "base": {"adult": 2}, "extra": {"adult": 50, "child": 25},
-                "stat": "active", "by": updated_by,
+                "iid": item_uuid,
+                "pid": provider_item_uuid,
+                "sid": segment_uuid,
+                "qty": 0.0,
+                "price": 200.0,
+                "base": {"adult": 2},
+                "extra": {"adult": 50, "child": 25},
+                "stat": "active",
+                "by": updated_by,
             },
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
 
         return {
@@ -479,7 +534,8 @@ class TestHotelHardening:
             "segment_uuid": segment_uuid,
             "batch_no": batch_no,
             "policy_uuid": policy_uuid,
-            "check_in": check_in, "check_out": check_out,
+            "check_in": check_in,
+            "check_out": check_out,
             "updated_by": updated_by,
         }
 
@@ -496,8 +552,13 @@ class TestHotelHardening:
                     request { requestUuid }
                 }
             }""",
-            {"email": "guest@example.com", "title": "Hotel hardening", "by": ctx["updated_by"]},
-            endpoint_id, part_id,
+            {
+                "email": "guest@example.com",
+                "title": "Hotel hardening",
+                "by": ctx["updated_by"],
+            },
+            endpoint_id,
+            part_id,
         )["insertUpdateRequest"]["request"]["requestUuid"]
 
         quote_uuid = _graphql(
@@ -508,8 +569,13 @@ class TestHotelHardening:
                     quote { quoteUuid }
                 }
             }""",
-            {"rid": request_uuid, "provId": "HOTEL-HARDEN-001", "by": ctx["updated_by"]},
-            endpoint_id, part_id,
+            {
+                "rid": request_uuid,
+                "provId": "HOTEL-HARDEN-001",
+                "by": ctx["updated_by"],
+            },
+            endpoint_id,
+            part_id,
         )["insertUpdateQuote"]["quote"]["quoteUuid"]
 
         # 3 nights × (200 base + 1 extra adult @ 50 + 1 child @ 25) = 3 × 275 = 825
@@ -526,12 +592,18 @@ class TestHotelHardening:
                 }
             }""",
             {
-                "qid": quote_uuid, "rid": request_uuid, "iid": ctx["item_uuid"],
-                "pid": ctx["provider_item_uuid"], "sid": ctx["segment_uuid"],
-                "bno": ctx["batch_no"], "qty": 3.0,
-                "pax": {"adult": 3, "child": 1}, "by": ctx["updated_by"],
+                "qid": quote_uuid,
+                "rid": request_uuid,
+                "iid": ctx["item_uuid"],
+                "pid": ctx["provider_item_uuid"],
+                "sid": ctx["segment_uuid"],
+                "bno": ctx["batch_no"],
+                "qty": 3.0,
+                "pax": {"adult": 3, "child": 1},
+                "by": ctx["updated_by"],
             },
-            endpoint_id, part_id,
+            endpoint_id,
+            part_id,
         )
         qi = qi_data["insertUpdateQuoteItem"]["quoteItem"]
         assert qi["pricePerUom"] == pytest.approx(275.0)
@@ -544,7 +616,10 @@ class TestHotelHardening:
 
         # 30 / 70 installment schedule on the quote total
         total = qi["subtotal"]
-        for priority, amount in [(1, round(total * 0.30, 2)), (2, round(total * 0.70, 2))]:
+        for priority, amount in [
+            (1, round(total * 0.30, 2)),
+            (2, round(total * 0.70, 2)),
+        ]:
             _graphql(
                 engine,
                 """mutation ($qid: String!, $rid: String, $priority: Int,
@@ -556,10 +631,14 @@ class TestHotelHardening:
                     }
                 }""",
                 {
-                    "qid": quote_uuid, "rid": request_uuid,
-                    "priority": priority, "amount": amount, "by": ctx["updated_by"],
+                    "qid": quote_uuid,
+                    "rid": request_uuid,
+                    "priority": priority,
+                    "amount": amount,
+                    "by": ctx["updated_by"],
                 },
-                endpoint_id, part_id,
+                endpoint_id,
+                part_id,
             )
 
 
@@ -1080,33 +1159,69 @@ class TestHardeningPilotSchemaCapabilities:
 
         item_args = Query._meta.fields["item_list"].args
         assert "pricing_mode" in item_args, "G2: item_list must filter by pricing_mode"
-        insert_item_args = Mutations._meta.fields[
-            "insert_update_item"
-        ].args
-        assert "pricing_mode" in insert_item_args, (
-            "G2: insert_update_item must accept pricing_mode"
-        )
+        insert_item_args = Mutations._meta.fields["insert_update_item"].args
+        assert (
+            "pricing_mode" in insert_item_args
+        ), "G2: insert_update_item must accept pricing_mode"
 
     @pytest.mark.unit
     def test_item_price_tier_schema_exposes_occupancy_fields(self):
         from ai_rfq_engine.schema import Mutations
 
         args = Mutations._meta.fields["insert_update_item_price_tier"].args
-        assert "base_occupancy" in args, (
-            "G2 occupancy: insert_update_item_price_tier must accept base_occupancy"
-        )
-        assert "extra_pax_surcharges" in args, (
-            "G2 occupancy: insert_update_item_price_tier must accept extra_pax_surcharges"
-        )
+        assert (
+            "base_occupancy" in args
+        ), "G2 occupancy: insert_update_item_price_tier must accept base_occupancy"
+        assert (
+            "extra_pax_surcharges" in args
+        ), "G2 occupancy: insert_update_item_price_tier must accept extra_pax_surcharges"
 
     @pytest.mark.unit
     def test_quote_item_schema_exposes_bundle_and_fx_fields(self):
-        from ai_rfq_engine.schema import Query
+        from ai_rfq_engine.schema import Mutations, Query
 
         args = Query._meta.fields["quote_item_list"].args
-        assert "bundle_uuid" in args, (
-            "G4 bundle: quote_item_list must filter by bundle_uuid"
+        assert (
+            "bundle_uuid" in args
+        ), "G4 bundle: quote_item_list must filter by bundle_uuid"
+        assert (
+            "bundle_component_uuid" in args
+        ), "bundle templates: quote_item_list must filter by bundle_component_uuid"
+        insert_args = Mutations._meta.fields["insert_update_quote_item"].args
+        assert "bundle_uuid" in insert_args
+        assert "bundle_component_uuid" in insert_args
+
+    @pytest.mark.unit
+    def test_bundle_schema_exposes_template_tables(self):
+        from ai_rfq_engine.schema import Mutations, Query, type_class
+        from ai_rfq_engine.types.bundle import BundleListType, BundleType
+        from ai_rfq_engine.types.bundle_component import (
+            BundleComponentListType,
+            BundleComponentType,
         )
+
+        for field in (
+            "bundle",
+            "bundle_list",
+            "bundle_component",
+            "bundle_component_list",
+        ):
+            assert field in Query._meta.fields
+        for field in (
+            "insert_update_bundle",
+            "delete_bundle",
+            "insert_update_bundle_component",
+            "delete_bundle_component",
+        ):
+            assert field in Mutations._meta.fields
+        assert "bundle_uuid" in Query._meta.fields["request_list"].args
+        assert "bundle_uuid" in Mutations._meta.fields["insert_update_request"].args
+
+        registered = set(type_class())
+        assert BundleType in registered
+        assert BundleListType in registered
+        assert BundleComponentType in registered
+        assert BundleComponentListType in registered
 
     @pytest.mark.unit
     def test_provider_item_batch_schema_exposes_service_window_filters(self):
@@ -1120,12 +1235,12 @@ class TestHardeningPilotSchemaCapabilities:
     def test_catalog_inquiry_and_availability_queries_are_registered(self):
         from ai_rfq_engine.schema import Query
 
-        assert "inquire_catalog" in Query._meta.fields, (
-            "G7b: inquire_catalog GraphQL query must be wired"
-        )
-        assert "check_availability" in Query._meta.fields, (
-            "G3: check_availability GraphQL query must be wired"
-        )
+        assert (
+            "inquire_catalog" in Query._meta.fields
+        ), "G7b: inquire_catalog GraphQL query must be wired"
+        assert (
+            "check_availability" in Query._meta.fields
+        ), "G3: check_availability GraphQL query must be wired"
 
     @pytest.mark.unit
     def test_catalog_ref_resolvers_present_without_external_config(self):
@@ -1140,9 +1255,7 @@ class TestHardeningPilotSchemaCapabilities:
             "item_catalog_ref_list",
             "item_catalog_refs",
         ):
-            assert field in Query._meta.fields, (
-                f"G7a: Query.{field} must be wired"
-            )
+            assert field in Query._meta.fields, f"G7a: Query.{field} must be wired"
         assert "external_system_config" not in Query._meta.fields
         assert "system_code" not in Query._meta.fields["item_catalog_refs"].args
         assert "system_code" not in Query._meta.fields["inquire_catalog"].args

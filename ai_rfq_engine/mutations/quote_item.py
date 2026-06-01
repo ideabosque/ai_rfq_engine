@@ -30,6 +30,7 @@ class InsertUpdateQuoteItem(Mutation):
         pax_breakdown = JSONCamelCase(required=False)
         bundle_uuid = String(required=False)
         bundle_label = String(required=False)
+        bundle_component_uuid = String(required=False)
         qty = Float(required=False)
         subtotal_discount = Float(required=False)
         currency = String(required=False)

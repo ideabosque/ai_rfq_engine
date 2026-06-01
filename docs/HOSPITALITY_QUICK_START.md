@@ -14,7 +14,8 @@ The RFQ core supports hospitality quote lines without a separate hospitality eng
 | Capacity evaluation | `ProviderItemBatch.in_stock`, `availability_qty`; `ProviderItem.availability_mode` |
 | Participant pricing | `Item.pricing_mode="per_pax_type"` and `QuoteItem.pax_breakdown` |
 | Accommodation pricing | `Item.pricing_mode="occupancy"` with tier `base_occupancy` and `extra_pax_surcharges` |
-| Itinerary grouping | `QuoteItem.bundle_uuid`, `bundle_label` |
+| Reusable package template | `BundleModel` plus `BundleComponentModel` |
+| Itinerary grouping | `Request.bundle_uuid`; `QuoteItem.bundle_uuid`, `bundle_label`, `bundle_component_uuid` |
 | Display-currency quote | `Quote.currency`, `display_currency`, `fx_rate`, `fx_rate_locked_at` |
 | Quoted terms | `CancellationPolicyModel` linked from `ProviderItemBatch` |
 | External discovery | `inquire_catalog` through KGE and `ItemCatalogRefModel` mapping |
@@ -63,6 +64,17 @@ For `occupancy`, define an active base tier with included occupancy and surcharg
 ```
 
 Here `qty` is the number of billable units, such as room-nights. With a base nightly price of `200.0`, this example prices at `(200 + 25) * 3 = 675`.
+
+## Configure A Reusable Bundle
+
+Use bundles when the package is reusable or selectable, not just when quote lines need a visual group.
+
+1. Create a `BundleModel` for the package: `bundle_uuid`, `bundle_code`, `bundle_name`, `bundle_type`, optional `extra`, and `status`.
+2. Create one `BundleComponentModel` per default component: `bundle_component_uuid`, `bundle_uuid`, `item_uuid`, optional `provider_item_uuid`, `component_role`, `required`, `default_qty`, and `sort_order`.
+3. Set `Request.bundle_uuid` when a customer request is for that package.
+4. When creating priced quote lines, keep each component as an independent `QuoteItem` and set `bundle_uuid`, `bundle_label`, and optionally `bundle_component_uuid`.
+
+Do not model a single priced parent bundle line unless the commercial contract is actually sold as one inseparable item. Independent quote lines preserve provider attribution, capacity holds, currencies, and cancellation terms.
 
 ## Terms, Currency, And Catalog
 

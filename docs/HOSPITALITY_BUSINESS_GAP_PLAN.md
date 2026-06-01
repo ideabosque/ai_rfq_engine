@@ -12,7 +12,8 @@ Most hospitality domain-model and quote-calculation gaps are implemented. The en
 
 - **Service-dated inventory** via `ProviderItemBatch.service_start_at` / `service_end_at`.
 - **Guest/participant and occupancy pricing** via `Item.pricing_mode` (`per_pax_type`, `occupancy`).
-- **Grouped itinerary components** via `QuoteItem.bundle_uuid` / `bundle_label`.
+- **Reusable package templates** via `BundleModel` / `BundleComponentModel`.
+- **Grouped priced itinerary components** via `Request.bundle_uuid` and `QuoteItem.bundle_uuid` / `bundle_label` / `bundle_component_uuid`.
 - **Quote-level currency conversion** via `FxRateModel` and locked FX rates.
 - **Quoted cancellation terms** via `CancellationPolicyModel` with engine-owned quote-line snapshots.
 - **Durable availability holds** via `AvailabilityHoldModel` and transactional `ProviderItemBatch.availability_qty` reservation/restoration.
@@ -32,13 +33,14 @@ The implemented design covers hospitality products expressible as independently 
 | Hotel room-night | `Item.pricing_mode="occupancy"` + service-dated `ProviderItemBatch` |
 | Ticket, transfer, activity, delegate fee | `pricing_mode="per_pax_type"` with `pax_breakdown` |
 | Unit-priced add-on or legacy procurement item | `pricing_mode="unit"` or `null` |
-| Itinerary or package | Multiple `QuoteItem` records sharing `bundle_uuid` and `bundle_label` |
+| Reusable itinerary or package | `BundleModel` with `BundleComponentModel` rows for default components |
+| Quoted package execution | Multiple independently priced `QuoteItem` records sharing `bundle_uuid` and optionally referencing `bundle_component_uuid` |
 | Deposit and balance | Existing `Installment` records on the quote |
 | Supplier cancellation terms | `CancellationPolicyModel` referenced from a batch; engine-owned snapshot on the quote line |
 | Display currency conversion | Line subtotal in native currency; display conversion when the quote carries a locked FX rate |
 | KGE-discovered product | KGE search response resolved to internal `Item`/`ProviderItem` via `ItemCatalogRefModel` namespace and node ID |
 
-The bundle model deliberately avoids an unpriced parent reservation record. Components stay independently priced and attributable to their providers.
+The bundle model is a reusable template layer, not a priced reservation parent. Components stay independently priced and attributable to their providers on `QuoteItem`.
 
 ---
 
@@ -51,7 +53,7 @@ The bundle model deliberately avoids an unpriced parent reservation record. Comp
 | **G1**: Service-date inventory | Implemented | `ProviderItemBatch.service_start_at`, `service_end_at`; overlap filter via `service_window_start`/`service_window_end` parameters in [provider_item_batches.py](../ai_rfq_engine/models/provider_item_batches.py) | Load-test access patterns; decide on production indexing |
 | **G2**: PAX and occupancy pricing | Implemented | `Item.pricing_mode`; `ItemPriceTier.pax_type`, `base_occupancy`, `extra_pax_surcharges`; full calculation paths in [quote_item.py](../ai_rfq_engine/models/quote_item.py) | Publish pricing examples; settle configurable PAX vocabulary |
 | **G3**: Availability and holds | Implemented in core; deployment validation pending | `AvailabilityHoldModel`; conditional transactional capacity mutation and persisted lifecycle in [handler.py](../ai_rfq_engine/handlers/availability/handler.py); quote hooks in [quote_item.py](../ai_rfq_engine/models/quote_item.py) | Run DynamoDB-backed contention/lifecycle tests; schedule expiry processing |
-| **G4**: Bundle composition | Implemented | `QuoteItem.bundle_uuid`, `bundle_label`; `bundle_uuid` filter in quote item list query; seeded itinerary integration scenario in [test_hardening_pilot.py](../ai_rfq_engine/tests/test_hardening_pilot.py) | Execute the scenario against reachable DynamoDB |
+| **G4**: Bundle composition | Implemented | `BundleModel`, `BundleComponentModel`; `Request.bundle_uuid`; `QuoteItem.bundle_uuid`, `bundle_label`, `bundle_component_uuid`; bundle filters in quote item and request list queries; seeded itinerary integration scenario in [test_hardening_pilot.py](../ai_rfq_engine/tests/test_hardening_pilot.py) | Execute the scenario against reachable DynamoDB |
 | **G5**: Currency and FX | Implemented for quote-time conversion | `FxRateModel` with `currency_pair_date` LSI; `Quote.currency`, `display_currency`, `fx_rate`, `fx_rate_locked_at`; conversion logic in [quote_item.py](../ai_rfq_engine/models/quote_item.py) lines 834–863 | Define rate sourcing, rounding, expiry, and downstream settlement reconciliation |
 | **G6**: Cancellation policy | Implemented for quoted-term integrity | `CancellationPolicyModel`; server-generated snapshot in [quote_item.py](../ai_rfq_engine/models/quote_item.py); caller substitution and update mutation rejected | Define policy authoring/import ownership and refund execution contract |
 | **G7**: Catalog bridge | Implemented for KGE search-first lookup | `ItemCatalogRefModel` with `namespace_node_index` and `item_lookup_index`; `inquire_catalog`; KGE invoker-backed handler in [handler.py](../ai_rfq_engine/handlers/catalog/handler.py) | Node-by-ID KGE inquiry blocked (`OperationUnsupportedError`); validate against deployed KGE |
@@ -62,7 +64,7 @@ The bundle model deliberately avoids an unpriced parent reservation record. Comp
 |---|---|
 | `Item` and `ProviderItem` | Product and supplier/property/operator offering; `ProviderItem.availability_mode` governs availability enforcement |
 | `Segment` and `SegmentContact` | Retail, corporate, loyalty, channel, or agent pricing segment |
-| `Request`, `Quote`, and `QuoteItem` | Inquiry-to-offer workflow; `QuoteItem.batch_no` pins a service-dated batch |
+| `Request`, `Quote`, and `QuoteItem` | Inquiry-to-offer workflow; `Request.bundle_uuid` may select a reusable package; `QuoteItem.batch_no` pins a service-dated batch |
 | `Installment` | Deposit and balance schedule on a quote |
 | `DiscountPrompt` | Discount and promotional rule input |
 | `File` | Request-associated metadata only; document delivery is out of scope |
@@ -224,7 +226,10 @@ Required verification:
 | `ProviderItem` | `availability_mode` (default `"none"`), `provider_item_external_id`, `item_spec` (MapAttribute) |
 | `ProviderItemBatch` | `service_start_at`, `service_end_at`, `availability_qty`, `currency`, `cancellation_policy_uuid` |
 | `ItemPriceTier` | `pax_type`, `currency`, `base_occupancy` (MapAttribute), `extra_pax_surcharges` (MapAttribute) |
-| `QuoteItem` | `pax_breakdown` (MapAttribute), `bundle_uuid`, `bundle_label`, `batch_no`, `currency`, `subtotal_native`, `hold_token`, `hold_expires_at` |
+| `Request` | `bundle_uuid` optional package/template selection |
+| `QuoteItem` | `pax_breakdown` (MapAttribute), `bundle_uuid`, `bundle_label`, `bundle_component_uuid`, `batch_no`, `currency`, `subtotal_native`, `hold_token`, `hold_expires_at` |
+| New model/API | `BundleModel` - reusable package or itinerary template with `bundle_code`, `bundle_name`, `bundle_type`, `extra`, and `status` |
+| New model/API | `BundleComponentModel` - default package components with `item_uuid`, optional `provider_item_uuid`, `component_role`, `required`, `default_qty`, `sort_order`, `extra`, and `status` |
 | `Quote` | `currency`, `display_currency`, `fx_rate`, `fx_rate_locked_at` |
 | New model/API | `AvailabilityHoldModel` - durable `held` / `confirmed` / `released` / `expired` capacity reservation state |
 | New model/API | `FxRateModel` — `source_currency`, `target_currency`, `rate`, `currency_pair_date` (LSI), `rate_date`, `provider`, `notes`, `status` |
@@ -324,7 +329,7 @@ The following decisions are required before broad customer rollout:
 | Decision | Current provisional behavior |
 |---|---|
 | PAX categories | Caller-provided category strings; formal tenant vocabulary not defined |
-| Bundle representation | Priced component lines grouped by `bundle_uuid`; no stored parent package |
+| Bundle representation | Reusable `Bundle`/`BundleComponent` templates feed independently priced `QuoteItem` component lines; no priced parent bundle line |
 | FX rate source and staleness | Locked quote field exists; source/freshness policy not defined |
 | Cancellation policy authoring | Engine persists and snapshots policies; import/authoring ownership not defined |
 | Namespace default | `"DEFAULT"` is the catalog sentinel; should be ratified or replaced |
@@ -334,7 +339,7 @@ The following decisions are required before broad customer rollout:
 
 The implementation has moved ahead of general project documentation. Update:
 
-1. ~~[DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — identify hospitality as a supported workload, not a future proposal.~~ **Done** — Item, ProviderItem, ProviderItemBatch, ItemPriceTier, QuoteItem, Quote all reflect hospitality fields; FxRate, CancellationPolicy, ItemCatalogRef models documented.
+1. ~~[DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md) — identify hospitality as a supported workload, not a future proposal.~~ **Done** — Item, ProviderItem, ProviderItemBatch, ItemPriceTier, Request, QuoteItem, Quote all reflect hospitality fields; Bundle, BundleComponent, FxRate, CancellationPolicy, ItemCatalogRef models documented.
 2. ~~[PRICING_CALCULATION.md](PRICING_CALCULATION.md) — document `per_pax_type`, `occupancy`, native/display currency, and cancellation-snapshot behavior.~~ **Done** — Sections 7a–7d added covering hospitality pricing modes, FX conversion, cancellation snapshots, and availability hold lifecycle.
 3. ~~[HOSPITALITY_QUICK_START.md](HOSPITALITY_QUICK_START.md) - service-dated inventory, pricing modes, KGE mapping, and reservation-readiness restrictions.~~ **Done**.
 

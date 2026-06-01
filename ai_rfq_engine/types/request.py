@@ -4,7 +4,7 @@ from __future__ import print_function
 
 __author__ = "bibow"
 
-from graphene import DateTime, List, ObjectType, String
+from graphene import DateTime, Field, List, ObjectType, String
 from silvaengine_dynamodb_base import ListObjectType
 from silvaengine_utility import JSONCamelCase
 
@@ -26,6 +26,7 @@ class RequestType(ObjectType):
     shipping_address = JSONCamelCase()
     items = List(JSONCamelCase)
     notes = String()
+    bundle_uuid = String()
     status = String()
     expired_at = DateTime()
     created_at = DateTime()
@@ -35,6 +36,7 @@ class RequestType(ObjectType):
     # Nested resolvers: strongly-typed nested relationships
     quotes = List(JSONCamelCase)
     files = List(JSONCamelCase)
+    bundle = Field(lambda: BundleType)
     # ------- Nested resolvers -------
 
     def resolve_quotes(parent, info):
@@ -70,6 +72,18 @@ class RequestType(ObjectType):
         return loaders.files_by_request_loader.load(request_uuid).then(
             lambda files: [normalize_to_json(file) for file in (files or [])]
         )
+
+    def resolve_bundle(parent, info):
+        """Resolve the optional requested bundle/package template."""
+        from ..models.bundle import resolve_bundle
+
+        bundle_uuid = getattr(parent, "bundle_uuid", None)
+        if not bundle_uuid:
+            return None
+        return resolve_bundle(info, bundle_uuid=bundle_uuid)
+
+
+from .bundle import BundleType
 
 
 class RequestListType(ListObjectType):

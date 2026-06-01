@@ -25,6 +25,11 @@ from .mutations.cancellation_policy import (
     DeleteCancellationPolicy,
     InsertUpdateCancellationPolicy,
 )
+from .mutations.bundle import DeleteBundle, InsertUpdateBundle
+from .mutations.bundle_component import (
+    DeleteBundleComponent,
+    InsertUpdateBundleComponent,
+)
 from .mutations.fx_rate import DeleteFxRate, InsertUpdateFxRate
 from .mutations.item_catalog_ref import (
     DeleteItemCatalogRef,
@@ -48,6 +53,11 @@ from .mutations.discount_prompt import InsertUpdateDiscountPrompt, DeleteDiscoun
 from .queries.cancellation_policy import (
     resolve_cancellation_policy,
     resolve_cancellation_policy_list,
+)
+from .queries.bundle import resolve_bundle, resolve_bundle_list
+from .queries.bundle_component import (
+    resolve_bundle_component,
+    resolve_bundle_component_list,
 )
 from .mutations.availability import (
     AcquireAvailabilityHold,
@@ -93,6 +103,8 @@ from .types.cancellation_policy import (
     CancellationPolicyListType,
     CancellationPolicyType,
 )
+from .types.bundle import BundleListType, BundleType
+from .types.bundle_component import BundleComponentListType, BundleComponentType
 from .types.availability import AvailabilityResultType
 from .types.catalog_inquiry import CatalogInquiryResultType
 from .types.discount_prompt import DiscountPromptListType, DiscountPromptType
@@ -117,6 +129,10 @@ from .types.segment_contact import SegmentContactListType, SegmentContactType
 def type_class():
     return [
         AvailabilityResultType,
+        BundleType,
+        BundleListType,
+        BundleComponentType,
+        BundleComponentListType,
         CancellationPolicyType,
         CancellationPolicyListType,
         CatalogInquiryResultType,
@@ -311,6 +327,7 @@ class Query(ObjectType):
         request_title=String(required=False),
         request_description=String(required=False),
         statuses=List(String, required=False),
+        bundle_uuid=String(required=False),
         from_expired_at=DateTime(required=False),
         to_expired_at=DateTime(required=False),
     )
@@ -355,6 +372,7 @@ class Query(ObjectType):
         item_uuid=String(required=False),
         request_uuid=String(required=False),
         bundle_uuid=String(required=False),
+        bundle_component_uuid=String(required=False),
         min_price_per_uom=Float(required=False),
         max_price_per_uom=Float(required=False),
         min_qty=Float(required=False),
@@ -428,6 +446,36 @@ class Query(ObjectType):
         page_number=Int(required=False),
         limit=Int(required=False),
         provider_item_uuid=String(required=False),
+        status=String(required=False),
+    )
+
+    bundle = Field(
+        BundleType,
+        bundle_uuid=String(required=True),
+    )
+
+    bundle_list = Field(
+        BundleListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        bundle_code=String(required=False),
+        bundle_type=String(required=False),
+        status=String(required=False),
+    )
+
+    bundle_component = Field(
+        BundleComponentType,
+        bundle_component_uuid=String(required=True),
+    )
+
+    bundle_component_list = Field(
+        BundleComponentListType,
+        page_number=Int(required=False),
+        limit=Int(required=False),
+        bundle_uuid=String(required=False),
+        item_uuid=String(required=False),
+        provider_item_uuid=String(required=False),
+        component_role=String(required=False),
         status=String(required=False),
     )
 
@@ -622,6 +670,26 @@ class Query(ObjectType):
     ) -> CancellationPolicyListType:
         return resolve_cancellation_policy_list(info, **kwargs)
 
+    def resolve_bundle(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> BundleType | None:
+        return resolve_bundle(info, **kwargs)
+
+    def resolve_bundle_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> BundleListType:
+        return resolve_bundle_list(info, **kwargs)
+
+    def resolve_bundle_component(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> BundleComponentType | None:
+        return resolve_bundle_component(info, **kwargs)
+
+    def resolve_bundle_component_list(
+        self, info: ResolveInfo, **kwargs: Dict[str, Any]
+    ) -> BundleComponentListType:
+        return resolve_bundle_component_list(info, **kwargs)
+
     def resolve_item_catalog_ref(
         self, info: ResolveInfo, **kwargs: Dict[str, Any]
     ) -> ItemCatalogRefType | None:
@@ -655,6 +723,10 @@ class Mutations(ObjectType):
     expire_availability_hold = ExpireAvailabilityHold.Field()
     insert_update_cancellation_policy = InsertUpdateCancellationPolicy.Field()
     delete_cancellation_policy = DeleteCancellationPolicy.Field()
+    insert_update_bundle = InsertUpdateBundle.Field()
+    delete_bundle = DeleteBundle.Field()
+    insert_update_bundle_component = InsertUpdateBundleComponent.Field()
+    delete_bundle_component = DeleteBundleComponent.Field()
     insert_update_item = InsertUpdateItem.Field()
     delete_item = DeleteItem.Field()
     insert_update_segment = InsertUpdateSegment.Field()

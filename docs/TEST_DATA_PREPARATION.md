@@ -67,31 +67,29 @@ Use this wrapper for every snippet below.
 Tables have **soft foreign keys** (UUID strings; DynamoDB does not enforce them). The application code does enforce ordering, so seed in this sequence:
 
 ```
-                                 ┌──> SegmentContact
-                                 │
-1. Segment ──────────────────────┤
-                                 │
-2. Item ──┬──> ProviderItem ──┬──┴──> ItemPriceTier (needs Item + ProviderItem + Segment)
-          │                   │
-          │                   ├──> ProviderItemBatch ──> AvailabilityHold (runtime only)
-          │                   │            │
-          │                   │            └──> CancellationPolicy (link by uuid)
-          │                   │
-          │                   └──> ItemCatalogRef (optional KGE mapping)
-          │
-          └──> CancellationPolicy (optional supplier scoping)
+1. Segment
+   -> SegmentContact
+
+2. Item
+   -> ProviderItem
+      -> ProviderItemBatch
+         -> AvailabilityHold (runtime only)
+      -> ItemPriceTier (needs Item + ProviderItem + Segment)
+      -> ItemCatalogRef (optional KGE mapping)
+   -> BundleComponent (needs Bundle + Item; optionally ProviderItem)
 
 3. CancellationPolicy   (independent; linked from ProviderItemBatch)
 4. FxRate               (independent; locked rate copied onto Quote)
 5. DiscountPrompt       (independent; scoped by tag)
+6. Bundle               (independent package/itinerary template)
+7. BundleComponent      (needs Bundle + Item; optionally ProviderItem)
 
-6. Request
-7. File (per request)
+8. Request              (optionally references Bundle)
+9. File (per request)
 
-8. Quote ──> QuoteItem (needs ItemPriceTier ACTIVE in DynamoDB GSI; see §13.1)
-         └──> Installment
+10. Quote -> QuoteItem (needs ItemPriceTier ACTIVE in DynamoDB GSI; see Section 18.1)
+          -> Installment
 ```
-
 Skipping ahead in the order causes either "not found" rejections (e.g. `ProviderItem` without an `Item`) or empty-result computations (e.g. a `QuoteItem` insert that finds no matching `ItemPriceTier`).
 
 ---
@@ -307,7 +305,7 @@ mutation InsertUpdateItemPriceTier(
 
 **Capture**: `itemPriceTierUuid`.
 
-**Gotcha**: Price tiers are queried at quote-item time via a DynamoDB GSI. After creating tiers, **wait 60–120 seconds** before seeding `QuoteItem` rows — see §13.1.
+**Gotcha**: Price tiers are queried at quote-item time via a DynamoDB GSI. After creating tiers, **wait 60–120 seconds** before seeding `QuoteItem` rows — see Section 18.1.
 
 ---
 
@@ -404,7 +402,84 @@ mutation InsertUpdateItemCatalogRef(
 
 ---
 
-## 12. `are-discount_prompts` — Discount Rules
+## 12. `are-bundles` — Bundle Templates
+
+Reusable package or itinerary templates. A `Bundle` is not a priced parent line; it groups independently priced `QuoteItem` rows and provides default components through `BundleComponent`.
+
+| Argument | Required | Notes |
+|---|---|---|
+| `bundleName` | yes (effective) | Display name, e.g. `"Honeymoon Package"`. |
+| `bundleCode` | no | Operator-facing code, e.g. `"PKG-HONEYMOON-3D"`. |
+| `bundleType` | no | Free-form category such as `tour`, `package`, `itinerary`, or `event`. |
+| `description` | no | Package notes. |
+| `extra` | no | Free-form map for tags, channel rules, or itinerary metadata. |
+| `status` | no | Default `active`. |
+| `updatedBy` | yes |  |
+| `bundleUuid` | no | Provide to update an existing bundle; omit on create. |
+
+```graphql
+mutation InsertUpdateBundle(
+  $code: String, $name: String, $type: String, $desc: String,
+  $extra: JSONCamelCase, $by: String!
+) {
+  insertUpdateBundle(
+    bundleCode: $code, bundleName: $name, bundleType: $type,
+    description: $desc, extra: $extra, updatedBy: $by
+  ) {
+    bundle { bundleUuid bundleCode bundleName }
+  }
+}
+```
+
+**Capture**: `bundleUuid` — pass to `BundleComponent`, optionally to `Request.bundleUuid`, and to each grouped `QuoteItem.bundleUuid`.
+
+**Delete guard**: a bundle cannot be deleted while components, requests, or quote items still reference it.
+
+---
+
+## 13. `are-bundle_components` — Bundle Components
+
+Template rows that define the default items inside a package. Components may reference only the catalog `Item`, or also pin a preferred supplier offering with `providerItemUuid`.
+
+| Argument | Required | Notes |
+|---|---|---|
+| `bundleUuid` | yes (effective) | FK to `Bundle`. |
+| `itemUuid` | yes (effective) | FK to `Item`. |
+| `providerItemUuid` | no | Optional FK to `ProviderItem` for default supplier selection. |
+| `componentRole` | no | Role such as `room`, `transfer`, `activity`, `meal`, or `ticket`. |
+| `required` | no | Defaults to `true`; set `false` for optional add-ons. |
+| `defaultQty` | no | Suggested quantity when building request/quote lines. |
+| `sortOrder` | no | Display/build order inside the package. |
+| `extra` | no | Free-form component metadata. |
+| `status` | no | Default `active`. |
+| `updatedBy` | yes |  |
+| `bundleComponentUuid` | no | Provide to update an existing component; omit on create. |
+
+```graphql
+mutation InsertUpdateBundleComponent(
+  $bundle: String!, $item: String!, $provider: String,
+  $role: String, $required: Boolean, $qty: SafeFloat,
+  $order: SafeFloat, $extra: JSONCamelCase, $by: String!
+) {
+  insertUpdateBundleComponent(
+    bundleUuid: $bundle, itemUuid: $item, providerItemUuid: $provider,
+    componentRole: $role, required: $required,
+    defaultQty: $qty, sortOrder: $order, extra: $extra, updatedBy: $by
+  ) {
+    bundleComponent {
+      bundleComponentUuid bundleUuid itemUuid providerItemUuid componentRole
+    }
+  }
+}
+```
+
+**Capture**: `bundleComponentUuid` — pass to `QuoteItem.bundleComponentUuid` when a quote line is created from this template component.
+
+**Validation rule**: when a quote item sets `bundleComponentUuid`, the component must belong to the same `bundleUuid` on the quote item.
+
+---
+
+## 14. `are-discount_prompts` — Discount Rules
 
 | Argument | Required | Notes |
 |---|---|---|
@@ -435,7 +510,7 @@ See [DISCOUNT_PROMOTION_PROMPT.md](DISCOUNT_PROMOTION_PROMPT.md) for the prompt-
 
 ---
 
-## 13. `are-requests` — Requests
+## 15. `are-requests` — Requests
 
 An incoming customer inquiry.
 
@@ -445,6 +520,7 @@ An incoming customer inquiry.
 | `requestTitle` | yes (effective) |  |
 | `requestDescription` | no |  |
 | `items` | no | List of `{item_uuid, quantity, provider_items?}` maps. Free-form — not a strict FK. |
+| `bundleUuid` | no | Optional FK to `Bundle` when the request is for a reusable package/template. |
 | `billingAddress`, `shippingAddress` | no | Address blobs (`street`, `city`, `state`, `postal_code`, `country`). |
 | `notes` | no |  |
 | `status` | no | Default `initial`. |
@@ -455,23 +531,23 @@ An incoming customer inquiry.
 mutation InsertUpdateRequest(
   $email: String!, $title: String!, $desc: String,
   $billing: JSONCamelCase, $shipping: JSONCamelCase,
-  $items: [JSONCamelCase], $expired: DateTime, $by: String!
+  $items: [JSONCamelCase], $bundle: String, $expired: DateTime, $by: String!
 ) {
   insertUpdateRequest(
     email: $email, requestTitle: $title, requestDescription: $desc,
     billingAddress: $billing, shippingAddress: $shipping,
-    items: $items, expiredAt: $expired, updatedBy: $by
+    items: $items, bundleUuid: $bundle, expiredAt: $expired, updatedBy: $by
   ) {
-    request { requestUuid }
+    request { requestUuid bundleUuid }
   }
 }
 ```
 
-**Capture**: `requestUuid` — used by `Quote`, `QuoteItem`, `Installment`, `File`.
+**Capture**: `requestUuid` — used by `Quote`, `QuoteItem`, `Installment`, `File`. If set, keep `bundleUuid` aligned with package quote lines.
 
 ---
 
-## 14. `are-files` — Request Attachments (metadata only)
+## 16. `are-files` — Request Attachments (metadata only)
 
 | Argument | Required | Notes |
 |---|---|---|
@@ -492,7 +568,7 @@ The engine stores only filename metadata; file content delivery is downstream.
 
 ---
 
-## 15. `are-quotes` — Quotes
+## 17. `are-quotes` — Quotes
 
 A supplier-specific quote answering a request.
 
@@ -530,7 +606,7 @@ mutation InsertUpdateQuote(
 
 ---
 
-## 16. `are-quote_items` — Quote Lines
+## 18. `are-quote_items` — Quote Lines
 
 The heart of the engine. Insert triggers tier pricing, availability enforcement, FX conversion, and (when applicable) hold acquisition + cancellation snapshot generation.
 
@@ -544,7 +620,8 @@ The heart of the engine. Insert triggers tier pricing, availability enforcement,
 | `qty` | yes (effective) | Billable unit count. For `per_pax_type`, must equal total of `paxBreakdown`. For `occupancy`, this is room-nights. |
 | `batchNo` | no | Pin a specific `ProviderItemBatch`. Required for hospitality date-driven pricing. |
 | `paxBreakdown` | no | Required for `per_pax_type` and `occupancy` modes. E.g. `{"adult": 2, "child": 1}`. |
-| `bundleUuid`, `bundleLabel` | no | Itinerary grouping. |
+| `bundleUuid`, `bundleLabel` | no | Package/itinerary grouping. `bundleUuid` should reference `Bundle` when the line comes from a reusable package. |
+| `bundleComponentUuid` | no | Optional FK to `BundleComponent`; must belong to the selected `bundleUuid`. |
 | `serviceStartAt`, `serviceEndAt` | no | Service window. Auto-filled from the pinned batch when `batchNo` is set. |
 | `subtotalDiscount` | no | Display-currency discount. |
 | `currency`, `subtotalNative` | no | Set by the engine during FX conversion. Don't pre-populate. |
@@ -557,18 +634,18 @@ mutation InsertUpdateQuoteItem(
   $qid: String!, $rid: String, $iid: String, $pid: String, $sid: String,
   $bno: String, $qty: Float, $pax: JSONCamelCase,
   $start: DateTime, $end: DateTime,
-  $bundle: String, $label: String, $by: String!
+  $bundle: String, $component: String, $label: String, $by: String!
 ) {
   insertUpdateQuoteItem(
     quoteUuid: $qid, requestUuid: $rid, itemUuid: $iid,
     providerItemUuid: $pid, segmentUuid: $sid, batchNo: $bno,
     qty: $qty, paxBreakdown: $pax,
     serviceStartAt: $start, serviceEndAt: $end,
-    bundleUuid: $bundle, bundleLabel: $label,
+    bundleUuid: $bundle, bundleComponentUuid: $component, bundleLabel: $label,
     updatedBy: $by
   ) {
     quoteItem {
-      quoteItemUuid pricePerUom qty
+      quoteItemUuid pricePerUom qty bundleUuid bundleComponentUuid
       subtotal subtotalNative finalSubtotal
       holdToken holdExpiresAt
     }
@@ -576,7 +653,7 @@ mutation InsertUpdateQuoteItem(
 }
 ```
 
-### 16.1 DynamoDB Eventual Consistency
+### 18.1 DynamoDB Eventual Consistency
 
 `QuoteItem` insert queries `ItemPriceTier` rows via a GSI. GSIs propagate asynchronously and **cannot use consistent reads**. After seeding tiers, wait before inserting quote items:
 
@@ -587,13 +664,13 @@ time.sleep(90)  # tiers usually propagate within 60–120s
 
 The committed `load_sample_data.py` defaults `create_quote_items = False` and recommends a two-pass run: first pass seeds everything except quote items, second pass (after the GSI catches up) creates them.
 
-### 16.2 Update Rule
+### 18.2 Update Rule
 
-After insert, `qty`, `batchNo`, and `paxBreakdown` **cannot be changed**. Allowed updates: `notes`, `bundleUuid`, `bundleLabel`, `currency`, `subtotalDiscount`, `subtotalNative`. To reprice, delete and re-insert.
+After insert, `qty`, `batchNo`, and `paxBreakdown` **cannot be changed**. Allowed updates: `notes`, `bundleUuid`, `bundleLabel`, `bundleComponentUuid`, `currency`, `subtotalDiscount`, `subtotalNative`. To reprice, delete and re-insert.
 
 ---
 
-## 17. `are-installments` — Payment Schedule
+## 19. `are-installments` — Payment Schedule
 
 | Argument | Required | Notes |
 |---|---|---|
@@ -627,7 +704,7 @@ mutation InsertUpdateInstallment(
 
 ---
 
-## 18. `are-availability_holds` — Holds (runtime only)
+## 20. `are-availability_holds` — Holds (runtime only)
 
 **Not seeded directly.** The engine creates a hold row atomically when:
 - A `QuoteItem` is inserted whose `ProviderItem.availabilityMode == "require_hold"`.
@@ -646,9 +723,9 @@ See [HOSPITALITY_BUSINESS_GUIDE.md §5](HOSPITALITY_BUSINESS_GUIDE.md) for the l
 
 ---
 
-## 19. Worked Seed Recipes
+## 21. Worked Seed Recipes
 
-### 19.1 Minimal Procurement Quote
+### 21.1 Minimal Procurement Quote
 
 A single-tenant, single-quote, single-line scenario that exercises the original procurement path.
 
@@ -665,7 +742,7 @@ A single-tenant, single-quote, single-line scenario that exercises the original 
 10. InsertUpdateInstallment  → 2 rows (priority 1, 2)
 ```
 
-### 19.2 Hotel Room-Night with Hold
+### 21.2 Hotel Room-Night with Hold
 
 Drives every hospitality feature: occupancy pricing, service-dated batch, durable hold, cancellation snapshot, FX conversion.
 
@@ -689,28 +766,61 @@ Drives every hospitality feature: occupancy pricing, service-dated batch, durabl
 14. (test) InsertUpdateQuote status="accepted" → engine confirms held items
 ```
 
-### 19.3 Multi-Leg Itinerary Bundle
+### 21.3 Multi-Leg Itinerary Bundle
 
-Three lines on one quote sharing `bundleUuid` and `bundleLabel`:
+Three independently priced lines on one quote sharing a persisted `bundleUuid`; each line can also point back to its originating `bundleComponentUuid`.
 
 ```text
-… seed prerequisites for transfer, hotel, activity items …
+1. Seed prerequisites for transfer, hotel, and activity items:
+   - Item
+   - ProviderItem
+   - ProviderItemBatch where needed
+   - active ItemPriceTier
 
-InsertUpdateQuoteItem (transfer)  bundleUuid="trip-1" bundleLabel="Honeymoon Package"
-InsertUpdateQuoteItem (hotel)     bundleUuid="trip-1" bundleLabel="Honeymoon Package"
-InsertUpdateQuoteItem (activity)  bundleUuid="trip-1" bundleLabel="Honeymoon Package"
+2. InsertUpdateBundle
+   -> bundleUuid
+
+3. InsertUpdateBundleComponent (transfer)
+   -> transferComponentUuid
+
+4. InsertUpdateBundleComponent (hotel)
+   -> hotelComponentUuid
+
+5. InsertUpdateBundleComponent (activity)
+   -> activityComponentUuid
+
+6. InsertUpdateRequest
+   -> requestUuid with bundleUuid=<bundleUuid>
+
+7. InsertUpdateQuote
+   -> quoteUuid
+
+8. InsertUpdateQuoteItem (transfer)
+   bundleUuid=<bundleUuid>
+   bundleComponentUuid=<transferComponentUuid>
+   bundleLabel="Honeymoon Package"
+
+9. InsertUpdateQuoteItem (hotel)
+   bundleUuid=<bundleUuid>
+   bundleComponentUuid=<hotelComponentUuid>
+   bundleLabel="Honeymoon Package"
+
+10. InsertUpdateQuoteItem (activity)
+    bundleUuid=<bundleUuid>
+    bundleComponentUuid=<activityComponentUuid>
+    bundleLabel="Honeymoon Package"
 ```
 
-Listing quote items with `bundleUuid` filter returns them as a group.
+Listing quote items with the `bundleUuid` filter returns the grouped package lines. The component UUIDs preserve provenance back to the package template without creating a priced parent line.
 
 ---
 
-## 20. Planned: KGE Catalog Ingestion (`prepare_flight_catalog_refs.py`)
+## 22. KGE Catalog Ingestion (`prepare_flight_catalog_refs.py`)
 
-> **Status**: Plan, not yet implemented. Captured here for review before code lands.
+> **Status**: Implemented seed utility.
 > **Goal**: ingest the products generated by `prepare_flight_products.py` into the knowledge graph (`knowledge_graph_engine`) and write `ItemCatalogRef` rows so `inquire_catalog` can resolve KGE search hits back to internal `Item` / `ProviderItem` records.
 
-### 20.1 Inputs
+### 22.1 Inputs
 
 `tests/prepare_test_data/flight_products.json` (already produced by `prepare_flight_products.py`). No new generation — the script reads what's on disk:
 
@@ -723,11 +833,13 @@ Listing quote items with `bundleUuid` filter returns them as a group.
   "provider_items": [{"providerItemUuid": "...", "itemUuid": "...",
                       "itemSpec": {"airline_code": "AA", "cabin_class": "Business", ...}}],
   "provider_item_batches": [...],
-  "item_price_tiers": [...]
+  "item_price_tiers": [...],
+  "bundles": [{"bundleUuid": "...", "bundleCode": "FLT-ITIN-001", ...}],
+  "bundle_components": [{"bundleComponentUuid": "...", "bundleUuid": "...", "itemUuid": "...", ...}]
 }
 ```
 
-### 20.2 KGE surface
+### 22.2 KGE surface
 
 From `knowledge_graph_engine/mutations/` and `queries/`:
 
@@ -739,13 +851,12 @@ From `knowledge_graph_engine/mutations/` and `queries/`:
 
 Invocation uses the same `aws_lambda_invoker` path the catalog handler already wires (no new transport).
 
-### 20.3 Flow
+### 22.3 Flow
 
 ```
 flight_products.json
-  → load + bundle each item with its provider, batches, tiers, policy
-  → (optional) insertUpdateGraphSchema with seed flight ontology
-  → for each item bundle:
+  → load each item with its provider, batches, tiers, policy, and bundle-component references
+  → for each item:
       a. compose natural-language description
       b. executeExtract(text=description,
                         documentSource="ai_rfq_seed",
@@ -756,47 +867,47 @@ flight_products.json
              nodeId=item.itemExternalId,
              itemUuid=item.itemUuid,
              providerItemUuid=...,
-             extra={"documentUuid": ..., "airline_code": ..., "cabin_class": ...})
-  → (optional) verification: search("Business class to LAX") and assert the
-    item surfaces via its ItemCatalogRef
+             extra={"documentUuid": ..., "airline_code": ..., "cabin_class": ...,
+                    "bundleComponents": [...]})
   → write flight_catalog_refs.json (gitignored)
 ```
 
-### 20.4 Design decisions
+### 22.4 Design decisions
 
 | Decision | Choice | Why |
 |---|---|---|
 | `node_id` value | `itemExternalId` (e.g. `FLIGHT-JFK-LAX-BUS`) passed as `documentExternalId` to KGE | Stable, semantic, survives re-extraction. Neo4j internal IDs are not stable. |
 | Granularity | One `executeExtract` per `Item`; one `ItemCatalogRef` per `(item, provider_item)` pair | An item is what the customer searches for; a row per provider so a hit resolves to a priced offering. |
-| Schema seeding | Pre-seed via `insertUpdateGraphSchema` | KGE evolves the schema automatically, but first extractions produce inconsistent LLM-picked labels. |
+| KGE ingest mode | Default runs `executeExtract`; `SEED_CATALOG_SKIP_INGEST=1` switches to link-only lookup/fallback mode | Lets QA either create graph data or only bridge RFQ rows to existing graph nodes. |
 | Namespace | `"FLIGHTS"` (override default `"DEFAULT"`) | Lets future hotel/event seed scripts use their own namespace without collision. |
-| Text format | Plain English prose composed from bundle fields | LLM extraction prefers prose over JSON. |
+| Text format | Plain English prose composed from item, provider, schedule, fare, cancellation, and package-template fields | LLM extraction prefers prose over JSON. |
 
-### 20.5 Configuration
+### 22.5 Configuration
 
 ```bash
 SEED_CATALOG_NAMESPACE=FLIGHTS              # ItemCatalogRef namespace
-SEED_CATALOG_ENSURE_SCHEMA=1                # 1 = run insertUpdateGraphSchema
 SEED_CATALOG_INPUT=flight_products.json     # source JSON path
+SEED_CATALOG_SKIP_INGEST=0                  # 1 = link-only lookup through inquireCatalog
+SEED_CATALOG_SEARCH_MODE=vector             # used when SKIP_INGEST=1
+SEED_CATALOG_TOP_K=5                        # used when SKIP_INGEST=1
+SEED_CATALOG_FALLBACK_TO_EXTERNAL_ID=1      # use itemExternalId when lookup returns no node
 ```
 
 Output: `tests/prepare_test_data/flight_catalog_refs.json` (gitignored).
 
-### 20.6 Prerequisites
+### 22.6 Prerequisites
 
 - A Neo4j instance registered for the tenant via `insertUpdateNeo4jInstance` (one-time tenant setup; out of scope for this script).
 - `flight_products.json` present on disk.
 - KGE deployed and reachable through `aws_lambda_invoker` in the engine context.
 
-### 20.7 Open questions to resolve before implementing
+### 22.7 Operational notes
 
-1. **Segment in extracted text?** Include "available to {segment_name} tier customers" in the prose, or keep segment scoping purely RFQ-side?
-2. **`ItemCatalogRef` per provider, or one per item with `provider_item_uuid` null?** Recommendation: per provider.
-3. **Schema seed: aggressive or conservative?** Aggressive = all entity types + relationships up front; conservative = only `Flight`, let KGE evolve.
-4. **Idempotency on re-run.** Skip extract when a `Document` with the same `documentExternalId` already exists, or accept duplicates? Pre-check would use KGE's `documentList` query.
-5. **Verification scope.** Run a final `search` round-trip and assert discoverability, or write and exit?
+1. `ItemCatalogRef` is written per `(item, provider_item)` pair so a catalog hit can resolve directly to a priced supplier offering.
+2. `nodeId` defaults to `itemExternalId`; in link-only mode the script can instead use a node identity found through `inquireCatalog`.
+3. Bundle membership is stored in `extra.bundleComponents` on the catalog ref. The authoritative package template still lives in `Bundle` / `BundleComponent`.
 
-### 20.8 Testing approach
+### 22.8 Testing approach
 
 | Layer | Method |
 |---|---|
@@ -805,7 +916,7 @@ Output: `tests/prepare_test_data/flight_catalog_refs.json` (gitignored).
 
 ---
 
-## 21. Troubleshooting
+## 23. Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
@@ -814,17 +925,21 @@ Output: `tests/prepare_test_data/flight_catalog_refs.json` (gitignored).
 | `require_hold requires a quantified availability_qty` | The selected batch's `availabilityQty` is `null`. Set it on the batch or use `availabilityMode="check_only"`. |
 | `Requested provider item is not available for the service window` | No matching batch overlaps the requested window, all matching batches are `inStock=false`, or `availabilityQty < qty`. |
 | `request_data.cancellation_policy_snapshot is engine-owned` | Caller included the reserved key in `requestData`. Remove it — the engine generates it from the linked policy. |
+| `Cannot find the bundle with ...` | `Request.bundleUuid` or `QuoteItem.bundleUuid` references a bundle that has not been seeded for this tenant. Create the `Bundle` first and reuse the captured `bundleUuid`. |
+| `bundle_component_uuid must belong to bundle_uuid` | The quote line references a component from a different bundle, or `bundleComponentUuid` was supplied without the matching `bundleUuid`. Use the component UUID captured from the same package template. |
 | `Cannot find the segment with …` on delete | Soft-FK guard: a `Segment` cannot be deleted while contacts reference it; same pattern for `QuoteItem` ↔ `Installment`. |
 | Mutations return `errors` referencing `partition_key` | Missing `endpoint_id` / `part_id` in the GraphQL call context, or `.env` not loaded. |
 
 ---
 
-## 22. Where To Look Next
+## 24. Where To Look Next
 
 | Question | Pointer |
 |---|---|
 | "What columns does each table actually have?" | [ER_DIAGRAM.md](ER_DIAGRAM.md) |
 | "How do these mutations turn into reservations and pricing?" | [HOSPITALITY_BUSINESS_GUIDE.md](HOSPITALITY_BUSINESS_GUIDE.md), [PRICING_CALCULATION.md](PRICING_CALCULATION.md) |
+| "Where are package templates modeled?" | [models/bundle.py](../ai_rfq_engine/models/bundle.py), [models/bundle_component.py](../ai_rfq_engine/models/bundle_component.py) |
 | "Working end-to-end seed script" | [tests/load_sample_data.py](../ai_rfq_engine/tests/load_sample_data.py) |
 | "Pytest fixtures consuming the seed JSON" | [tests/conftest.py](../ai_rfq_engine/tests/conftest.py), [tests/test_data.json](../ai_rfq_engine/tests/test_data.json) |
+| "Bundle template behavior tests" | [tests/test_bundle_templates.py](../ai_rfq_engine/tests/test_bundle_templates.py) |
 | "Integration patterns for holds" | [tests/test_availability_contention.py](../ai_rfq_engine/tests/test_availability_contention.py) |

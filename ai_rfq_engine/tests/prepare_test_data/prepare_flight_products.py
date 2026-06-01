@@ -5,7 +5,7 @@ Seed flight-themed product data for the AI RFQ engine.
 
 Looks up an existing ``Segment`` (does NOT create one — run
 ``prepare_segments_and_contacts.py`` first if you have none) and then
-generates a coherent flight catalog across five tables:
+generates a coherent flight catalog across seven tables:
 
     Item                 ── a flight cabin product (e.g. "Flight JFK->LAX Economy")
     ProviderItem         ── an airline's offering of that product
@@ -14,6 +14,8 @@ generates a coherent flight catalog across five tables:
                               with departure/arrival as service window and
                               seat count as availability_qty
     ItemPriceTier        ── adult / child / infant prices for the segment
+    Bundle               -- reusable multi-leg itinerary template
+    BundleComponent      -- flight legs inside the itinerary template
 
 The data is generated with Faker for flavour, but flight-specific structure
 (IATA codes, cabin classes, flight numbers) is curated locally because
@@ -27,6 +29,8 @@ Counts and selection are configurable via env vars (or edit the constants):
 
     SEED_FLIGHT_NUM_ROUTES=8        # number of Item rows
     SEED_FLIGHT_BATCHES_PER_ROUTE=3 # ProviderItemBatch rows per route
+    SEED_FLIGHT_NUM_BUNDLES=2       # multi-leg itinerary templates to create
+    SEED_FLIGHT_BUNDLE_SIZE=3       # max legs per itinerary bundle
     SEED_FLIGHT_SEGMENT_UUID=...    # pin a specific segment instead of the
                                     # first one returned by segmentList
 
@@ -80,6 +84,8 @@ OUTPUT_FILE = os.path.join(os.path.dirname(__file__), "flight_products.json")
 
 NUM_ROUTES = int(os.getenv("SEED_FLIGHT_NUM_ROUTES", "5"))
 BATCHES_PER_ROUTE = int(os.getenv("SEED_FLIGHT_BATCHES_PER_ROUTE", "2"))
+NUM_BUNDLES = int(os.getenv("SEED_FLIGHT_NUM_BUNDLES", "2"))
+BUNDLE_SIZE = max(2, int(os.getenv("SEED_FLIGHT_BUNDLE_SIZE", "3")))
 PINNED_SEGMENT_UUID = os.getenv("SEED_FLIGHT_SEGMENT_UUID")
 
 SETTING = {
@@ -241,6 +247,39 @@ mutation InsertUpdateItemPriceTier(
         currency: $cur, status: $stat, updatedBy: $by
     ) {
         itemPriceTier { itemPriceTierUuid }
+    }
+}
+"""
+
+BUNDLE_MUTATION = """
+mutation InsertUpdateBundle(
+    $code: String, $name: String, $type: String, $desc: String,
+    $extra: JSONCamelCase, $stat: String, $by: String!
+) {
+    insertUpdateBundle(
+        bundleCode: $code, bundleName: $name, bundleType: $type,
+        description: $desc, extra: $extra, status: $stat, updatedBy: $by
+    ) {
+        bundle { bundleUuid bundleCode bundleName }
+    }
+}
+"""
+
+BUNDLE_COMPONENT_MUTATION = """
+mutation InsertUpdateBundleComponent(
+    $bundle: String, $item: String, $provider: String,
+    $role: String, $required: Boolean, $qty: SafeFloat,
+    $order: SafeFloat, $extra: JSONCamelCase, $stat: String, $by: String!
+) {
+    insertUpdateBundleComponent(
+        bundleUuid: $bundle, itemUuid: $item, providerItemUuid: $provider,
+        componentRole: $role, required: $required,
+        defaultQty: $qty, sortOrder: $order, extra: $extra,
+        status: $stat, updatedBy: $by
+    ) {
+        bundleComponent {
+            bundleComponentUuid bundleUuid itemUuid providerItemUuid componentRole
+        }
     }
 }
 """
@@ -608,6 +647,147 @@ def seed_price_tiers(
     return tiers
 
 
+def _route_label(item: dict) -> str:
+    external_id = item.get("itemExternalId") or ""
+    parts = external_id.split("-")
+    if len(parts) >= 3:
+        return f"{parts[1]}->{parts[2]}"
+    return item.get("itemName") or item.get("itemUuid") or "Flight leg"
+
+
+def seed_bundle(engine: AIRFQEngine, legs: list[dict], bundle_index: int) -> dict | None:
+    labels = [_route_label(leg["item"]) for leg in legs]
+    code = f"FLT-ITIN-{bundle_index:03d}"
+    name = "Flight Itinerary " + " + ".join(labels[:3])
+    description = "Multi-leg flight itinerary template composed of independently priced flight legs."
+    extra = {
+        "source": "prepare_flight_products",
+        "legCount": len(legs),
+        "routes": labels,
+        "itemExternalIds": [leg["item"].get("itemExternalId") for leg in legs],
+    }
+    data = run_graphql(
+        engine,
+        BUNDLE_MUTATION,
+        {
+            "code": code,
+            "name": name[:180],
+            "type": "flight_itinerary",
+            "desc": description,
+            "extra": extra,
+            "stat": "active",
+            "by": UPDATED_BY,
+        },
+    )
+    if not data:
+        return None
+    bundle = data["insertUpdateBundle"]["bundle"]
+    logger.info("  bundle: %s -> %s", code, bundle["bundleUuid"])
+    return {
+        "bundleUuid": bundle["bundleUuid"],
+        "bundleCode": bundle.get("bundleCode") or code,
+        "bundleName": bundle.get("bundleName") or name[:180],
+        "bundleType": "flight_itinerary",
+        "description": description,
+        "extra": extra,
+        "status": "active",
+    }
+
+
+def seed_bundle_component(
+    engine: AIRFQEngine,
+    *,
+    bundle_uuid: str,
+    leg: dict,
+    sort_order: int,
+) -> dict | None:
+    item = leg["item"]
+    provider_item = leg["provider_item"]
+    route_label = _route_label(item)
+    data = run_graphql(
+        engine,
+        BUNDLE_COMPONENT_MUTATION,
+        {
+            "bundle": bundle_uuid,
+            "item": item["itemUuid"],
+            "provider": provider_item["providerItemUuid"],
+            "role": "flight_leg",
+            "required": True,
+            "qty": 1.0,
+            "order": float(sort_order),
+            "extra": {
+                "route": route_label,
+                "itemExternalId": item.get("itemExternalId"),
+                "providerItemExternalId": provider_item.get(
+                    "providerItemExternalId"
+                ),
+            },
+            "stat": "active",
+            "by": UPDATED_BY,
+        },
+    )
+    if not data:
+        return None
+    component = data["insertUpdateBundleComponent"]["bundleComponent"]
+    logger.info(
+        "  bundle component: %s leg %d -> %s",
+        bundle_uuid,
+        sort_order,
+        component["bundleComponentUuid"],
+    )
+    return {
+        "bundleComponentUuid": component["bundleComponentUuid"],
+        "bundleUuid": bundle_uuid,
+        "itemUuid": item["itemUuid"],
+        "providerItemUuid": provider_item["providerItemUuid"],
+        "componentRole": "flight_leg",
+        "required": True,
+        "defaultQty": 1.0,
+        "sortOrder": float(sort_order),
+        "extra": {
+            "route": route_label,
+            "itemExternalId": item.get("itemExternalId"),
+            "providerItemExternalId": provider_item.get("providerItemExternalId"),
+        },
+        "status": "active",
+    }
+
+
+def seed_itinerary_bundles(engine: AIRFQEngine, output: dict) -> None:
+    legs_by_item = {
+        item["itemUuid"]: {"item": item, "provider_item": None}
+        for item in output["items"]
+    }
+    for provider_item in output["provider_items"]:
+        item_uuid = provider_item.get("itemUuid")
+        if item_uuid in legs_by_item and not legs_by_item[item_uuid]["provider_item"]:
+            legs_by_item[item_uuid]["provider_item"] = provider_item
+
+    available_legs = [
+        leg for leg in legs_by_item.values() if leg.get("item") and leg.get("provider_item")
+    ]
+    if len(available_legs) < 2 or NUM_BUNDLES <= 0:
+        logger.info("Skipping itinerary bundles; need at least two seeded flight legs")
+        return
+
+    for bundle_index in range(1, min(NUM_BUNDLES, len(available_legs)) + 1):
+        leg_count = min(BUNDLE_SIZE, len(available_legs))
+        legs = random.sample(available_legs, leg_count)
+        bundle = seed_bundle(engine, legs, bundle_index)
+        if not bundle:
+            continue
+        output["bundles"].append(bundle)
+        for sort_order, leg in enumerate(legs, start=1):
+            component = seed_bundle_component(
+                engine,
+                bundle_uuid=bundle["bundleUuid"],
+                leg=leg,
+                sort_order=sort_order,
+            )
+            if component:
+                output["bundle_components"].append(component)
+
+
 # --- Orchestrator ----------------------------------------------------------- #
 
 
@@ -626,6 +806,8 @@ def generate(engine: AIRFQEngine) -> dict:
         "provider_items": [],
         "provider_item_batches": [],
         "item_price_tiers": [],
+        "bundles": [],
+        "bundle_components": [],
     }
 
     logger.info(
@@ -695,6 +877,8 @@ def generate(engine: AIRFQEngine) -> dict:
         )
         output["item_price_tiers"].extend(tiers)
 
+    seed_itinerary_bundles(engine, output)
+
     return output
 
 
@@ -702,12 +886,14 @@ def write_output(output: dict) -> None:
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2)
     logger.info(
-        "Wrote: %d items, %d provider_items, %d batches, %d tiers, %d policies -> %s",
+        "Wrote: %d items, %d provider_items, %d batches, %d tiers, %d policies, %d bundles, %d components -> %s",
         len(output["items"]),
         len(output["provider_items"]),
         len(output["provider_item_batches"]),
         len(output["item_price_tiers"]),
         len(output["cancellation_policies"]),
+        len(output["bundles"]),
+        len(output["bundle_components"]),
         OUTPUT_FILE,
     )
 

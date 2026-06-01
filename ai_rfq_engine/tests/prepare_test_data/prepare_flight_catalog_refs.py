@@ -211,6 +211,8 @@ def compose_description(
     batches: list[dict],
     tiers: list[dict],
     policy: dict | None,
+    bundle_components: list[dict] | None = None,
+    bundles_by_uuid: dict[str, dict] | None = None,
 ) -> str:
     """Build the prose KGE will run extraction over."""
     lines: list[str] = []
@@ -267,6 +269,19 @@ def compose_description(
             lines.append(f"{label}: {tiers_text}.")
         elif policy.get("description"):
             lines.append(f"{label}: {policy['description']}.")
+
+    package_names = []
+    for component in bundle_components or []:
+        bundle = (bundles_by_uuid or {}).get(component.get("bundleUuid"), {})
+        name = bundle.get("bundleName") or bundle.get("bundleCode")
+        if name and name not in package_names:
+            package_names.append(name)
+    if package_names:
+        lines.append(
+            "This flight can be used as a component in package templates: "
+            + ", ".join(package_names)
+            + "."
+        )
 
     return " ".join(lines)
 
@@ -437,6 +452,10 @@ def index_by(items: list[dict], key: str) -> dict[str, list[dict]]:
     return grouped
 
 
+def index_one_by(items: list[dict], key: str) -> dict[str, dict]:
+    return {entry[key]: entry for entry in items if entry.get(key)}
+
+
 def build_search_text(item: dict, provider_items: list[dict]) -> str:
     external_id = item.get("itemExternalId")
     if external_id:
@@ -467,6 +486,10 @@ def generate() -> dict:
     tiers_by_item = index_by(
         flight_data.get("item_price_tiers") or [], "itemUuid"
     )
+    bundle_components_by_item = index_by(
+        flight_data.get("bundle_components") or [], "itemUuid"
+    )
+    bundles_by_uuid = index_one_by(flight_data.get("bundles") or [], "bundleUuid")
     policies_by_uuid = {
         p.get("policyUuid"): p
         for p in (flight_data.get("cancellation_policies") or [])
@@ -496,6 +519,7 @@ def generate() -> dict:
 
         item_batches = batches_by_item.get(item.get("itemUuid"), [])
         item_tiers = tiers_by_item.get(item.get("itemUuid"), [])
+        item_components = bundle_components_by_item.get(item.get("itemUuid"), [])
         policy = None
         for b in item_batches:
             pol_uuid = b.get("cancellationPolicyUuid")
@@ -541,6 +565,8 @@ def generate() -> dict:
                 batches=item_batches,
                 tiers=item_tiers,
                 policy=policy,
+                bundle_components=item_components,
+                bundles_by_uuid=bundles_by_uuid,
             )
             ingest_result = ingest_into_kge(item, description)
             if not ingest_result:
@@ -587,6 +613,26 @@ def generate() -> dict:
                     else None
                 ),
                 "cabinClass": spec.get("cabin_class"),
+                "bundleComponents": [
+                    {
+                        "bundleUuid": component.get("bundleUuid"),
+                        "bundleCode": (
+                            bundles_by_uuid.get(component.get("bundleUuid"), {}).get(
+                                "bundleCode"
+                            )
+                        ),
+                        "bundleName": (
+                            bundles_by_uuid.get(component.get("bundleUuid"), {}).get(
+                                "bundleName"
+                            )
+                        ),
+                        "bundleComponentUuid": component.get(
+                            "bundleComponentUuid"
+                        ),
+                        "componentRole": component.get("componentRole"),
+                    }
+                    for component in item_components
+                ],
                 "kgeResolution": {
                     "matchedVia": matched_via,
                     "documentUuid": (

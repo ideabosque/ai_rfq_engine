@@ -133,6 +133,20 @@ class Config:
             "list_resolver": "ai_rfq_engine.queries.cancellation_policy.resolve_cancellation_policy_list",
             "cache_keys": ["context:partition_key", "key:policy_uuid"],
         },
+        "bundle": {
+            "module": "ai_rfq_engine.models.bundle",
+            "model_class": "BundleModel",
+            "getter": "get_bundle",
+            "list_resolver": "ai_rfq_engine.queries.bundle.resolve_bundle_list",
+            "cache_keys": ["context:partition_key", "key:bundle_uuid"],
+        },
+        "bundle_component": {
+            "module": "ai_rfq_engine.models.bundle_component",
+            "model_class": "BundleComponentModel",
+            "getter": "get_bundle_component",
+            "list_resolver": "ai_rfq_engine.queries.bundle_component.resolve_bundle_component_list",
+            "cache_keys": ["context:partition_key", "key:bundle_component_uuid"],
+        },
         "item_catalog_ref": {
             "module": "ai_rfq_engine.models.item_catalog_ref",
             "model_class": "ItemCatalogRefModel",
@@ -161,6 +175,14 @@ class Config:
                 "list_resolver": "resolve_file_list",
                 "module": "file",
                 "dependency_key": "request_uuid",
+            },
+        ],
+        "bundle": [
+            {
+                "entity_type": "bundle_component",
+                "list_resolver": "resolve_bundle_component_list",
+                "module": "bundle_component",
+                "dependency_key": "bundle_uuid",
             },
         ],
         "quote": [

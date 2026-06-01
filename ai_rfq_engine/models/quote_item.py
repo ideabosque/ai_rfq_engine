@@ -419,6 +419,7 @@ class QuoteItemModel(BaseModel):
     pax_breakdown = MapAttribute(null=True)
     bundle_uuid = UnicodeAttribute(null=True)
     bundle_label = UnicodeAttribute(null=True)
+    bundle_component_uuid = UnicodeAttribute(null=True)
     subtotal = NumberAttribute()
     subtotal_discount = NumberAttribute(null=True)
     final_subtotal = NumberAttribute()
@@ -586,6 +587,7 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
     updated_at_gt = kwargs.get("updated_at_gt")
     updated_at_lt = kwargs.get("updated_at_lt")
     bundle_uuid = kwargs.get("bundle_uuid")
+    bundle_component_uuid = kwargs.get("bundle_component_uuid")
 
     args = []
     inquiry_funct = QuoteItemModel.scan
@@ -658,6 +660,8 @@ def resolve_quote_item_list(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Any:
         )
     if bundle_uuid:
         the_filters &= QuoteItemModel.bundle_uuid == bundle_uuid
+    if bundle_component_uuid:
+        the_filters &= QuoteItemModel.bundle_component_uuid == bundle_component_uuid
     if the_filters is not None:
         args.append(the_filters)
 
@@ -828,6 +832,7 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
             "pax_breakdown",
             "bundle_uuid",
             "bundle_label",
+            "bundle_component_uuid",
             "currency",
             "subtotal_native",
             "subtotal_discount",
@@ -877,6 +882,22 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
             selected_batch_no = (availability.get("request") or {}).get("batch_no")
             if not cols.get("batch_no") and selected_batch_no:
                 cols["batch_no"] = selected_batch_no
+
+        if cols.get("bundle_component_uuid"):
+            if not cols.get("bundle_uuid"):
+                raise ValueError(
+                    "bundle_uuid is required when bundle_component_uuid is provided"
+                )
+            from .utils import validate_bundle_component_exists
+
+            if not validate_bundle_component_exists(
+                info.context.get("partition_key"),
+                cols["bundle_uuid"],
+                cols["bundle_component_uuid"],
+            ):
+                raise ValueError(
+                    "bundle_component_uuid does not belong to the selected bundle_uuid"
+                )
 
         # G5: apply Quote-locked FX rate. ``subtotal`` from tier pricing is in the
         # native (supplier) currency. If the parent Quote was created with a
@@ -965,6 +986,33 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
     else:
         quote_item = kwargs.get("entity")
         request_uuid = quote_item.request_uuid
+        next_bundle_uuid = kwargs.get(
+            "bundle_uuid", getattr(quote_item, "bundle_uuid", None)
+        )
+        next_bundle_component_uuid = kwargs.get(
+            "bundle_component_uuid",
+            getattr(quote_item, "bundle_component_uuid", None),
+        )
+        if next_bundle_uuid == "null":
+            next_bundle_uuid = None
+        if next_bundle_component_uuid == "null":
+            next_bundle_component_uuid = None
+        if next_bundle_component_uuid:
+            if not next_bundle_uuid:
+                raise ValueError(
+                    "bundle_uuid is required when bundle_component_uuid is provided"
+                )
+            from .utils import validate_bundle_component_exists
+
+            if not validate_bundle_component_exists(
+                info.context.get("partition_key"),
+                next_bundle_uuid,
+                next_bundle_component_uuid,
+            ):
+                raise ValueError(
+                    "bundle_component_uuid does not belong to the selected bundle_uuid"
+                )
+
         if "request_data" in kwargs:
             request_data = kwargs["request_data"]
             existing_data = getattr(quote_item, "request_data", None) or {}
@@ -999,6 +1047,15 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
             actions.append(
                 QuoteItemModel.bundle_label.set(
                     None if kwargs["bundle_label"] == "null" else kwargs["bundle_label"]
+                )
+            )
+
+        if "bundle_component_uuid" in kwargs:
+            actions.append(
+                QuoteItemModel.bundle_component_uuid.set(
+                    None
+                    if kwargs["bundle_component_uuid"] == "null"
+                    else kwargs["bundle_component_uuid"]
                 )
             )
 

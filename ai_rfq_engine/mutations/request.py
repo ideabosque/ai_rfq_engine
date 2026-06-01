@@ -25,6 +25,7 @@ class InsertUpdateRequest(Mutation):
         shipping_address = JSONCamelCase(required=False)
         items = List(JSONCamelCase, required=False)
         notes = String(required=False)
+        bundle_uuid = String(required=False)
         status = String(required=False)
         expired_at = DateTime(required=False)
         updated_by = String(required=True)

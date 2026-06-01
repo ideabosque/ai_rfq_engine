@@ -20,6 +20,7 @@ erDiagram
     ITEM ||--o{ PROVIDER_ITEM : "offered by"
     ITEM ||--o{ ITEM_PRICE_TIER : "priced via"
     ITEM ||--o{ ITEM_CATALOG_REF : "discovered as"
+    ITEM ||--o{ BUNDLE_COMPONENT : "template component"
 
     PROVIDER_ITEM ||--o{ PROVIDER_ITEM_BATCH : "stocked as"
     PROVIDER_ITEM ||--o{ ITEM_PRICE_TIER : "supplier price"
@@ -27,6 +28,7 @@ erDiagram
     PROVIDER_ITEM ||--o{ AVAILABILITY_HOLD : "reserves capacity"
     PROVIDER_ITEM ||--o{ QUOTE_ITEM : "quoted as"
     PROVIDER_ITEM ||--o{ ITEM_CATALOG_REF : "supplier ref"
+    PROVIDER_ITEM ||--o{ BUNDLE_COMPONENT : "default supplier"
 
     PROVIDER_ITEM_BATCH ||--o{ AVAILABILITY_HOLD : "reserved from"
     PROVIDER_ITEM_BATCH ||--o{ QUOTE_ITEM : "pinned by"
@@ -36,6 +38,7 @@ erDiagram
     REQUEST ||--o{ FILE : "attached files"
     REQUEST ||--o{ INSTALLMENT : "billing schedule"
     REQUEST ||--o{ QUOTE_ITEM : "ordered for"
+    REQUEST }o--|| BUNDLE : "selected package"
 
     QUOTE ||--o{ QUOTE_ITEM : "contains"
     QUOTE ||--o{ INSTALLMENT : "split into"
@@ -43,6 +46,12 @@ erDiagram
 
     QUOTE_ITEM }o--|| AVAILABILITY_HOLD : "hold_token"
     QUOTE_ITEM }o--|| ITEM : "of item"
+    QUOTE_ITEM }o--|| BUNDLE : "bundle_uuid"
+    QUOTE_ITEM }o--|| BUNDLE_COMPONENT : "from template"
+
+    BUNDLE ||--o{ BUNDLE_COMPONENT : "has components"
+    BUNDLE ||--o{ REQUEST : "requested as"
+    BUNDLE ||--o{ QUOTE_ITEM : "quoted group"
 
     FX_RATE }o..o{ QUOTE : "reference rate"
     DISCOUNT_PROMPT }o..o{ QUOTE_ITEM : "scoped pricing"
@@ -160,6 +169,29 @@ erDiagram
         map extra
         string status
     }
+    BUNDLE {
+        string partition_key PK
+        string bundle_uuid PK
+        string bundle_code
+        string bundle_name
+        string bundle_type
+        string description
+        map extra
+        string status
+    }
+    BUNDLE_COMPONENT {
+        string partition_key PK
+        string bundle_component_uuid PK
+        string bundle_uuid FK
+        string item_uuid FK
+        string provider_item_uuid FK
+        string component_role
+        boolean required
+        number default_qty
+        number sort_order
+        map extra
+        string status
+    }
     DISCOUNT_PROMPT {
         string partition_key PK
         string discount_prompt_uuid PK
@@ -180,6 +212,7 @@ erDiagram
         map billing_address
         map shipping_address
         list items
+        string bundle_uuid FK
         string status
         datetime expired_at
     }
@@ -215,6 +248,7 @@ erDiagram
         map pax_breakdown
         string bundle_uuid
         string bundle_label
+        string bundle_component_uuid FK
         number subtotal
         number subtotal_discount
         number final_subtotal
@@ -333,7 +367,7 @@ A priceable thing in the catalog — a hotel room category, a transfer leg, an e
 - LSI `updated_at-index`
 
 **Relationships**
-- Has many `ProviderItem`, `ItemPriceTier`, `ItemCatalogRef`.
+- Has many `ProviderItem`, `ItemPriceTier`, `ItemCatalogRef`, `BundleComponent`.
 - Referenced by `QuoteItem.item_uuid`.
 
 ---
@@ -361,7 +395,7 @@ A supplier-specific offering of an `Item`. The same hotel room (`Item`) can be s
 - LSI `updated_at-index`
 
 **Relationships**
-- Has many `ProviderItemBatch`, `ItemPriceTier`, `AvailabilityHold`, `QuoteItem`.
+- Has many `ProviderItemBatch`, `ItemPriceTier`, `AvailabilityHold`, `QuoteItem`, `BundleComponent`.
 - Optional `CancellationPolicy` defaults (linked by `cancellation_policy.provider_item_uuid`).
 
 ---
@@ -527,7 +561,72 @@ Mapping table between external catalog references (KGE search results) and inter
 
 ---
 
-### 3.11 `are-discount_prompts` — `DiscountPromptModel`
+### 3.11 `are-bundles` — `BundleModel`
+
+Reusable package/itinerary templates such as a hotel stay + transfers + excursions. A request can select one bundle, and quote lines can carry the same `bundle_uuid` so they render and price as a grouped offer while each component remains independently priced.
+
+| Column | Type | Notes |
+|---|---|---|
+| `partition_key` | str (hash) | Tenant key. |
+| `bundle_uuid` | str (range) | Stable bundle identifier. |
+| `bundle_code` | str (nullable) | Human/operator-facing package code. |
+| `bundle_name` | str | Display name. |
+| `bundle_type` | str (nullable) | Free-form category such as `tour`, `package`, `itinerary`, or `event`. |
+| `description` | str (nullable) | Display/agent notes. |
+| `extra` | map (nullable) | Free-form metadata for package rules, tags, or channel-specific data. |
+| `status` | str | Default `active`. |
+| `created_at`, `updated_at`, `updated_by` | audit |  |
+
+**Indexes**
+- LSI `bundle_code-index`
+- LSI `bundle_type-index`
+- LSI `status-index`
+- LSI `updated_at-index`
+
+**Relationships**
+- Has many `BundleComponent` rows.
+- Referenced by `Request.bundle_uuid` when a request selects a package.
+- Referenced by `QuoteItem.bundle_uuid` for grouped package quote lines.
+
+**Delete rule**: refuses if any `BundleComponent`, `Request`, or `QuoteItem` still references the bundle.
+
+---
+
+### 3.12 `are-bundle_components` — `BundleComponentModel`
+
+Template rows that define the default items inside a bundle. Components can point at the catalog item only, or also pin a preferred supplier offering through `provider_item_uuid`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `partition_key` | str (hash) | Tenant key. |
+| `bundle_component_uuid` | str (range) | Stable component identifier. |
+| `bundle_uuid` | str | FK → `BundleModel.bundle_uuid`. |
+| `item_uuid` | str | FK → `ItemModel.item_uuid`. |
+| `provider_item_uuid` | str (nullable) | Optional FK → `ProviderItemModel.provider_item_uuid` for default supplier selection. |
+| `component_role` | str (nullable) | Role within the package, e.g. `room`, `transfer`, `activity`, `meal`. |
+| `required` | bool | Whether this component is expected in the package. Default `true`. |
+| `default_qty` | number (nullable) | Suggested quantity when building request/quote lines. |
+| `sort_order` | number (nullable) | Display/build order inside the package. |
+| `extra` | map (nullable) | Free-form component metadata. |
+| `status` | str | Default `active`. |
+| `created_at`, `updated_at`, `updated_by` | audit |  |
+
+**Indexes**
+- LSI `bundle_uuid-index`
+- LSI `item_uuid-index`
+- LSI `provider_item_uuid-index`
+- LSI `component_role-index`
+- LSI `status-index`
+- LSI `updated_at-index`
+
+**Relationships**
+- Belongs to one `Bundle`.
+- References one `Item` and optionally one `ProviderItem`.
+- Referenced by `QuoteItem.bundle_component_uuid`; quote-item validation requires the component to belong to the selected `bundle_uuid`.
+
+---
+
+### 3.13 `are-discount_prompts` — `DiscountPromptModel`
 
 Pricing-engine discount rules. Scoped by `scope` (a tag like a segment id, customer corp id, or item id) and consumed at quote-line totalling time.
 
@@ -552,7 +651,7 @@ See [DISCOUNT_PROMOTION_PROMPT.md](DISCOUNT_PROMOTION_PROMPT.md) for authoring g
 
 ---
 
-### 3.12 `are-requests` — `RequestModel`
+### 3.14 `are-requests` — `RequestModel`
 
 An incoming customer inquiry. Carries contact info, optional addresses, and a free-form items list.
 
@@ -565,6 +664,7 @@ An incoming customer inquiry. Carries contact info, optional addresses, and a fr
 | `request_title`, `request_description` | str | Display fields. |
 | `billing_address`, `shipping_address` | map (nullable) | Address blobs. |
 | `items` | list of map | Customer's wish list (free-form; not a strict FK to `Item`). |
+| `bundle_uuid` | str (nullable) | Optional FK → `BundleModel.bundle_uuid` when the request is for a package template. |
 | `notes` | str (nullable) |  |
 | `status` | str | Default `initial`. |
 | `expired_at` | datetime (nullable) | Optional request expiry. |
@@ -574,11 +674,11 @@ An incoming customer inquiry. Carries contact info, optional addresses, and a fr
 - LSI `email-index`
 - LSI `updated_at-index`
 
-**Relationships**: has many `Quote`, `QuoteItem`, `Installment`, `File`.
+**Relationships**: has many `Quote`, `QuoteItem`, `Installment`, `File`; optionally references one `Bundle`.
 
 ---
 
-### 3.13 `are-quotes` — `QuoteModel`
+### 3.15 `are-quotes` — `QuoteModel`
 
 A supplier-specific quote answering a `Request`. Multiple quotes (from different providers) can exist per request.
 
@@ -607,7 +707,7 @@ A supplier-specific quote answering a `Request`. Multiple quotes (from different
 
 ---
 
-### 3.14 `are-quote_items` — `QuoteItemModel`
+### 3.16 `are-quote_items` — `QuoteItemModel`
 
 A single priced line on a `Quote`. Carries pricing inputs, the calculated subtotal in both native and display currency, optional bundle grouping, and an optional availability-hold token.
 
@@ -624,7 +724,8 @@ A single priced line on a `Quote`. Carries pricing inputs, the calculated subtot
 | `price_per_uom` | number | Selected tier price. |
 | `qty` | number | Billable units. For `per_pax_type`, must equal the total of `pax_breakdown`. For `occupancy`, this is room-nights, **not** guest count. |
 | `pax_breakdown` | map (nullable) | Per-PAX-type counts. |
-| `bundle_uuid`, `bundle_label` | str (nullable) | Itinerary grouping — multiple lines with the same UUID render together. |
+| `bundle_uuid`, `bundle_label` | str (nullable) | Package/itinerary grouping. `bundle_uuid` optionally references `BundleModel.bundle_uuid`; multiple independently priced lines with the same UUID render together. |
+| `bundle_component_uuid` | str (nullable) | Optional FK → `BundleComponentModel.bundle_component_uuid`; when set, it must belong to the selected `bundle_uuid`. |
 | `subtotal` | number | Display-currency subtotal. |
 | `subtotal_discount` | number (nullable) | Display-currency discount applied. |
 | `final_subtotal` | number | `subtotal - subtotal_discount`. |
@@ -641,11 +742,11 @@ A single priced line on a `Quote`. Carries pricing inputs, the calculated subtot
 - LSI `updated_at-index`
 - **GSI** `item_uuid-provider_item_uuid-index` — hash `item_uuid`, range `provider_item_uuid`. Lets analytics list all quote lines for a given product across quotes.
 
-**Update rule**: `pax_breakdown`, `qty`, and `batch_no` cannot be changed after creation. Allowed updates: `notes`, `bundle_uuid`, `bundle_label`, `currency`, `subtotal_discount`, `subtotal_native`. The engine-owned cancellation snapshot is also immutable.
+**Update rule**: `pax_breakdown`, `qty`, and `batch_no` cannot be changed after creation. Allowed updates: `notes`, `bundle_uuid`, `bundle_label`, `bundle_component_uuid`, `currency`, `subtotal_discount`, `subtotal_native`. The engine-owned cancellation snapshot is also immutable.
 
 ---
 
-### 3.15 `are-installments` — `InstallmentModel`
+### 3.17 `are-installments` — `InstallmentModel`
 
 Payment schedule rows for a `Quote` (e.g. 30% deposit + 70% balance).
 
@@ -671,7 +772,7 @@ Payment schedule rows for a `Quote` (e.g. 30% deposit + 70% balance).
 
 ---
 
-### 3.16 `are-files` — `FileModel`
+### 3.18 `are-files` — `FileModel`
 
 Metadata-only attachments associated with a `Request`. Actual file delivery is out of scope for this engine.
 
@@ -699,6 +800,8 @@ A few non-obvious lookup patterns deserve calling out:
 | "What's the active price for this segment×provider×qty?" | Query `ItemPriceTierModel` by hash `item_uuid`, filter `segment_uuid`, `provider_item_uuid`, `status="active"`, then bracket on `quantity_greater_then / quantity_less_then`. |
 | "Which quote line owns this hold?" | Load the hold by `(partition_key, hold_token)`; it carries `quote_uuid` + `quote_item_uuid`. |
 | "What's the supplier's catalog reference for this internal item?" | Query `ItemCatalogRef.item_lookup-index` by hash `partition_key`, range `item_lookup_key` (== `item_uuid`). |
+| "What are the default components for this package?" | Query `BundleComponent.bundle_uuid-index` by `(partition_key, bundle_uuid)`. |
+| "Which quote line came from a package component?" | Use `QuoteItem.bundle_component_uuid` today; add a dedicated index later only if this becomes a high-volume lookup. |
 | "Find all quote items for an `item_uuid` across all quotes" | Use the `item_uuid-provider_item_uuid-index` GSI on `QuoteItem`. |
 
 ---
@@ -710,5 +813,6 @@ A few non-obvious lookup patterns deserve calling out:
 | "How is a line actually priced?" | [PRICING_CALCULATION.md §7](PRICING_CALCULATION.md) |
 | "How does the hold transaction run end-to-end?" | [HOSPITALITY_BUSINESS_GUIDE.md §5](HOSPITALITY_BUSINESS_GUIDE.md), [HOSPITALITY_BUSINESS_GAP_PLAN.md §4.4](HOSPITALITY_BUSINESS_GAP_PLAN.md) |
 | "What does an availability/catalog handler call look like?" | [handlers/availability/handler.py](../ai_rfq_engine/handlers/availability/handler.py), [handlers/catalog/handler.py](../ai_rfq_engine/handlers/catalog/handler.py) |
+| "Where are package templates modeled?" | [models/bundle.py](../ai_rfq_engine/models/bundle.py), [models/bundle_component.py](../ai_rfq_engine/models/bundle_component.py) |
 | "Quote-item orchestration source" | [models/quote_item.py](../ai_rfq_engine/models/quote_item.py) |
 | "GraphQL surface" | [schema.py](../ai_rfq_engine/schema.py) |

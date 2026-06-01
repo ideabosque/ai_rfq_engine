@@ -14,6 +14,8 @@ from ..utils.normalization import normalize_to_json
 
 def initialize_tables(logger: logging.Logger) -> None:
     from .availability_hold import AvailabilityHoldModel
+    from .bundle import BundleModel
+    from .bundle_component import BundleComponentModel
     from .cancellation_policy import CancellationPolicyModel
     from .discount_prompt import DiscountPromptModel
     from .file import FileModel
@@ -32,6 +34,8 @@ def initialize_tables(logger: logging.Logger) -> None:
 
     models: List = [
         AvailabilityHoldModel,
+        BundleModel,
+        BundleComponentModel,
         CancellationPolicyModel,
         DiscountPromptModel,
         FileModel,
@@ -125,6 +129,26 @@ def validate_batch_exists(provider_item_uuid: str, batch_no: str) -> bool:
     from .provider_item_batches import get_provider_item_batch_count
 
     return get_provider_item_batch_count(provider_item_uuid, batch_no) > 0
+
+
+def validate_bundle_exists(partition_key: str, bundle_uuid: str) -> bool:
+    """Validate if a bundle exists in the database."""
+    from .bundle import get_bundle_count
+
+    return get_bundle_count(partition_key, bundle_uuid) > 0
+
+
+def validate_bundle_component_exists(
+    partition_key: str,
+    bundle_uuid: str,
+    bundle_component_uuid: str,
+) -> bool:
+    """Validate if a bundle component exists and belongs to a bundle."""
+    from .bundle_component import validate_bundle_component_for_bundle
+
+    return validate_bundle_component_for_bundle(
+        partition_key, bundle_uuid, bundle_component_uuid
+    )
 
 
 def combine_all_discount_prompts(

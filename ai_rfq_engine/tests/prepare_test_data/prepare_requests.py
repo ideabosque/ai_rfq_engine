@@ -7,7 +7,7 @@ Generates customer inquiries that reference real items / provider items /
 batches produced by ``prepare_flight_products.py``, addressed to emails
 already attached to a segment via ``prepare_segments_and_contacts.py``.
 
-Per ``TEST_DATA_PREPARATION.md §13`` and the validator in
+Per ``TEST_DATA_PREPARATION.md §15`` and the validator in
 ``models/request.py::_validate_request_items`` the ``items`` list carries
 free-form maps; the engine only enforces the existence of any
 ``item_uuid``, ``provider_item_uuid``, and ``(provider_item_uuid,
@@ -96,6 +96,7 @@ NUM_REQUESTS = int(os.getenv("SEED_REQUEST_NUM_REQUESTS", "5"))
 MAX_ITEMS = max(1, int(os.getenv("SEED_REQUEST_MAX_ITEMS", "3")))
 PIN_PROVIDER_PROB = float(os.getenv("SEED_REQUEST_PIN_PROVIDER_PROB", "0.6"))
 PIN_BATCH_PROB = float(os.getenv("SEED_REQUEST_PIN_BATCH_PROB", "0.4"))
+BUNDLE_REQUEST_PROB = float(os.getenv("SEED_REQUEST_BUNDLE_PROB", "0.6"))
 
 SETTING = {
     "region_name": os.getenv("region_name"),
@@ -243,6 +244,7 @@ def _build_request_item(
     cabin_preference: str | None,
     provider_items_by_item: dict[str, list[dict]],
     batches_by_provider: dict[str, list[dict]],
+    bundle_component: dict | None = None,
 ) -> dict:
     qty = sum(pax_breakdown.values())
     entry: dict[str, Any] = {
@@ -252,9 +254,27 @@ def _build_request_item(
     }
     if cabin_preference:
         entry["cabin_preference"] = cabin_preference
+    if bundle_component:
+        entry["bundle_component_uuid"] = bundle_component.get(
+            "bundleComponentUuid"
+        )
 
-    if random.random() < PIN_PROVIDER_PROB:
-        provider_item = _pick_provider_for_item(item, provider_items_by_item)
+    should_pin_provider = bool(
+        bundle_component and bundle_component.get("providerItemUuid")
+    ) or random.random() < PIN_PROVIDER_PROB
+    if should_pin_provider:
+        provider_item = None
+        if bundle_component and bundle_component.get("providerItemUuid"):
+            for candidate in provider_items_by_item.get(item.get("itemUuid"), []):
+                if (
+                    candidate.get("providerItemUuid")
+                    == bundle_component.get("providerItemUuid")
+                ):
+                    provider_item = candidate
+                    break
+        provider_item = provider_item or _pick_provider_for_item(
+            item, provider_items_by_item
+        )
         if provider_item:
             pi_entry: dict[str, Any] = {
                 "provider_item_uuid": provider_item["providerItemUuid"],
@@ -278,15 +298,15 @@ mutation InsertUpdateRequest(
     $email: String, $title: String, $desc: String,
     $billing: JSONCamelCase, $shipping: JSONCamelCase,
     $items: [JSONCamelCase], $notes: String,
-    $status: String, $expired: DateTime, $by: String!
+    $bundle: String, $status: String, $expired: DateTime, $by: String!
 ) {
     insertUpdateRequest(
         email: $email, requestTitle: $title, requestDescription: $desc,
         billingAddress: $billing, shippingAddress: $shipping,
-        items: $items, notes: $notes, status: $status,
+        items: $items, notes: $notes, bundleUuid: $bundle, status: $status,
         expiredAt: $expired, updatedBy: $by
     ) {
-        request { requestUuid }
+        request { requestUuid bundleUuid }
     }
 }
 """
@@ -368,6 +388,19 @@ def _index_batches(batches: list[dict]) -> dict[str, list[dict]]:
     return by_provider
 
 
+def _index_components_by_bundle(
+    components: list[dict],
+) -> dict[str, list[dict]]:
+    by_bundle: dict[str, list[dict]] = {}
+    for component in components:
+        bundle_uuid = component.get("bundleUuid")
+        if bundle_uuid:
+            by_bundle.setdefault(bundle_uuid, []).append(component)
+    for entries in by_bundle.values():
+        entries.sort(key=lambda c: c.get("sortOrder") or 0)
+    return by_bundle
+
+
 # --- Generator ------------------------------------------------------------- #
 
 
@@ -387,11 +420,47 @@ def _seed_one(
     items: list[dict],
     provider_items_by_item: dict[str, list[dict]],
     batches_by_provider: dict[str, list[dict]],
+    bundles: list[dict],
+    components_by_bundle: dict[str, list[dict]],
+    items_by_uuid: dict[str, dict],
 ) -> dict | None:
     scenario = random.choice(SCENARIOS)
-    lo, hi = scenario["item_count"]
-    item_count = min(random.randint(lo, hi), MAX_ITEMS, len(items))
-    chosen_items = random.sample(items, item_count)
+    selected_bundle = None
+    selected_components: list[dict] = []
+    if (
+        bundles
+        and random.random() < BUNDLE_REQUEST_PROB
+        and scenario["name"] in {"multi_leg", "honeymoon"}
+    ):
+        candidate_bundles = [
+            bundle
+            for bundle in bundles
+            if components_by_bundle.get(bundle.get("bundleUuid"))
+        ]
+        if candidate_bundles:
+            selected_bundle = random.choice(candidate_bundles)
+            selected_components = components_by_bundle.get(
+                selected_bundle["bundleUuid"], []
+            )[:MAX_ITEMS]
+
+    if selected_components:
+        chosen_items = [
+            items_by_uuid[c["itemUuid"]]
+            for c in selected_components
+            if c.get("itemUuid") in items_by_uuid
+        ]
+        item_count = len(chosen_items)
+        if not chosen_items:
+            selected_bundle = None
+            selected_components = []
+    else:
+        chosen_items = []
+
+    if not chosen_items:
+        lo, hi = scenario["item_count"]
+        item_count = min(random.randint(lo, hi), MAX_ITEMS, len(items))
+        chosen_items = random.sample(items, item_count)
+        selected_components = []
 
     pax_lo, pax_hi = scenario["pax_count"]
     pax_count = random.randint(pax_lo, pax_hi)
@@ -414,6 +483,9 @@ def _seed_one(
         else None
     )
 
+    component_by_item = {
+        component.get("itemUuid"): component for component in selected_components
+    }
     item_payload = [
         _build_request_item(
             it,
@@ -421,6 +493,7 @@ def _seed_one(
             cabin_preference=cabin,
             provider_items_by_item=provider_items_by_item,
             batches_by_provider=batches_by_provider,
+            bundle_component=component_by_item.get(it.get("itemUuid")),
         )
         for it in chosen_items
     ]
@@ -437,6 +510,7 @@ def _seed_one(
         "shipping": _build_address(),
         "items": item_payload,
         "notes": fake.sentence(nb_words=12),
+        "bundle": selected_bundle.get("bundleUuid") if selected_bundle else None,
         "status": "initial",
         "expired": expired_at,
         "by": UPDATED_BY,
@@ -444,14 +518,16 @@ def _seed_one(
     data = run_mutation(engine, variables)
     if not data:
         return None
-    request_uuid = data["insertUpdateRequest"]["request"]["requestUuid"]
+    saved_request = data["insertUpdateRequest"]["request"]
+    request_uuid = saved_request["requestUuid"]
     logger.info(
-        "  %s: %s (%d items, %d pax, %s) -> %s",
+        "  %s: %s (%d items, %d pax, %s, bundle=%s) -> %s",
         scenario["name"],
         title,
         len(item_payload),
         pax_count,
         cabin or "no cabin pref",
+        selected_bundle.get("bundleCode") if selected_bundle else "none",
         request_uuid,
     )
     return {
@@ -463,6 +539,9 @@ def _seed_one(
         "billingAddress": variables["billing"],
         "shippingAddress": variables["shipping"],
         "items": item_payload,
+        "bundleUuid": saved_request.get("bundleUuid"),
+        "bundleCode": selected_bundle.get("bundleCode") if selected_bundle else None,
+        "bundleName": selected_bundle.get("bundleName") if selected_bundle else None,
         "notes": variables["notes"],
         "status": "initial",
         "expiredAt": expired_at,
@@ -483,8 +562,14 @@ def generate(engine: AIRFQEngine) -> dict:
         )
     provider_items = (flight_data or {}).get("provider_items") or []
     batches = (flight_data or {}).get("provider_item_batches") or []
+    bundles = (flight_data or {}).get("bundles") or []
+    bundle_components = (flight_data or {}).get("bundle_components") or []
+    items_by_uuid = {
+        item["itemUuid"]: item for item in items if item.get("itemUuid")
+    }
     provider_items_by_item = _index_provider_items(provider_items)
     batches_by_provider = _index_batches(batches)
+    components_by_bundle = _index_components_by_bundle(bundle_components)
 
     segments_data = _safe_load(SEGMENTS_INPUT)
     contact_emails = [
@@ -511,6 +596,9 @@ def generate(engine: AIRFQEngine) -> dict:
             items=items,
             provider_items_by_item=provider_items_by_item,
             batches_by_provider=batches_by_provider,
+            bundles=bundles,
+            components_by_bundle=components_by_bundle,
+            items_by_uuid=items_by_uuid,
         )
         if record:
             output["requests"].append(record)

@@ -10,7 +10,7 @@ This is what makes ``QuoteModel.total_quote_amount``,
 holds, applies FX conversion, and then rolls up the totals onto the
 parent quote via ``update_quote_totals``.
 
-Per ``TEST_DATA_PREPARATION.md §16`` each QuoteItem requires:
+Per ``TEST_DATA_PREPARATION.md §18`` each QuoteItem requires:
 
     * ``quoteUuid``, ``requestUuid``, ``itemUuid``, ``providerItemUuid``,
       ``segmentUuid``                — for tier pricing.
@@ -25,6 +25,9 @@ Per ``TEST_DATA_PREPARATION.md §16`` each QuoteItem requires:
                                         and a service window must be
                                         resolvable; pinning the batch
                                         gives the engine its dates.
+    * ``bundleUuid`` /
+      ``bundleComponentUuid``         — when the request came from a
+                                        persisted flight itinerary bundle.
 
 The script consumes prior outputs:
 
@@ -134,14 +137,16 @@ QUOTE_ITEM_MUTATION = """
 mutation InsertUpdateQuoteItem(
     $qid: String!, $rid: String, $iid: String, $pid: String, $sid: String,
     $bno: String, $qty: SafeFloat, $pax: JSONCamelCase,
-    $bundleUuid: String, $bundleLabel: String,
+    $bundleUuid: String, $bundleComponentUuid: String, $bundleLabel: String,
     $discount: SafeFloat, $by: String!
 ) {
     insertUpdateQuoteItem(
         quoteUuid: $qid, requestUuid: $rid, itemUuid: $iid,
         providerItemUuid: $pid, segmentUuid: $sid, batchNo: $bno,
         qty: $qty, paxBreakdown: $pax,
-        bundleUuid: $bundleUuid, bundleLabel: $bundleLabel,
+        bundleUuid: $bundleUuid,
+        bundleComponentUuid: $bundleComponentUuid,
+        bundleLabel: $bundleLabel,
         subtotalDiscount: $discount,
         updatedBy: $by
     ) {
@@ -150,6 +155,7 @@ mutation InsertUpdateQuoteItem(
             pricePerUom qty
             subtotal subtotalDiscount finalSubtotal
             subtotalNative currency
+            bundleUuid bundleComponentUuid
         }
     }
 }
@@ -267,7 +273,8 @@ def _seed_one(
     provider_item: dict,
     batch: dict,
     segment_uuid: str,
-    bundle: tuple[str, str] | None,
+    bundle_uuid: str | None,
+    bundle_label: str | None,
 ) -> dict | None:
     pax_breakdown = request_item.get("pax_breakdown") or {"adult": int(request_item.get("quantity") or 1)}
     qty = sum(int(v) for v in pax_breakdown.values())
@@ -276,8 +283,7 @@ def _seed_one(
     if random.random() < DISCOUNT_PROB:
         discount = round(random.uniform(DISCOUNT_MIN, DISCOUNT_MAX), 2)
 
-    bundle_uuid = bundle[0] if bundle else None
-    bundle_label = bundle[1] if bundle else None
+    bundle_component_uuid = request_item.get("bundle_component_uuid")
 
     variables = {
         "qid": quote["quoteUuid"],
@@ -289,6 +295,7 @@ def _seed_one(
         "qty": float(qty),
         "pax": pax_breakdown,
         "bundleUuid": bundle_uuid,
+        "bundleComponentUuid": bundle_component_uuid,
         "bundleLabel": bundle_label,
         "discount": discount,
         "by": UPDATED_BY,
@@ -325,6 +332,8 @@ def _seed_one(
         "subtotalNative": qi.get("subtotalNative"),
         "currency": qi.get("currency"),
         "bundleUuid": bundle_uuid,
+        "bundleComponentUuid": qi.get("bundleComponentUuid")
+        or bundle_component_uuid,
         "bundleLabel": bundle_label,
     }
 
@@ -399,13 +408,16 @@ def generate(engine: AIRFQEngine) -> dict:
             len(request_items),
         )
 
-        # Group request items into a bundle if the request has 2+ items;
-        # mirrors the itinerary-grouping pattern from §4 in the guide.
-        bundle: tuple[str, str] | None = None
-        if len(request_items) >= 2:
-            bundle_uuid = f"bundle-{quote['quoteUuid'][:8]}"
-            bundle_label = request.get("requestTitle") or "Itinerary"
-            bundle = (bundle_uuid, bundle_label[:80])
+        # Package grouping comes from prepare_requests.py, which references
+        # persisted Bundle/BundleComponent rows created by prepare_flight_products.py.
+        bundle_uuid = request.get("bundleUuid")
+        bundle_label = (
+            request.get("bundleName")
+            or request.get("requestTitle")
+            or "Itinerary"
+        )
+        if not bundle_uuid:
+            bundle_label = None
 
         seeded = 0
         for ri in request_items:
@@ -454,7 +466,8 @@ def generate(engine: AIRFQEngine) -> dict:
                 provider_item=provider_item,
                 batch=batch,
                 segment_uuid=segment_uuid,
-                bundle=bundle,
+                bundle_uuid=bundle_uuid,
+                bundle_label=bundle_label[:80] if bundle_label else None,
             )
             if record:
                 output["quote_items"].append(record)
@@ -471,9 +484,18 @@ def generate(engine: AIRFQEngine) -> dict:
     return output
 
 
+def _json_default(obj):
+    """``json.dump`` default for Decimal values returned by DynamoDB-backed fields."""
+    import decimal
+
+    if isinstance(obj, decimal.Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
 def write_output(output: dict) -> None:
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2)
+        json.dump(output, f, indent=2, default=_json_default)
     logger.info(
         "Wrote: %d quote_items, %d empty quotes, %d skipped lines -> %s",
         len(output["quote_items"]),
