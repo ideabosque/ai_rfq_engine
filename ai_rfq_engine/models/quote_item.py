@@ -529,10 +529,18 @@ def get_quote_item_type(info: ResolveInfo, quote_item: QuoteItemModel) -> QuoteI
     """
     Nested resolver approach: return minimal quote_item data.
     Those are resolved lazily by QuoteItemType resolvers.
+
+    ``request_data`` is engine-owned (it holds the cancellation-policy
+    snapshot, see _build_cancellation_snapshot) and is intentionally not
+    exposed via QuoteItemType. Filter it out before unpacking so the
+    Type constructor doesn't choke on the extra kwarg.
     """
     _ = info  # Keep for signature compatibility with decorators
     quote_item_dict = quote_item.__dict__["attribute_values"].copy()
-    return QuoteItemType(**normalize_to_json(quote_item_dict))
+    normalized = normalize_to_json(quote_item_dict)
+    allowed_fields = set(QuoteItemType._meta.fields.keys())
+    filtered = {k: v for k, v in normalized.items() if k in allowed_fields}
+    return QuoteItemType(**filtered)
 
 
 def resolve_quote_item(
@@ -920,8 +928,10 @@ def insert_update_quote_item(info: ResolveInfo, **kwargs: Dict[str, Any]) -> Non
                 request_data["cancellation_policy_snapshot"] = snapshot
                 cols["request_data"] = request_data
 
-        # Auto-calculate subtotal and final_subtotal (both in DISPLAY currency)
-        subtotal_discount = cols.get("subtotal_discount", 0)
+        # Auto-calculate subtotal and final_subtotal (both in DISPLAY currency).
+        # ``.get(..., 0)`` returns None when the key is present with value None,
+        # so explicitly coalesce so a None discount becomes 0.
+        subtotal_discount = cols.get("subtotal_discount") or 0
         final_subtotal = subtotal_display - subtotal_discount
         cols["subtotal"] = subtotal_display
         cols["final_subtotal"] = final_subtotal
