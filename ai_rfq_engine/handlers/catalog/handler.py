@@ -5,13 +5,14 @@ from __future__ import annotations
 
 __author__ = "bibow"
 
+import logging
 from typing import Any, Optional, TypedDict
 
 import pendulum
 from graphene import ResolveInfo
-from silvaengine_constants import InvocationType
 from silvaengine_utility import Invoker
-from silvaengine_utility.serializer import Serializer
+
+from ..config import Config
 
 
 class CatalogReference(TypedDict):
@@ -84,23 +85,6 @@ def _partition_key(info: ResolveInfo) -> str:
     return partition_key
 
 
-def _decode_graphql_result(response: Any) -> dict[str, Any]:
-    if not isinstance(response, dict):
-        raise SystemError("Knowledge graph invocation returned no response")
-    body = response.get("body", response)
-    if isinstance(body, (str, bytes)):
-        body = Serializer.json_loads(body)
-    if not isinstance(body, dict):
-        raise SystemError("Knowledge graph invocation returned an invalid response")
-    if body.get("errors"):
-        raise SystemError(f"Knowledge graph catalog search failed: {body['errors']}")
-    data = body.get("data", body)
-    result = data.get("search") if isinstance(data, dict) else None
-    if not isinstance(result, dict):
-        raise SystemError("Knowledge graph invocation did not return search data")
-    return result
-
-
 def _search_inquiry(
     info: ResolveInfo,
     reference: CatalogReference,
@@ -109,34 +93,41 @@ def _search_inquiry(
     query_text = query.get("query_text")
     if not query_text:
         raise SystemError("Catalog browse inquiry requires query.query_text")
-    try:
-        invoker = info.context.get("aws_lambda_invoker")
-        if not callable(invoker):
-            raise SystemError("aws_lambda_invoker is required for catalog inquiry")
-        response = invoker(
-            invocation_type=InvocationType.REQUEST_RESPONSE,
-            payload=Invoker.build_invoker_payload(
-                context=info.context,
-                module_name="knowledge_graph_engine",
-                class_name="KnowledgeGraphEngine",
-                function_name="knowledge_graph_graphql",
-                parameters={
-                    "query": _KGE_SEARCH_QUERY,
-                    "variables": {
-                        "queryText": query_text,
-                        "searchMode": query.get("search_mode", "text2cypher"),
-                        "indexName": query.get("index_name", "vector"),
-                        "retrievalQuery": query.get("retrieval_query"),
-                        "filters": query.get("filters"),
-                        "topK": query.get("top_k", 10),
-                        "page": query.get("page", 1),
-                        "limit": query.get("limit", 10),
-                    },
-                    "context": info.context,
-                },
-            ),
+
+    setting = Config.get_setting()
+    if not (setting.get("functs_on_local") or {}).get("knowledge_graph_graphql"):
+        raise SystemError(
+            "functs_on_local.knowledge_graph_graphql must be configured to route "
+            "catalog inquiries through Invoker.invoke_funct_on_local"
         )
-        payload = _decode_graphql_result(response)
+    logger = info.context.get("logger") or logging.getLogger("catalog")
+
+    try:
+        data = Invoker.invoke_funct_on_local(
+            logger,
+            setting,
+            "knowledge_graph_graphql",
+            query=_KGE_SEARCH_QUERY,
+            variables={
+                "queryText": query_text,
+                "searchMode": query.get("search_mode", "text2cypher"),
+                "indexName": query.get("index_name", "vector"),
+                "retrievalQuery": query.get("retrieval_query"),
+                "filters": query.get("filters"),
+                "topK": query.get("top_k", 10),
+                "page": query.get("page", 1),
+                "limit": query.get("limit", 10),
+            },
+            endpoint_id=info.context.get("endpoint_id"),
+            part_id=info.context.get("part_id"),
+        )
+        if not isinstance(data, dict):
+            raise SystemError("Knowledge graph invocation returned no data")
+        payload = data.get("search")
+        if not isinstance(payload, dict):
+            raise SystemError(
+                "Knowledge graph invocation did not return search payload"
+            )
     except CatalogHandlerError:
         raise
     except Exception as exc:
@@ -144,6 +135,7 @@ def _search_inquiry(
         if "timeout" in message or "timed out" in message:
             raise SystemTimeoutError("Knowledge graph catalog search timed out") from exc
         raise SystemError(f"Knowledge graph catalog search failed: {exc}") from exc
+
     return {
         "ref": reference,
         "payload": payload,

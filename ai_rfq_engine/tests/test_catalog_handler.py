@@ -14,8 +14,22 @@ import pytest
 @pytest.fixture
 def info():
     return SimpleNamespace(
-        context={"partition_key": "tenant-test", "aws_lambda_invoker": MagicMock()}
+        context={
+            "partition_key": "tenant-test",
+            "endpoint_id": "gpt",
+            "part_id": "test",
+        }
     )
+
+
+_FUNCTS_ON_LOCAL_SETTING = {
+    "functs_on_local": {
+        "knowledge_graph_graphql": {
+            "module_name": "knowledge_graph_engine",
+            "class_name": "KnowledgeGraphEngine",
+        },
+    },
+}
 
 
 @pytest.mark.unit
@@ -27,23 +41,28 @@ def test_dispatch_inquire_rejects_unpublished_node_lookup(info):
 
 
 @pytest.mark.unit
-def test_dispatch_inquire_invokes_kge_graphql_search(info):
+def test_dispatch_inquire_invokes_kge_graphql_search(info, monkeypatch):
     from ai_rfq_engine.handlers.catalog import dispatch_inquire
+    from ai_rfq_engine.handlers.catalog import handler as catalog_handler
 
-    info.context["aws_lambda_invoker"].return_value = {
-        "statusCode": 200,
-        "body": {"data": {"search": {"results": [{"name": "Onsen"}], "total": 1}}},
-    }
+    monkeypatch.setattr(
+        catalog_handler.Config, "get_setting", lambda: _FUNCTS_ON_LOCAL_SETTING
+    )
+    invoker_mock = MagicMock(
+        return_value={"search": {"results": [{"name": "Onsen"}], "total": 1}}
+    )
+    monkeypatch.setattr(
+        catalog_handler.Invoker, "invoke_funct_on_local", invoker_mock
+    )
+
     result = dispatch_inquire(info, query={"query_text": "onsen hotel"})
-    call = info.context["aws_lambda_invoker"].call_args.kwargs
-    payload = call["payload"]
-    from silvaengine_constants import InvocationType
 
-    assert call["invocation_type"] is InvocationType.REQUEST_RESPONSE
-    assert payload["module_name"] == "knowledge_graph_engine"
-    assert payload["class_name"] == "KnowledgeGraphEngine"
-    assert payload["function_name"] == "knowledge_graph_graphql"
-    assert payload["parameters"]["variables"]["queryText"] == "onsen hotel"
+    args, kwargs = invoker_mock.call_args
+    assert args[1] is _FUNCTS_ON_LOCAL_SETTING
+    assert args[2] == "knowledge_graph_graphql"
+    assert kwargs["variables"]["queryText"] == "onsen hotel"
+    assert kwargs["endpoint_id"] == "gpt"
+    assert kwargs["part_id"] == "test"
     assert result["payload"]["total"] == 1
 
 
@@ -56,14 +75,15 @@ def test_dispatch_inquire_requires_partition_key():
 
 
 @pytest.mark.unit
-def test_dispatch_inquire_requires_invoker():
+def test_dispatch_inquire_requires_functs_on_local(info, monkeypatch):
     from ai_rfq_engine.handlers.catalog import CatalogSystemError, dispatch_inquire
+    from ai_rfq_engine.handlers.catalog import handler as catalog_handler
 
-    with pytest.raises(CatalogSystemError, match="aws_lambda_invoker"):
-        dispatch_inquire(
-            SimpleNamespace(context={"partition_key": "tenant"}),
-            query={"query_text": "room"},
-        )
+    monkeypatch.setattr(
+        catalog_handler.Config, "get_setting", lambda: {"functs_on_local": {}}
+    )
+    with pytest.raises(CatalogSystemError, match="functs_on_local"):
+        dispatch_inquire(info, query={"query_text": "room"})
 
 
 @pytest.mark.unit
