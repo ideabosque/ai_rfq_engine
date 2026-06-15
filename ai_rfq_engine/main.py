@@ -247,8 +247,11 @@ class AIRFQEngine(Graphql):
             BaseModel.Meta.aws_access_key_id = setting.get("aws_access_key_id")
             BaseModel.Meta.aws_secret_access_key = setting.get("aws_secret_access_key")
 
-        # Initialize configuration via the Config class
-        Config.initialize(logger, **setting)
+        # Initialize configuration via the Config class.
+        # ``Config.initialize`` takes a single positional dict (see
+        # handlers/config.py); do NOT splat the kwargs or it errors with
+        # "unexpected keyword argument 'region_name'" et al.
+        Config.initialize(logger, setting)
 
         self.logger = logger
         self.setting = setting
@@ -307,3 +310,25 @@ class AIRFQEngine(Graphql):
             mutation=Mutations,
             types=type_class(),
         )
+
+
+# ---------------------------------------------------------------------------
+# Module-level dispatch functions for gateway integration
+# ---------------------------------------------------------------------------
+# These are called by silvaengine_gateway via the route manifest's
+# ``dispatch`` field (e.g. "ai_rfq_engine.main:dispatch_graphql").
+# They create a short-lived AIRFQEngine instance using the
+# already-initialized Config singleton.
+# ---------------------------------------------------------------------------
+
+
+def dispatch_graphql(**params: Any) -> Any:
+    """Execute a GraphQL query/mutation against the AI RFQ Engine.
+
+    Requires Config.initialize() to have been called (done by gateway startup).
+    """
+    from .handlers.config import Config
+
+    logger = Config.get_logger()
+    instance = AIRFQEngine(logger, **Config.get_setting())
+    return instance.ai_rfq_graphql(**params)

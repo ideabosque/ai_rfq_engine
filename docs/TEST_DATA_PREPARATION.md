@@ -721,6 +721,136 @@ What you can do for tests:
 
 See [HOSPITALITY_BUSINESS_GUIDE.md §5](HOSPITALITY_BUSINESS_GUIDE.md) for the lifecycle and [tests/test_availability_contention.py](../ai_rfq_engine/tests/test_availability_contention.py) for integration-test patterns.
 
+### 20.1 Data Prerequisites Chain
+
+The hold path triggers inside `insert_update_quote_item` → `_enforce_availability` → `dispatch_acquire_hold`. For that to succeed, every upstream row must already be in DynamoDB:
+
+```
+Segment                            (tier pricing key)
+   ↓
+Item                               (pricing_mode: per_pax_type or occupancy for hospitality)
+   ↓
+ProviderItem                       (availability_mode="require_hold")
+   ↓
+ProviderItemBatch                  (service_start_at/end_at + availability_qty > 0)
+   ↓                               (null availability_qty → require_hold rejects)
+   └── (optional) CancellationPolicy linked via cancellationPolicyUuid
+   ↓
+ItemPriceTier                      (status="active", segment + provider + pax matched)
+   ↓                               (GSI propagation: wait 60–120 s after creation)
+Request                            (free-form items list)
+   ↓
+Quote                              (currency, optional display_currency + fx_rate)
+   ↓
+QuoteItem                          ← HOLD GETS ACQUIRED HERE
+```
+
+Using the prep scripts:
+
+```
+1. prepare_segments_and_contacts.py    → segments
+2. prepare_flight_products.py          → item + provider_item (require_hold) +
+                                          batch (with availability_qty) +
+                                          tier (active) + cancellation_policy
+   ⏳ wait for the price-tier GSI to propagate (60–120 s)
+3. prepare_requests.py
+4. prepare_fx_rates.py                 (optional, for FX coverage)
+5. prepare_quotes.py
+6. prepare_quote_items.py              ← actually fires acquire_hold
+```
+
+### 20.2 Lifecycle States and Transitions
+
+```
+T0  Acquire    insert_update_quote_item with batch_no
+              → _enforce_availability
+              → dispatch_acquire_hold:
+                  • condition: in_stock=true AND availability_qty >= qty
+                  • TransactWrite: batch.availability_qty -= qty
+                                  + AvailabilityHoldModel(status="held")
+              → QuoteItem.hold_token / hold_expires_at populated
+
+T1  ONE of:
+    Confirm   Quote.status → "accepted"
+              → _confirm_quote_item_holds walks quote items
+              → dispatch_confirm_hold (status: held → confirmed)
+                  • idempotent: repeat does NOT decrement again
+
+    Release   delete_quote_item
+              → _release_availability_hold (status: held → released)
+                  • batch.availability_qty += qty (exactly once)
+
+    Expire    expireAvailabilityHold mutation OR scan_expired_holds
+              → only when expires_at < now
+              → status: held → expired, capacity restored once
+```
+
+### 20.3 §4.4 Verification Matrix
+
+Every scenario in the gap plan's §4.4 verification table is mapped to a concrete test:
+
+| # | Check | Test class / function |
+|---|---|---|
+| 1 | Concurrent acquisition cannot overbook | `TestConcurrentHoldAcquisition::test_concurrent_acquisition_cannot_overbook` |
+| 2 | Confirm idempotency | `TestConcurrentHoldAcquisition::test_hold_confirm_idempotent` |
+| 3 | Release idempotency | `TestConcurrentHoldAcquisition::test_hold_release_idempotent` |
+| 4 | Expiry restores capacity, blocks confirm | `TestExpiredHoldRestoresCapacity` |
+| 5 | Unknown token fails closed | `TestConcurrentHoldAcquisition::test_unknown_token_fails_closed` |
+| 6 | Quote-create failure → no capacity leak | `TestQuoteCreationFailureNoLeak` |
+| 7 | Unquantified batch rejected by `require_hold` | `TestUnquantifiedBatchRejectsHold` |
+
+All seven live in [tests/test_availability_contention.py](../ai_rfq_engine/tests/test_availability_contention.py) (gated `@pytest.mark.integration` — needs reachable DynamoDB).
+
+### 20.4 Test Execution Layers
+
+Run in this order for the fastest feedback path:
+
+```
+A. Unit (no DynamoDB, sub-second)
+   pytest ai_rfq_engine/tests/test_availability_handler.py            # 24 tests, mocked
+   pytest ai_rfq_engine/tests/test_gap_closure_development.py         # expiry scanner + telemetry
+   pytest ai_rfq_engine/tests/test_quote_item_g5_g6.py                # cancellation snapshot
+   pytest ai_rfq_engine/tests/test_quote_item_g2_occupancy.py         # pricing modes
+
+B. Integration (reachable DynamoDB)
+   pytest ai_rfq_engine/tests/test_availability_contention.py         # all 7 §4.4 cases
+
+C. End-to-end pilots (DynamoDB + tiers propagated, ~2 min runtime)
+   pytest ai_rfq_engine/tests/test_hospitality_pilot.py
+   pytest ai_rfq_engine/tests/test_hardening_pilot.py
+```
+
+### 20.5 Hard Dependencies and Failure Symptoms
+
+If a hold test fails, check these in order — most failures map to one missing prerequisite:
+
+| Dependency | Symptom if missed |
+|---|---|
+| `availability_qty` is non-null on the batch | `require_hold requires a quantified availability_qty` |
+| `service_start_at` / `service_end_at` set on batch OR passed explicitly | `service_start_at and service_end_at are required for availability checks` |
+| `ItemPriceTier.status == "active"` AND GSI propagated | `No price tier found for item_uuid=…, qty=…, segment_uuid=…` |
+| `ProviderItem.availability_mode == "require_hold"` | Hold path silently skipped (treated as `none`) |
+| Same `partition_key` on engine context as on the seeded records | `Query condition missed key schema element: endpoint_id` (schema-drift signature) |
+| `are-availability_holds` table exists | `Table not found` on the first acquire |
+
+### 20.6 Operational Tail (expiry scanner)
+
+Stale `held` records that never confirmed or released are reaped by `scan_expired_holds`:
+
+```python
+from ai_rfq_engine.handlers.availability.expiry_scanner import scan_expired_holds
+
+result = scan_expired_holds(
+    logger,
+    partition_key="gpt#nestaging",
+    batch_size=100,
+    dry_run=False,
+)
+# result == {"scanned": N, "expired": M, "errors": 0}
+```
+
+In production this runs as a scheduled Lambda. To exercise the path in tests against your seed data, mutate `AvailabilityHoldModel.expires_at` into the past for a `held` row, then invoke either `scan_expired_holds` or the `expireAvailabilityHold` GraphQL mutation directly. Capacity restoration is idempotent — running the scanner twice is safe.
+
 ---
 
 ## 21. Worked Seed Recipes

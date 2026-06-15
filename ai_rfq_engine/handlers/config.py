@@ -4,7 +4,7 @@ from __future__ import print_function
 __author__ = "bibow"
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import boto3
 
@@ -16,6 +16,10 @@ class Config:
     Centralized Configuration Class
     Manages shared configuration variables across the application.
     """
+
+    _initialized: bool = False
+    _logger: Optional[logging.Logger] = None
+    _setting: Dict[str, Any] = {}
 
     # Class attributes
     aws_lambda = None
@@ -263,18 +267,21 @@ class Config:
 
     # Public methods
     @classmethod
-    def initialize(cls, logger: logging.Logger, **setting: Dict[str, Any]) -> None:
+    def initialize(cls, logger: logging.Logger, setting: Dict[str, Any]) -> None:
         """
         Initialize configuration setting.
         Args:
             logger (logging.Logger): Logger instance for logging.
-            **setting (Dict[str, Any]): Configuration dictionary.
+            setting (Dict[str, Any]): Configuration dictionary.
         """
         try:
+            cls._logger = logger
+            cls._setting = dict(setting)
             cls._set_parameters(setting)
             cls._initialize_aws_services(setting)
             if setting.get("initialize_tables"):
                 cls._initialize_tables(logger)
+            cls._initialized = True
             logger.info("Configuration initialized successfully.")
         except Exception as e:
             logger.exception("Failed to initialize configuration.")
@@ -363,3 +370,17 @@ class Config:
     def get_entity_children(cls, entity_type: str) -> List[Dict[str, str]]:
         """Get child entities for a specific entity type."""
         return cls.CACHE_RELATIONSHIPS.get(entity_type, [])
+
+    @classmethod
+    def get_setting(cls) -> Dict[str, Any]:
+        """Return the setting dict stored at initialization time."""
+        if not cls._initialized:
+            raise RuntimeError("Config not initialized")
+        return cls._setting
+
+    @classmethod
+    def get_logger(cls) -> logging.Logger:
+        """Return the logger stored at initialization time."""
+        if cls._logger:
+            return cls._logger
+        return logging.getLogger()

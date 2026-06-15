@@ -161,6 +161,7 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
+diagrams/
 .vscode/
 test_data.json
 ai_rfq_engine/tests/prepare_test_data/flight_products.json
@@ -171,5 +172,6 @@ ai_rfq_engine/tests/prepare_test_data/fx_rates.json
 ai_rfq_engine/tests/prepare_test_data/requests.json
 ai_rfq_engine/tests/prepare_test_data/quotes.json
 ai_rfq_engine/tests/prepare_test_data/quote_items.json
+docs/ARCHITECTURE_AND_ER_DIAGRAMS_ZH_TW.md
 .claude
 .zed
